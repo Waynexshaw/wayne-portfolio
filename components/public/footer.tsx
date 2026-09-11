@@ -55,7 +55,7 @@ export function Footer() {
                 <Send size={18} />
               </a>
               <a
-                href="https://linkedin.com/in/defiwaynex"
+                href="https://www.linkedin.com/in/joseph-henshaw-72a170405"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Wayne on LinkedIn"

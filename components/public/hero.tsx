@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Twitter, ArrowRight, ExternalLink } from 'lucide-react'
+import { Twitter, ArrowRight, ExternalLink, Linkedin } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 export function HeroSection() {
@@ -15,24 +15,11 @@ export function HeroSection() {
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-32">
         <div className="max-w-3xl">
-          {/* Label with subtle electric blue accent */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="mb-6"
-          >
-            <span className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-violet-600 dark:text-violet-400 font-medium px-3 py-1 rounded-full bg-violet-500/10 border border-violet-500/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-electric animate-pulse" />
-              @defiwaynex
-            </span>
-          </motion.div>
-
           {/* Name */}
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
             className="font-serif text-6xl sm:text-7xl md:text-8xl font-medium tracking-tight leading-none mb-8"
           >
             Wayne
@@ -42,7 +29,7 @@ export function HeroSection() {
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.35 }}
+            transition={{ duration: 0.6, delay: 0.25 }}
             className="text-xl md:text-2xl text-muted-foreground leading-relaxed max-w-2xl mb-12"
           >
             Growth strategist, researcher, writer and founder working at the
@@ -63,7 +50,7 @@ export function HeroSection() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.5 }}
+            transition={{ duration: 0.6, delay: 0.4 }}
             className="flex flex-wrap items-center gap-4 mb-12"
           >
             <Link
@@ -75,7 +62,7 @@ export function HeroSection() {
             </Link>
             <Link
               href="/work"
-              className="inline-flex items-center gap-2 px-6 py-3 border border-border hover:border-foreground/50 text-foreground rounded-lg font-medium transition-colors duration-200"
+              className="inline-flex items-center gap-2 px-6 py-3 border border-border hover:border-foreground/50 text-foreground rounded-lg font-medium transition-colors"
             >
               Explore my work
             </Link>
@@ -85,8 +72,8 @@ export function HeroSection() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.65 }}
-            className="flex items-center gap-6"
+            transition={{ duration: 0.6, delay: 0.55 }}
+            className="flex flex-wrap items-center gap-6"
           >
             <a
               href="https://x.com/defiwaynex"
@@ -96,6 +83,15 @@ export function HeroSection() {
             >
               <Twitter size={14} />
               <span>@defiwaynex</span>
+            </a>
+            <a
+              href="https://www.linkedin.com/in/joseph-henshaw-72a170405"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Linkedin size={14} />
+              <span>LinkedIn</span>
             </a>
             <a
               href="https://pevranetwork.com.ng"

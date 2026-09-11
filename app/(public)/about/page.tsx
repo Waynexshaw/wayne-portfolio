@@ -268,6 +268,7 @@ export default function AboutPage() {
                 {[
                   { label: 'PEVRA Network (Building)', href: 'https://pevranetwork.com.ng', external: true },
                   { label: 'X / Twitter (@defiwaynex)', href: 'https://x.com/defiwaynex', external: true },
+                  { label: 'LinkedIn', href: 'https://www.linkedin.com/in/joseph-henshaw-72a170405', external: true },
                   { label: 'Substack Publication', href: 'https://defiwaynex.substack.com', external: true },
                   { label: 'Case studies & Work', href: '/work', external: false },
                   { label: 'Writing & Research archive', href: '/writing', external: false },

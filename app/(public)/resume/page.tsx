@@ -31,8 +31,11 @@ export default async function ResumePage() {
               Web3 Growth Strategist, Researcher, Writer & Founder
             </p>
             <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground">
-              <a href="https://x.com/defiwaynex" className="hover:text-foreground transition-colors">
+              <a href="https://x.com/defiwaynex" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
                 @defiwaynex
+              </a>
+              <a href="https://www.linkedin.com/in/joseph-henshaw-72a170405" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                LinkedIn
               </a>
               <a href="https://defiwaynex.com" className="hover:text-foreground transition-colors">
                 defiwaynex.com

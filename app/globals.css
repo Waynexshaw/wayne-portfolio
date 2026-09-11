@@ -29,26 +29,26 @@
   }
 
   .light {
-    /* Editorial Warm Cream (Light Option) */
-    --background: 40 33% 97%;         /* Warm Cream / Linen #FAF8F5 */
-    --foreground: 250 35% 12%;        /* Deep Ink Charcoal #141026 */
-    --card: 0 0% 100%;                /* Pure Crisp White #FFFFFF */
-    --card-foreground: 250 35% 12%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 250 35% 12%;
+    /* Editorial Rich Warm Cream (Light Option) */
+    --background: 40 36% 94%;         /* Rich Warm Cream #F6F1E7 */
+    --foreground: 250 40% 10%;        /* High-Contrast Deep Ink Charcoal #120E22 */
+    --card: 38 32% 91%;               /* Elevated Warm Cream Ivory #ECE5D8 */
+    --card-foreground: 250 40% 10%;
+    --popover: 38 32% 91%;
+    --popover-foreground: 250 40% 10%;
     --primary: 263 70% 48%;           /* Rich Royal Purple #7533E6 */
     --primary-foreground: 0 0% 100%;
-    --secondary: 38 25% 92%;          /* Warm Parchment #EDE8DF */
-    --secondary-foreground: 250 35% 12%;
-    --muted: 38 20% 92%;
-    --muted-foreground: 240 8% 40%;   /* Muted Slate #61606B */
+    --secondary: 38 25% 86%;          /* Warm Biscuit Parchment #E0D7C7 */
+    --secondary-foreground: 250 40% 10%;
+    --muted: 38 25% 88%;
+    --muted-foreground: 245 15% 32%;  /* High-Contrast Legible Dark Slate #434057 */
     --accent: 263 70% 48%;
     --accent-foreground: 0 0% 100%;
-    --electric: 217 91% 50%;          /* Deep Electric Blue #1D6AE5 */
+    --electric: 217 91% 45%;          /* Rich Electric Blue #1260D4 */
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
-    --border: 38 18% 86%;             /* Delicate Warm Border #E2DDD3 */
-    --input: 38 18% 86%;
+    --border: 38 20% 82%;             /* Visible Warm Border #D7CEBD */
+    --input: 38 20% 82%;
     --ring: 263 70% 48%;
   }
 }

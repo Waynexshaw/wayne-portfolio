@@ -127,7 +127,7 @@ export default async function ArticlePage({ params }: PageProps) {
             {/* Content */}
             {article.content && (
               <div
-                className="prose prose-invert max-w-none prose-headings:font-serif prose-headings:font-medium prose-a:text-violet-400 prose-a:no-underline hover:prose-a:underline prose-blockquote:border-violet-600 prose-code:text-violet-300"
+                className="prose dark:prose-invert max-w-none prose-headings:font-serif prose-headings:font-medium prose-a:text-violet-600 dark:prose-a:text-violet-400 prose-a:no-underline hover:prose-a:underline prose-blockquote:border-violet-600 prose-code:text-violet-700 dark:prose-code:text-violet-300"
                 dangerouslySetInnerHTML={{ __html: article.content }}
               />
             )}
