@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Twitter, ArrowRight } from 'lucide-react'
+import { Twitter, ArrowRight, ExternalLink } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 export function HeroSection() {
@@ -101,9 +101,10 @@ export function HeroSection() {
               href="https://pevranetwork.com.ng"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              pevranetwork.com.ng ?
+              <span>pevranetwork.com.ng</span>
+              <ExternalLink size={12} />
             </a>
           </motion.div>
         </div>

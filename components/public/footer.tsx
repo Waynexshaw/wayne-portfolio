@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Twitter, Send, Linkedin } from 'lucide-react'
+import { Twitter, Send, Linkedin, ExternalLink } from 'lucide-react'
 
 const footerLinks = {
   navigation: [
@@ -98,9 +98,10 @@ export function Footer() {
                       href={link.href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
                     >
-                      {link.label} ?
+                      <span>{link.label}</span>
+                      <ExternalLink size={10} />
                     </a>
                   ) : (
                     <Link
