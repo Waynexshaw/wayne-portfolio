@@ -1,0 +1,145 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 4%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 263 70% 50%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 65%;
+    --accent: 263 70% 50%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 14%;
+    --input: 0 0% 14%;
+    --ring: 263 70% 50%;
+    --radius: 0.5rem;
+  }
+
+  .light {
+    --background: 0 0% 98%;
+    --foreground: 0 0% 4%;
+    --card: 0 0% 95%;
+    --card-foreground: 0 0% 4%;
+    --popover: 0 0% 95%;
+    --popover-foreground: 0 0% 4%;
+    --primary: 263 70% 50%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 90%;
+    --secondary-foreground: 0 0% 4%;
+    --muted: 0 0% 90%;
+    --muted-foreground: 0 0% 40%;
+    --accent: 263 70% 50%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 88%;
+    --input: 0 0% 88%;
+    --ring: 263 70% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  ::selection {
+    @apply bg-violet-600/30 text-foreground;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-violet-500 ring-offset-2 ring-offset-background;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .section-padding {
+    @apply py-24 md:py-32;
+  }
+
+  .container-narrow {
+    @apply max-w-3xl mx-auto px-4 sm:px-6;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent;
+  }
+
+  .gradient-text-violet {
+    @apply bg-gradient-to-r from-violet-400 to-violet-600 bg-clip-text text-transparent;
+  }
+
+  .border-subtle {
+    @apply border border-border/50;
+  }
+
+  .surface {
+    @apply bg-card border border-border rounded-lg;
+  }
+
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* Typography prose overrides */
+.prose {
+  @apply max-w-none;
+}
+
+.prose h1, .prose h2, .prose h3, .prose h4 {
+  @apply font-serif;
+}
+
+.prose a {
+  @apply text-violet-400 no-underline hover:underline;
+}
+
+/* Admin table styles */
+.admin-table {
+  @apply w-full text-sm;
+}
+
+.admin-table th {
+  @apply text-left text-xs uppercase tracking-wider text-muted-foreground font-medium p-3 border-b border-border;
+}
+
+.admin-table td {
+  @apply p-3 border-b border-border/50 align-middle;
+}
+
+.admin-table tr:hover td {
+  @apply bg-muted/20;
+}
