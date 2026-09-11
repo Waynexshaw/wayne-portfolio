@@ -23,7 +23,7 @@ export function FinalCta() {
             </h2>
             <p className="mt-6 text-lg text-muted-foreground leading-relaxed max-w-xl">
               If you are building something in Web3, thinking through a growth
-              problem, or want to understand how I approach a specific challenge —
+              problem, or want to understand how I approach a specific challenge,
               I am open to a conversation.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-4">

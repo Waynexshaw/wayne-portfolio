@@ -13,7 +13,7 @@ const thoughts = [
   {
     idea: 'Research should shape decisions, not just produce documents.',
     detail:
-      'A research report no one acts on is not research — it is documentation of missed opportunity. The point of understanding your market is to change what you do next.',
+      'A research report no one acts on is not research, it is documentation of missed opportunity. The point of understanding your market is to change what you do next.',
   },
   {
     idea: 'Web3 products need better experiences, not just better tokenomics.',
@@ -23,7 +23,7 @@ const thoughts = [
   {
     idea: 'Content should create distribution, not just fill a calendar.',
     detail:
-      'Publishing regularly is not a strategy. Publishing things that are genuinely useful, shareable or thought-provoking — that is how content becomes distribution.',
+      'Publishing regularly is not a strategy. Publishing things that are genuinely useful, shareable or thought-provoking, that is how content becomes distribution.',
   },
   {
     idea: 'Building forces strategy to become practical.',
@@ -58,7 +58,7 @@ export function HowIThink() {
             </h2>
             <p className="mt-4 text-muted-foreground leading-relaxed">
               A few ideas I keep coming back to. These come from research,
-              experience, and mistakes — not theory.
+              experience, and mistakes, not theory.
             </p>
             <Link
               href="/writing"

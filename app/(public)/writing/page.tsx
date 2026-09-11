@@ -51,7 +51,7 @@ export default async function WritingPage({
             </h1>
             <p className="mt-6 text-lg text-muted-foreground leading-relaxed">
               Research, essays, analysis and notes across DeFi, RWA, growth strategy,
-              Web3 and building. Written to be useful — not to fill a content calendar.
+              Web3 and building. Written to be useful, not to fill a content calendar.
             </p>
           </div>
 

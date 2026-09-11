@@ -63,7 +63,7 @@ const experiences = [
     end_date: "2025-03-01",
     link: null,
     order_index: 3,
-    description: "MetaKeySwap was building a decentralized exchange focused on swapping, farming, liquidity pools and IDO functionality. When I joined, the project had weak branding, limited community structure and poor visibility. I built and executed a growth structure around branding, community, and visibility. The project eventually folded — an invaluable lesson that growth structure cannot replace a team's core ability to keep building and operating.",
+    description: "MetaKeySwap was building a decentralized exchange focused on swapping, farming, liquidity pools and IDO functionality. When I joined, the project had weak branding, limited community structure and poor visibility. I built and executed a growth structure around branding, community, and visibility. The project eventually folded, an invaluable lesson that growth structure cannot replace a team's core ability to keep building and operating.",
     achievements: [
       "Executed hands-on growth strategy across branding, community, and visibility",
       "Structured referral campaigns and community activations driving measurable activity boosts",
@@ -92,7 +92,7 @@ const experiences = [
     end_date: "2024-05-01",
     link: null,
     order_index: 5,
-    description: "My entry into Web3 began through writing and research. I started by studying protocols, breaking down projects, and publishing what I learned. Over time, my questions shifted from 'What does this project do?' toward 'Why would someone use it? Why would they leave? What makes it useful? How does it grow?' — laying the foundation for my strategy and growth work today.",
+    description: "My entry into Web3 began through writing and research. I started by studying protocols, breaking down projects, and publishing what I learned. Over time, my questions shifted from 'What does this project do?' toward 'Why would someone use it? Why would they leave? What makes it useful? How does it grow?', laying the foundation for my strategy and growth work today.",
     achievements: [
       "In-depth research on emerging DeFi protocols, token design, and ecosystem mechanics",
       "Authored educational articles, breakdowns, and threads clarifying decentralized finance",

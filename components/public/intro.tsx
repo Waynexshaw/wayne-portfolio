@@ -41,12 +41,12 @@ export function IntroSection() {
                   My work sits at a specific intersection: understanding why
                   users come, why they stay, why they leave, and what a
                   product can actually do about it. That understanding comes
-                  from research — not assumptions.
+                  from research, not assumptions.
                 </p>
                 <p>
                   I have worked across DeFi, RWA, infrastructure, community
                   growth and content strategy. Currently, I am applying that
-                  thinking directly as the founder of PEVRA — a blockchain
+                  thinking directly as the founder of PEVRA, a blockchain
                   telecommunications platform solving phone number recycling
                   in Nigeria.
                 </p>

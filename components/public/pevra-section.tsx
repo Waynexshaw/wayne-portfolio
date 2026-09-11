@@ -40,13 +40,13 @@ export function PevraSection() {
             <div className="space-y-4 text-muted-foreground leading-relaxed mb-10">
               <p>
                 In Nigeria, phone numbers get recycled. When someone abandons a
-                number, it goes back into circulation — history and all. People
+                number, it goes back into circulation, history and all. People
                 have been detained and arrested for crimes committed by whoever
                 held their number before them.
               </p>
               <p>
                 PEVRA solves this by separating identity from the number. Your
-                identity — verified with your national ID — follows you across
+                identity, verified with your national ID, follows you across
                 every number you ever hold. Using blockchain infrastructure and
                 soulbound-token technology, your phone identity becomes
                 permanent.

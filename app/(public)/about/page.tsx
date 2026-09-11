@@ -234,7 +234,7 @@ export default function AboutPage() {
               </h2>
               <div className="mt-6 space-y-4 text-muted-foreground leading-relaxed">
                 <p>
-                  The majority of my energy is focused on <strong>PEVRA</strong> — architecting a permanent, sovereign telecom identity layer for Nigeria and emerging markets, and scaling the early waitlist.
+                  The majority of my energy is focused on <strong>PEVRA</strong>, architecting a permanent, sovereign telecom identity layer for Nigeria and emerging markets, and scaling the early waitlist.
                 </p>
                 <p>
                   Alongside PEVRA, I work with selected early and growth-stage Web3 protocols on positioning, GTM, retention architecture, and protocol intelligence.

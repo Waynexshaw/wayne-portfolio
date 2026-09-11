@@ -22,7 +22,7 @@ export default function ContactPage() {
               </h1>
               <p className="mt-8 text-lg text-muted-foreground leading-relaxed">
                 If you are building something in Web3, working through a growth
-                problem, or want to understand how I approach a specific challenge —
+                problem, or want to understand how I approach a specific challenge,
                 I am open to a conversation.
               </p>
 
