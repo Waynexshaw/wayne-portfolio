@@ -3,203 +3,241 @@ import Link from 'next/link'
 import { ArrowRight, ExternalLink } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'About',
+  title: 'About | Wayne — Web3 Growth Strategist, Researcher & Builder',
   description:
-    'The professional journey of Henshaw Joseph (Wayne) — Web3 growth strategist, researcher, writer and founder of PEVRA.',
+    'The story behind Wayne (@defiwaynex): moving from writing and DeFi research to growth strategy and founding PEVRA.',
 }
 
-const beliefs = [
-  'Understanding why users leave is more valuable than understanding why they came.',
-  'Research that does not change a decision is decoration.',
-  'The best growth strategies are mostly product decisions.',
-  'Building something is the fastest way to test a strategic theory.',
-  'Web3 needs better product thinking, not just better token design.',
-  'Content that is not useful to the reader is noise.',
+const progression = [
+  {
+    step: '01',
+    stage: 'Writing',
+    label: 'Curiosity & First Principles',
+    description:
+      'Did not enter through a traditional tech background. Started curious about crypto and financial systems, researching protocols, breaking down projects, and writing to understand.',
+  },
+  {
+    step: '02',
+    stage: 'Research',
+    label: 'Formal Training & Analysis',
+    description:
+      'Formal DeFi research training and completed a program at Profunda Academy with an internship. Shifted from asking "what does a project do?" to "why do people use it, why do they stay, and what creates real utility?"',
+  },
+  {
+    step: '03',
+    stage: 'Strategy',
+    label: 'User Behavior & Retention',
+    description:
+      'Realized growth is not merely user acquisition. It is retention, community building, positioning, partnerships, and user psychology. Developed strategy through hands-on problem solving rather than textbook theory.',
+  },
+  {
+    step: '04',
+    stage: 'Building',
+    label: 'Founding PEVRA & Execution',
+    description:
+      'Founded PEVRA to solve phone number recycling in emerging markets. Living inside the constraints of tokenomics, GTM, compliance, partnerships, and building a real venture changed how I understand strategy forever.',
+  },
 ]
 
 const pillars = [
   {
-    name: 'Growth',
+    name: 'Web3 Research',
     description:
-      'Acquisition, activation, retention and community strategy. Most Web3 projects focus too heavily on acquisition. I focus on the complete picture — what brings people in, what makes them stay, what builds real ecosystem depth.',
+      'First-principles protocol analysis, market intelligence, tokenomics teardowns, and analytical research reports that guide real decisions.',
   },
   {
-    name: 'Strategy & Research',
+    name: 'Growth Strategy',
     description:
-      'Market research, protocol analysis and competitive intelligence. Research is only useful if it changes what you do next. I conduct research to surface decisions, not just to document a market.',
+      'Holistic go-to-market planning, user activation, sustainable retention frameworks, and community growth designed for long-term survival.',
   },
   {
-    name: 'Content & Distribution',
+    name: 'Content & Narrative',
     description:
-      'Research-led content strategy and founder-led distribution. The best content in Web3 teaches something real. I build content systems that create genuine authority and sustainable distribution.',
+      'Research-led storytelling, distribution architecture, and educational writing that builds authentic conviction and market authority.',
   },
   {
-    name: 'Building',
+    name: 'Venture Building',
     description:
-      'Applying strategy directly as a founder with PEVRA. Advising is valuable. Building forces you to find out what actually works under constraints. I do both — and building has made my strategy sharper.',
-  },
-]
-
-const journey = [
-  {
-    period: 'Early career',
-    stage: 'Content & Writing',
-    description:
-      'Started in content — understanding how ideas spread, how audiences form, and how words either build trust or erode it.',
-  },
-  {
-    period: 'Into Web3',
-    stage: 'DeFi & Research',
-    description:
-      'Discovered DeFi and spent significant time understanding how these protocols work, why they succeed, why they fail, and what users actually need.',
-  },
-  {
-    period: 'Strategy',
-    stage: 'Growth & Community',
-    description:
-      'Applied research to strategy — helping Web3 products understand their users, grow communities and develop go-to-market approaches grounded in real insight.',
-  },
-  {
-    period: 'Now',
-    stage: 'Founder & Builder',
-    description:
-      'Founded PEVRA. The transition from strategist and researcher to founder changed the nature of my work. I now apply everything I know inside a real product under real constraints.',
+      'Hands-on product development, compliance navigation, and operational execution as the founder of PEVRA.',
   },
 ]
 
 export default function AboutPage() {
   return (
     <div className="pt-16">
-      {/* Hero */}
-      <section className="section-padding">
+      {/* Editorial Hero Header */}
+      <section className="section-padding pb-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-3xl">
             <span className="text-xs uppercase tracking-widest text-violet-400 font-medium">
-              About
+              About Wayne
             </span>
-            <h1 className="mt-4 font-serif text-5xl md:text-6xl lg:text-7xl font-medium tracking-tight leading-none">
-              Henshaw Joseph
+            <h1 className="mt-4 font-serif text-5xl md:text-6xl lg:text-7xl font-medium tracking-tight leading-tight">
+              Writing, then research, then strategy, and eventually building.
             </h1>
-            <p className="mt-2 text-muted-foreground text-lg">
-              Professionally known as Wayne. Online as @defiwaynex.
-            </p>
-            <p className="mt-8 text-xl md:text-2xl text-muted-foreground leading-relaxed">
-              I research markets, develop strategy around what I find, and help
-              Web3 products grow. I am also building PEVRA — which means I now
-              live inside the same problems I used to analyze from the outside.
+            <p className="mt-6 text-xl text-muted-foreground leading-relaxed">
+              My journey into Web3 was not a straight line. Each stage grew out of the one before it.
             </p>
           </div>
         </div>
       </section>
 
-      {/* Journey */}
+      {/* Main Narrative Narrative Section */}
       <section className="section-padding border-t border-border/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-16">
-            <div>
-              <span className="text-xs uppercase tracking-widest text-violet-400 font-medium">
-                Journey
-              </span>
-              <h2 className="mt-2 font-serif text-4xl font-medium tracking-tight">
-                How I got here
-              </h2>
-            </div>
-            <div className="lg:col-span-2 space-y-0">
-              {journey.map((step, i) => (
-                <div
-                  key={i}
-                  className="border-t border-border/30 py-8 first:border-0 grid grid-cols-4 gap-6"
-                >
-                  <div>
-                    <p className="text-xs text-muted-foreground/60 font-medium">{step.period}</p>
-                    <p className="text-sm font-medium text-foreground mt-1">{step.stage}</p>
-                  </div>
-                  <div className="col-span-3">
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      {step.description}
-                    </p>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16">
+            <div className="lg:col-span-4">
+              <div className="sticky top-24 space-y-6">
+                <span className="text-xs uppercase tracking-widest text-violet-400 font-medium">
+                  The Background
+                </span>
+                <h2 className="font-serif text-3xl font-medium text-foreground">
+                  The person behind the work.
+                </h2>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Known professionally as <strong>Wayne</strong> (Henshaw Joseph), online as <strong>@defiwaynex</strong>.
+                </p>
+                <div className="pt-4 border-t border-border/30">
+                  <div className="flex items-center gap-3">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-xs text-foreground font-medium">Building PEVRA & advising select teams</span>
                   </div>
                 </div>
-              ))}
+              </div>
+            </div>
+
+            <div className="lg:col-span-8 space-y-8 text-lg text-muted-foreground leading-relaxed">
+              <p className="text-foreground text-xl md:text-2xl font-serif leading-relaxed">
+                I didn’t get into Web3 through a traditional tech background.
+              </p>
+
+              <p>
+                I started on the writing and research side. I was curious about crypto and wanted to understand how this new financial system actually worked, so I started learning about DeFi, researching protocols, breaking down projects, and writing about what I was learning.
+              </p>
+
+              <p>
+                The more I researched, the more my questions changed. I became less interested in simply understanding what a project did and more interested in <strong className="text-foreground font-medium">why people used it, why they left, how communities grew, and what actually made a product useful.</strong>
+              </p>
+
+              <p>
+                That was the beginning of the shift from Web3 content writing into DeFi research, analysis, and strategy.
+              </p>
+
+              <div className="p-6 md:p-8 rounded-xl bg-card border border-border/50 my-6">
+                <p className="text-foreground font-medium mb-2">Formative Training & Grounding</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  I took formal training in DeFi research and later completed a program at <strong>Profunda Academy</strong>, where I also had the opportunity to take on a free internship. Those experiences helped me move beyond simply consuming information. They taught me how to research properly, structure my thinking, and communicate ideas more clearly.
+                </p>
+              </div>
+
+              <p>
+                One of the biggest shifts in my thinking came when I realized that <span className="text-foreground font-medium">growth isn’t simply about getting more people into a project.</span> It’s about understanding why they come in, what makes them stay, and what turns users into an active community.
+              </p>
+
+              <p>
+                That changed the way I approached Web3 projects. I started thinking more deeply about acquisition, retention, community building, positioning, partnerships, and user behaviour. My work as a strategist developed through actually working through these problems rather than simply learning growth theory.
+              </p>
+
+              <div className="border-l-2 border-violet-500 pl-6 my-8 py-2">
+                <p className="text-2xl font-serif text-foreground italic leading-snug">
+                  "Building has changed the way I understand strategy. You learn differently when you’re responsible for the decisions yourself."
+                </p>
+              </div>
+
+              <p>
+                Then I started building. As the founder of <strong className="text-foreground font-medium">PEVRA</strong>, I’ve had to think about product design, tokenomics, developer partnerships, go-to-market, licensing, compliance, community, waitlist growth, and the realities of taking a Web3 idea from a concept toward an actual business.
+              </p>
+
+              <p>
+                Today, I work at the intersection of <strong className="text-violet-400 font-medium">Web3 research, growth strategy, content, and building</strong>.
+              </p>
+
+              <p>
+                I still love writing and research, but I’m increasingly interested in what happens after the research: understanding the problem, making better decisions, building useful products, and figuring out how people move from discovering a project to becoming long-term users.
+              </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Pillars */}
-      <section className="section-padding border-t border-border/30">
+      {/* Progression Timeline / The Stages */}
+      <section className="section-padding border-t border-border/30 bg-card/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mb-12">
+          <div className="mb-16 max-w-2xl">
             <span className="text-xs uppercase tracking-widest text-violet-400 font-medium">
-              What I work on
+              Evolution
             </span>
-            <h2 className="mt-2 font-serif text-4xl font-medium tracking-tight">
-              Four pillars
+            <h2 className="mt-2 font-serif text-4xl md:text-5xl font-medium tracking-tight">
+              The Four Stages
             </h2>
+            <p className="mt-4 text-muted-foreground">
+              How writing deepened into research, sharpened into strategy, and culminated in building.
+            </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-border/30 border border-border/30 rounded-lg overflow-hidden">
-            {pillars.map((pillar) => (
-              <div key={pillar.name} className="bg-card p-8">
-                <h3 className="font-medium text-lg text-foreground mb-3">{pillar.name}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {pillar.description}
-                </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {progression.map((item) => (
+              <div
+                key={item.step}
+                className="surface p-6 flex flex-col justify-between hover:border-violet-600/40 transition-colors"
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="font-mono text-xs text-muted-foreground/60">{item.step}</span>
+                    <span className="text-xs uppercase tracking-widest text-violet-400 font-medium">{item.stage}</span>
+                  </div>
+                  <h3 className="text-foreground font-medium text-base mb-2">{item.label}</h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{item.description}</p>
+                </div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* What I believe */}
+      {/* Pillars of Work */}
       <section className="section-padding border-t border-border/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-16">
-            <div>
-              <span className="text-xs uppercase tracking-widest text-violet-400 font-medium">
-                Principles
-              </span>
-              <h2 className="mt-2 font-serif text-4xl font-medium tracking-tight">
-                What I believe
-              </h2>
-            </div>
-            <div className="lg:col-span-2">
-              <ul className="space-y-6">
-                {beliefs.map((belief, i) => (
-                  <li key={i} className="flex items-start gap-4 border-t border-border/30 pt-6 first:border-0 first:pt-0">
-                    <span className="text-xs text-violet-400/60 font-mono mt-1">
-                      {String(i + 1).padStart(2, '0')}
-                    </span>
-                    <p className="text-foreground leading-relaxed">{belief}</p>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          <div className="mb-12 max-w-2xl">
+            <span className="text-xs uppercase tracking-widest text-violet-400 font-medium">
+              What I Work On
+            </span>
+            <h2 className="mt-2 font-serif text-4xl font-medium tracking-tight">
+              Four Core Pillars
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-border/30 border border-border/30 rounded-lg overflow-hidden">
+            {pillars.map((pillar) => (
+              <div key={pillar.name} className="bg-card p-8 flex flex-col justify-between">
+                <div>
+                  <h3 className="font-medium text-lg text-foreground mb-3">{pillar.name}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {pillar.description}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Currently */}
+      {/* Currently Focused On & Contact Trigger */}
       <section className="section-padding border-t border-border/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
             <div>
               <span className="text-xs uppercase tracking-widest text-violet-400 font-medium">
-                Currently
+                Currently Focused On
               </span>
               <h2 className="mt-2 font-serif text-4xl font-medium tracking-tight">
-                What I am focused on
+                Building & Advising
               </h2>
               <div className="mt-6 space-y-4 text-muted-foreground leading-relaxed">
                 <p>
-                  The majority of my time right now goes into PEVRA — building
-                  the product, growing early registrations, and working through
-                  the infrastructure and strategic challenges of launching a
-                  blockchain telecom platform.
+                  The majority of my energy is focused on <strong>PEVRA</strong> — architecting a permanent, sovereign telecom identity layer for Nigeria and emerging markets, and scaling the early waitlist.
                 </p>
                 <p>
-                  Alongside that, I continue to write, research, and take on
-                  selected advisory and strategic work for Web3 projects where
-                  I think I can genuinely contribute.
+                  Alongside PEVRA, I work with selected early and growth-stage Web3 protocols on positioning, GTM, retention architecture, and protocol intelligence.
                 </p>
               </div>
               <div className="mt-8 flex flex-wrap gap-4">
@@ -207,7 +245,7 @@ export default function AboutPage() {
                   href="https://pevranetwork.com.ng"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-violet-600 hover:bg-violet-700 text-white rounded-lg font-medium transition-colors group"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-violet-600 hover:bg-violet-700 text-white rounded-lg font-medium transition-colors"
                 >
                   Explore PEVRA
                   <ExternalLink size={14} />
@@ -221,17 +259,19 @@ export default function AboutPage() {
                 </Link>
               </div>
             </div>
-            <div className="border border-border/50 rounded-lg p-8 bg-card">
+
+            <div className="border border-border/50 rounded-xl p-8 bg-card">
               <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-6">
-                Links
+                Direct Channels
               </p>
               <ul className="space-y-4">
                 {[
-                  { label: 'PEVRA Network', href: 'https://pevranetwork.com.ng', external: true },
-                  { label: 'X / Twitter', href: 'https://x.com/defiwaynex', external: true },
-                  { label: 'Selected work', href: '/work', external: false },
-                  { label: 'Writing & research', href: '/writing', external: false },
-                  { label: 'Professional experience', href: '/experience', external: false },
+                  { label: 'PEVRA Network (Building)', href: 'https://pevranetwork.com.ng', external: true },
+                  { label: 'X / Twitter (@defiwaynex)', href: 'https://x.com/defiwaynex', external: true },
+                  { label: 'Substack Publication', href: 'https://defiwaynex.substack.com', external: true },
+                  { label: 'Case studies & Work', href: '/work', external: false },
+                  { label: 'Writing & Research archive', href: '/writing', external: false },
+                  { label: 'Professional timeline', href: '/experience', external: false },
                 ].map((link) => (
                   <li key={link.href}>
                     {link.external ? (
@@ -239,18 +279,18 @@ export default function AboutPage() {
                         href={link.href}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center justify-between text-sm text-muted-foreground hover:text-foreground transition-colors group py-2 border-b border-border/20 last:border-0"
+                        className="flex items-center justify-between text-sm text-muted-foreground hover:text-foreground transition-colors py-2 border-b border-border/20 last:border-0"
                       >
                         {link.label}
-                        <ExternalLink size={12} className="shrink-0" />
+                        <ExternalLink size={12} />
                       </a>
                     ) : (
                       <Link
                         href={link.href}
-                        className="flex items-center justify-between text-sm text-muted-foreground hover:text-foreground transition-colors group py-2 border-b border-border/20 last:border-0"
+                        className="flex items-center justify-between text-sm text-muted-foreground hover:text-foreground transition-colors py-2 border-b border-border/20 last:border-0 group"
                       >
                         {link.label}
-                        <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform shrink-0" />
+                        <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
                       </Link>
                     )}
                   </li>
