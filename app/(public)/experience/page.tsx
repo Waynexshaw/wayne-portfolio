@@ -30,11 +30,13 @@ export default async function ExperiencePage() {
               Experience
             </span>
             <h1 className="mt-4 font-serif text-5xl md:text-6xl font-medium tracking-tight">
-              Professional record.
+              Professional Record
             </h1>
-            <p className="mt-6 text-lg text-muted-foreground leading-relaxed">
-              A timeline of meaningful work. This is not a complete list of
-              every role — only the experiences that shaped the professional I am now.
+            <p className="mt-4 text-xl text-foreground/90 font-serif">
+              A timeline of meaningful work.
+            </p>
+            <p className="mt-4 text-base text-muted-foreground leading-relaxed">
+              This is not a complete list of every role I&apos;ve ever held. It is a record of the projects, roles and experiences that shaped how I think, how I work, and the professional I am today.
             </p>
           </div>
 
@@ -84,7 +86,7 @@ export default async function ExperiencePage() {
                         )}
                       </div>
                       {entry.description && (
-                        <p className="mt-4 text-sm text-muted-foreground leading-relaxed">
+                        <p className="mt-4 text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
                           {entry.description}
                         </p>
                       )}

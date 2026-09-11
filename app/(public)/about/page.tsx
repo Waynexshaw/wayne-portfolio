@@ -140,7 +140,7 @@ export default function AboutPage() {
 
               <div className="border-l-2 border-violet-500 pl-6 my-8 py-2">
                 <p className="text-2xl font-serif text-foreground italic leading-snug">
-                  "Building has changed the way I understand strategy. You learn differently when you’re responsible for the decisions yourself."
+                  &ldquo;Building has changed the way I understand strategy. You learn differently when you&apos;re responsible for the decisions yourself.&rdquo;
                 </p>
               </div>
 

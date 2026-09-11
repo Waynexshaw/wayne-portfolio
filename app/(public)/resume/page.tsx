@@ -1,6 +1,6 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
-import { Download, ArrowRight } from 'lucide-react'
+import { Download, ArrowRight, ExternalLink } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { formatDateShort } from '@/lib/utils'
 import type { Database } from '@/lib/database.types'
@@ -148,7 +148,8 @@ export default async function ResumePage() {
                 rel="noopener noreferrer"
                 className="mt-2 inline-flex items-center gap-1 text-xs text-violet-400 hover:text-violet-300 transition-colors"
               >
-                pevranetwork.com.ng ?
+                <span>pevranetwork.com.ng</span>
+                <ExternalLink size={10} />
               </a>
             </div>
           </section>
