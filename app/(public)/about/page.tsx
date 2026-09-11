@@ -1,5 +1,6 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowRight, ExternalLink } from 'lucide-react'
 
 export const metadata: Metadata = {
@@ -88,6 +89,18 @@ export default function AboutPage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16">
             <div className="lg:col-span-4">
               <div className="sticky top-24 space-y-6">
+                <div className="relative w-full aspect-square max-w-xs rounded-2xl overflow-hidden p-1 bg-gradient-to-tr from-violet-600/30 via-border to-electric/30 shadow-xl shadow-violet-950/20 mb-6">
+                  <div className="relative w-full h-full rounded-[14px] overflow-hidden bg-card">
+                    <Image
+                      src="/headshot.jpg"
+                      alt="Henshaw Joseph (Wayne)"
+                      fill
+                      priority
+                      className="object-cover object-center"
+                      sizes="(max-width: 1024px) 280px, 320px"
+                    />
+                  </div>
+                </div>
                 <span className="text-xs uppercase tracking-widest text-violet-400 font-medium">
                   The Background
                 </span>

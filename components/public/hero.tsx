@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { Twitter, ArrowRight, ExternalLink, Linkedin } from 'lucide-react'
 import { motion } from 'framer-motion'
 
@@ -14,94 +15,117 @@ export function HeroSection() {
       </div>
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-32">
-        <div className="max-w-3xl">
-          {/* Name */}
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="font-serif text-6xl sm:text-7xl md:text-8xl font-medium tracking-tight leading-none mb-8"
-          >
-            Wayne
-          </motion.h1>
-
-          {/* Positioning */}
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.25 }}
-            className="text-xl md:text-2xl text-muted-foreground leading-relaxed max-w-2xl mb-12"
-          >
-            Growth strategist, researcher, writer and founder working at the
-            intersection of Web3, products and emerging markets. Currently
-            building{' '}
-            <a
-              href="https://pevranetwork.com.ng"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-foreground underline underline-offset-4 decoration-violet-600/50 hover:decoration-violet-400 transition-colors"
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
+          <div className="lg:col-span-8 max-w-3xl">
+            {/* Name */}
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="font-serif text-6xl sm:text-7xl md:text-8xl font-medium tracking-tight leading-none mb-8"
             >
-              PEVRA
-            </a>
-            .
-          </motion.p>
+              Wayne
+            </motion.h1>
 
-          {/* CTAs */}
+            {/* Positioning */}
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.25 }}
+              className="text-xl md:text-2xl text-muted-foreground leading-relaxed max-w-2xl mb-12"
+            >
+              Growth strategist, researcher, writer and founder working at the
+              intersection of Web3, products and emerging markets. Currently
+              building{' '}
+              <a
+                href="https://pevranetwork.com.ng"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-foreground underline underline-offset-4 decoration-violet-600/50 hover:decoration-violet-400 transition-colors"
+              >
+                PEVRA
+              </a>
+              .
+            </motion.p>
+
+            {/* CTAs */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="flex flex-wrap items-center gap-4 mb-12"
+            >
+              <Link
+                href="/contact"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-violet-600 hover:bg-violet-700 text-white rounded-lg font-medium transition-all duration-200 hover:shadow-lg hover:shadow-violet-600/20 group"
+              >
+                Work with me
+                <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+              </Link>
+              <Link
+                href="/work"
+                className="inline-flex items-center gap-2 px-6 py-3 border border-border hover:border-foreground/50 text-foreground rounded-lg font-medium transition-colors"
+              >
+                Explore my work
+              </Link>
+            </motion.div>
+
+            {/* Social */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.6, delay: 0.55 }}
+              className="flex flex-wrap items-center gap-6"
+            >
+              <a
+                href="https://x.com/defiwaynex"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Twitter size={14} />
+                <span>@defiwaynex</span>
+              </a>
+              <a
+                href="https://www.linkedin.com/in/joseph-henshaw-72a170405"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Linkedin size={14} />
+                <span>LinkedIn</span>
+              </a>
+              <a
+                href="https://pevranetwork.com.ng"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <span>pevranetwork.com.ng</span>
+                <ExternalLink size={12} />
+              </a>
+            </motion.div>
+          </div>
+
+          {/* Headshot Portrait */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
-            className="flex flex-wrap items-center gap-4 mb-12"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.7, delay: 0.2 }}
+            className="lg:col-span-4 flex justify-center lg:justify-end"
           >
-            <Link
-              href="/contact"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-violet-600 hover:bg-violet-700 text-white rounded-lg font-medium transition-all duration-200 hover:shadow-lg hover:shadow-violet-600/20 group"
-            >
-              Work with me
-              <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-            </Link>
-            <Link
-              href="/work"
-              className="inline-flex items-center gap-2 px-6 py-3 border border-border hover:border-foreground/50 text-foreground rounded-lg font-medium transition-colors"
-            >
-              Explore my work
-            </Link>
-          </motion.div>
-
-          {/* Social */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.55 }}
-            className="flex flex-wrap items-center gap-6"
-          >
-            <a
-              href="https://x.com/defiwaynex"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <Twitter size={14} />
-              <span>@defiwaynex</span>
-            </a>
-            <a
-              href="https://www.linkedin.com/in/joseph-henshaw-72a170405"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <Linkedin size={14} />
-              <span>LinkedIn</span>
-            </a>
-            <a
-              href="https://pevranetwork.com.ng"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <span>pevranetwork.com.ng</span>
-              <ExternalLink size={12} />
-            </a>
+            <div className="relative w-64 h-64 sm:w-72 sm:h-72 lg:w-80 lg:h-80 rounded-2xl overflow-hidden p-1 bg-gradient-to-tr from-violet-600/30 via-border to-electric/30 shadow-2xl shadow-violet-950/20">
+              <div className="relative w-full h-full rounded-[14px] overflow-hidden bg-card">
+                <Image
+                  src="/headshot.jpg"
+                  alt="Henshaw Joseph (Wayne)"
+                  fill
+                  priority
+                  className="object-cover object-center"
+                  sizes="(max-width: 768px) 256px, 320px"
+                />
+              </div>
+            </div>
           </motion.div>
         </div>
       </div>
