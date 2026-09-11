@@ -53,6 +53,21 @@ const config: Config = {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
+        electric: {
+          DEFAULT: '#38bdf8',
+          400: '#38bdf8',
+          500: '#0ea5e9',
+          600: '#0284c7',
+        },
+        navy: {
+          900: '#0f0b24',
+          950: '#080614',
+        },
+        cream: {
+          50: '#faf8f5',
+          100: '#f5f1eb',
+          200: '#e8e2d8',
+        },
         violet: {
           50: '#f5f3ff',
           100: '#ede9fe',

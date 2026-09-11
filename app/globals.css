@@ -4,48 +4,52 @@
 
 @layer base {
   :root {
-    --background: 0 0% 4%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 7%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 7%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 263 70% 50%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 12%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 12%;
-    --muted-foreground: 0 0% 65%;
+    /* Midnight Sovereign (Dark Default) */
+    --background: 252 50% 4.5%;       /* Deep Navy-Purple #080614 */
+    --foreground: 240 20% 98%;        /* Crisp Silver-White #FAFAFE */
+    --card: 252 42% 8.5%;             /* Midnight Obsidian #0F0B1E */
+    --card-foreground: 240 20% 98%;
+    --popover: 252 42% 8.5%;
+    --popover-foreground: 240 20% 98%;
+    --primary: 263 70% 50%;           /* Royal Purple #7C3AED */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 252 30% 12%;         /* Deep Violet Tint #18132B */
+    --secondary-foreground: 240 20% 95%;
+    --muted: 252 25% 12%;
+    --muted-foreground: 240 10% 68%;  /* Soft Muted Lavender-Gray #A5A5BA */
     --accent: 263 70% 50%;
-    --accent-foreground: 0 0% 98%;
+    --accent-foreground: 0 0% 100%;
+    --electric: 199 89% 58%;          /* Electric Blue #38BDF8 */
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14%;
-    --input: 0 0% 14%;
+    --border: 252 25% 15%;            /* Subtle Translucent Violet Border */
+    --input: 252 25% 15%;
     --ring: 263 70% 50%;
     --radius: 0.5rem;
   }
 
   .light {
-    --background: 0 0% 98%;
-    --foreground: 0 0% 4%;
-    --card: 0 0% 95%;
-    --card-foreground: 0 0% 4%;
-    --popover: 0 0% 95%;
-    --popover-foreground: 0 0% 4%;
-    --primary: 263 70% 50%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 90%;
-    --secondary-foreground: 0 0% 4%;
-    --muted: 0 0% 90%;
-    --muted-foreground: 0 0% 40%;
-    --accent: 263 70% 50%;
-    --accent-foreground: 0 0% 98%;
+    /* Editorial Warm Cream (Light Option) */
+    --background: 40 33% 97%;         /* Warm Cream / Linen #FAF8F5 */
+    --foreground: 250 35% 12%;        /* Deep Ink Charcoal #141026 */
+    --card: 0 0% 100%;                /* Pure Crisp White #FFFFFF */
+    --card-foreground: 250 35% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 250 35% 12%;
+    --primary: 263 70% 48%;           /* Rich Royal Purple #7533E6 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 38 25% 92%;          /* Warm Parchment #EDE8DF */
+    --secondary-foreground: 250 35% 12%;
+    --muted: 38 20% 92%;
+    --muted-foreground: 240 8% 40%;   /* Muted Slate #61606B */
+    --accent: 263 70% 48%;
+    --accent-foreground: 0 0% 100%;
+    --electric: 217 91% 50%;          /* Deep Electric Blue #1D6AE5 */
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 88%;
-    --input: 0 0% 88%;
-    --ring: 263 70% 50%;
+    --border: 38 18% 86%;             /* Delicate Warm Border #E2DDD3 */
+    --input: 38 18% 86%;
+    --ring: 263 70% 48%;
   }
 }
 

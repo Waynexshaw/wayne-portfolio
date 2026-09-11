@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Menu, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 const navLinks = [
   { href: '/', label: 'Home' },
@@ -79,25 +80,29 @@ export function Navigation() {
               ))}
             </div>
 
-            {/* CTA */}
-            <div className="hidden md:flex items-center gap-4">
+            {/* CTA & Theme Switcher */}
+            <div className="hidden md:flex items-center gap-3">
+              <ThemeToggle />
               <Link
                 href="/contact"
-                className="text-sm px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-md transition-colors duration-200 font-medium"
+                className="text-sm px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-md transition-colors duration-200 font-medium shadow-sm hover:shadow-violet-600/25"
               >
                 Work with me
               </Link>
             </div>
 
-            {/* Mobile toggle */}
-            <button
-              className="md:hidden p-2 text-muted-foreground hover:text-foreground transition-colors"
-              onClick={() => setIsOpen(!isOpen)}
-              aria-label="Toggle navigation"
-              aria-expanded={isOpen}
-            >
-              {isOpen ? <X size={20} /> : <Menu size={20} />}
-            </button>
+            {/* Mobile actions */}
+            <div className="flex md:hidden items-center gap-2">
+              <ThemeToggle />
+              <button
+                className="p-2 text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => setIsOpen(!isOpen)}
+                aria-label="Toggle navigation"
+                aria-expanded={isOpen}
+              >
+                {isOpen ? <X size={20} /> : <Menu size={20} />}
+              </button>
+            </div>
           </div>
         </nav>
       </header>

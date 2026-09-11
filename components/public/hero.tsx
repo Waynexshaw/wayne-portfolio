@@ -7,23 +7,23 @@ import { motion } from 'framer-motion'
 export function HeroSection() {
   return (
     <section className="relative min-h-screen flex items-center pt-16">
-      {/* Subtle background gradient */}
+      {/* Ambient background aura (Royal Purple + Electric Blue beacon) */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-violet-600/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/3 left-1/4 w-64 h-64 bg-violet-600/3 rounded-full blur-3xl" />
+        <div className="absolute top-1/4 right-1/4 w-[28rem] h-[28rem] bg-violet-600/10 dark:bg-violet-600/15 rounded-full blur-[100px]" />
+        <div className="absolute bottom-1/3 left-1/4 w-80 h-80 bg-electric-500/8 dark:bg-electric-400/10 rounded-full blur-[110px]" />
       </div>
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-32">
         <div className="max-w-3xl">
-          {/* Label */}
+          {/* Label with subtle electric blue accent */}
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
             className="mb-6"
           >
-            <span className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-violet-400 font-medium">
-              <span className="w-4 h-px bg-violet-400" />
+            <span className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-violet-600 dark:text-violet-400 font-medium px-3 py-1 rounded-full bg-violet-500/10 border border-violet-500/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-electric animate-pulse" />
               @defiwaynex
             </span>
           </motion.div>
