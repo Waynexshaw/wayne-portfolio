@@ -9,6 +9,9 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      // --------------------------------------------------------
+      // Existing Public Portfolio Tables (Preserved 100%)
+      // --------------------------------------------------------
       articles: {
         Row: {
           id: string
@@ -245,32 +248,32 @@ export interface Database {
       metrics: {
         Row: {
           id: string
-          project_id: string | null
           label: string
           value: string
+          change: string | null
           context: string | null
-          date_range: string | null
           verified: boolean
+          order_index: number
           created_at: string
         }
         Insert: {
           id?: string
-          project_id?: string | null
           label: string
           value: string
+          change?: string | null
           context?: string | null
-          date_range?: string | null
           verified?: boolean
+          order_index?: number
           created_at?: string
         }
         Update: {
           id?: string
-          project_id?: string | null
           label?: string
           value?: string
+          change?: string | null
           context?: string | null
-          date_range?: string | null
           verified?: boolean
+          order_index?: number
         }
       }
       testimonials: {
@@ -373,6 +376,554 @@ export interface Database {
           id?: string
           key?: string
           value?: string | null
+        }
+      }
+
+      // --------------------------------------------------------
+      // Waynex Vault (WV) — Phase 1 Foundational Tables
+      // --------------------------------------------------------
+      user_profiles: {
+        Row: {
+          id: string
+          full_name: string
+          display_name: string | null
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          full_name: string
+          display_name?: string | null
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          full_name?: string
+          display_name?: string | null
+          avatar_url?: string | null
+          bio?: string | null
+          updated_at?: string
+        }
+      }
+      identities: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          handle: string | null
+          type: 'personal' | 'pseudonymous' | 'entity' | 'brand'
+          bio: string | null
+          avatar_url: string | null
+          is_default: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          handle?: string | null
+          type: 'personal' | 'pseudonymous' | 'entity' | 'brand'
+          bio?: string | null
+          avatar_url?: string | null
+          is_default?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          handle?: string | null
+          type?: 'personal' | 'pseudonymous' | 'entity' | 'brand'
+          bio?: string | null
+          avatar_url?: string | null
+          is_default?: boolean
+          updated_at?: string
+        }
+      }
+      workspaces: {
+        Row: {
+          id: string
+          owner_id: string
+          primary_identity_id: string | null
+          name: string
+          slug: string
+          description: string | null
+          workspace_type: string
+          icon: string | null
+          is_default: boolean
+          archived_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          owner_id: string
+          primary_identity_id?: string | null
+          name: string
+          slug: string
+          description?: string | null
+          workspace_type?: string
+          icon?: string | null
+          is_default?: boolean
+          archived_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          owner_id?: string
+          primary_identity_id?: string | null
+          name?: string
+          slug?: string
+          description?: string | null
+          workspace_type?: string
+          icon?: string | null
+          is_default?: boolean
+          archived_at?: string | null
+          updated_at?: string
+        }
+      }
+      workspace_members: {
+        Row: {
+          id: string
+          workspace_id: string
+          user_id: string
+          role: 'owner' | 'admin' | 'member' | 'viewer'
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          user_id: string
+          role?: 'owner' | 'admin' | 'member' | 'viewer'
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          user_id?: string
+          role?: 'owner' | 'admin' | 'member' | 'viewer'
+          updated_at?: string
+        }
+      }
+      workspace_projects: {
+        Row: {
+          id: string
+          workspace_id: string
+          identity_id: string | null
+          title: string
+          slug: string
+          description: string | null
+          status: 'planning' | 'active' | 'paused' | 'completed' | 'archived'
+          priority: 'low' | 'medium' | 'high' | 'urgent'
+          start_date: string | null
+          target_date: string | null
+          completed_at: string | null
+          archived_at: string | null
+          metadata: Json
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          identity_id?: string | null
+          title: string
+          slug: string
+          description?: string | null
+          status?: 'planning' | 'active' | 'paused' | 'completed' | 'archived'
+          priority?: 'low' | 'medium' | 'high' | 'urgent'
+          start_date?: string | null
+          target_date?: string | null
+          completed_at?: string | null
+          archived_at?: string | null
+          metadata?: Json
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          identity_id?: string | null
+          title?: string
+          slug?: string
+          description?: string | null
+          status?: 'planning' | 'active' | 'paused' | 'completed' | 'archived'
+          priority?: 'low' | 'medium' | 'high' | 'urgent'
+          start_date?: string | null
+          target_date?: string | null
+          completed_at?: string | null
+          archived_at?: string | null
+          metadata?: Json
+          updated_at?: string
+        }
+      }
+      companies: {
+        Row: {
+          id: string
+          owner_id: string
+          name: string
+          domain: string | null
+          industry: string | null
+          website: string | null
+          linkedin_url: string | null
+          x_handle: string | null
+          description: string | null
+          archived_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          owner_id: string
+          name: string
+          domain?: string | null
+          industry?: string | null
+          website?: string | null
+          linkedin_url?: string | null
+          x_handle?: string | null
+          description?: string | null
+          archived_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          owner_id?: string
+          name?: string
+          domain?: string | null
+          industry?: string | null
+          website?: string | null
+          linkedin_url?: string | null
+          x_handle?: string | null
+          description?: string | null
+          archived_at?: string | null
+          updated_at?: string
+        }
+      }
+      workspace_companies: {
+        Row: {
+          id: string
+          workspace_id: string
+          company_id: string
+          tier: 'tier_1' | 'tier_2' | 'tier_3' | 'archived'
+          status: 'prospect' | 'active' | 'partner' | 'portfolio' | 'vendor' | 'past'
+          notes: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          company_id: string
+          tier?: 'tier_1' | 'tier_2' | 'tier_3' | 'archived'
+          status?: 'prospect' | 'active' | 'partner' | 'portfolio' | 'vendor' | 'past'
+          notes?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          company_id?: string
+          tier?: 'tier_1' | 'tier_2' | 'tier_3' | 'archived'
+          status?: 'prospect' | 'active' | 'partner' | 'portfolio' | 'vendor' | 'past'
+          notes?: string | null
+          updated_at?: string
+        }
+      }
+      contacts: {
+        Row: {
+          id: string
+          owner_id: string
+          company_id: string | null
+          full_name: string
+          email: string | null
+          phone: string | null
+          role_title: string | null
+          location: string | null
+          bio: string | null
+          avatar_url: string | null
+          archived_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          owner_id: string
+          company_id?: string | null
+          full_name: string
+          email?: string | null
+          phone?: string | null
+          role_title?: string | null
+          location?: string | null
+          bio?: string | null
+          avatar_url?: string | null
+          archived_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          owner_id?: string
+          company_id?: string | null
+          full_name?: string
+          email?: string | null
+          phone?: string | null
+          role_title?: string | null
+          location?: string | null
+          bio?: string | null
+          avatar_url?: string | null
+          archived_at?: string | null
+          updated_at?: string
+        }
+      }
+      workspace_contacts: {
+        Row: {
+          id: string
+          workspace_id: string
+          contact_id: string
+          primary_identity_id: string | null
+          relationship_type: string | null
+          relationship_stage: 'lead' | 'outreach' | 'connected' | 'in_discussion' | 'partner' | 'investor' | 'client' | 'dormant' | 'archived'
+          relationship_score: number
+          priority: 'low' | 'medium' | 'high' | 'urgent'
+          notes: string | null
+          last_contacted_at: string | null
+          next_follow_up_at: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          contact_id: string
+          primary_identity_id?: string | null
+          relationship_type?: string | null
+          relationship_stage?: 'lead' | 'outreach' | 'connected' | 'in_discussion' | 'partner' | 'investor' | 'client' | 'dormant' | 'archived'
+          relationship_score?: number
+          priority?: 'low' | 'medium' | 'high' | 'urgent'
+          notes?: string | null
+          last_contacted_at?: string | null
+          next_follow_up_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          contact_id?: string
+          primary_identity_id?: string | null
+          relationship_type?: string | null
+          relationship_stage?: 'lead' | 'outreach' | 'connected' | 'in_discussion' | 'partner' | 'investor' | 'client' | 'dormant' | 'archived'
+          relationship_score?: number
+          priority?: 'low' | 'medium' | 'high' | 'urgent'
+          notes?: string | null
+          last_contacted_at?: string | null
+          next_follow_up_at?: string | null
+          updated_at?: string
+        }
+      }
+      social_profiles: {
+        Row: {
+          id: string
+          contact_id: string
+          platform: 'x' | 'telegram' | 'linkedin' | 'discord' | 'farcaster' | 'github' | 'other'
+          handle: string
+          profile_url: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          contact_id: string
+          platform: 'x' | 'telegram' | 'linkedin' | 'discord' | 'farcaster' | 'github' | 'other'
+          handle: string
+          profile_url?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          contact_id?: string
+          platform?: 'x' | 'telegram' | 'linkedin' | 'discord' | 'farcaster' | 'github' | 'other'
+          handle?: string
+          profile_url?: string | null
+        }
+      }
+      interactions: {
+        Row: {
+          id: string
+          workspace_id: string
+          contact_id: string
+          identity_id: string | null
+          channel: 'x' | 'telegram' | 'linkedin' | 'email' | 'call' | 'meeting' | 'in_person' | 'other'
+          direction: 'inbound' | 'outbound' | 'internal_note'
+          purpose: string | null
+          subject: string | null
+          content: string
+          response: string | null
+          status: 'planned' | 'completed' | 'cancelled' | 'no_response'
+          sentiment: 'positive' | 'neutral' | 'negative' | 'critical' | null
+          next_action: string | null
+          follow_up_at: string | null
+          notes: string | null
+          interaction_date: string
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          contact_id: string
+          identity_id?: string | null
+          channel: 'x' | 'telegram' | 'linkedin' | 'email' | 'call' | 'meeting' | 'in_person' | 'other'
+          direction?: 'inbound' | 'outbound' | 'internal_note'
+          purpose?: string | null
+          subject?: string | null
+          content: string
+          response?: string | null
+          status?: 'planned' | 'completed' | 'cancelled' | 'no_response'
+          sentiment?: 'positive' | 'neutral' | 'negative' | 'critical' | null
+          next_action?: string | null
+          follow_up_at?: string | null
+          notes?: string | null
+          interaction_date?: string
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          contact_id?: string
+          identity_id?: string | null
+          channel?: 'x' | 'telegram' | 'linkedin' | 'email' | 'call' | 'meeting' | 'in_person' | 'other'
+          direction?: 'inbound' | 'outbound' | 'internal_note'
+          purpose?: string | null
+          subject?: string | null
+          content?: string
+          response?: string | null
+          status?: 'planned' | 'completed' | 'cancelled' | 'no_response'
+          sentiment?: 'positive' | 'neutral' | 'negative' | 'critical' | null
+          next_action?: string | null
+          follow_up_at?: string | null
+          notes?: string | null
+          interaction_date?: string
+        }
+      }
+      follow_ups: {
+        Row: {
+          id: string
+          workspace_id: string
+          contact_id: string
+          interaction_id: string | null
+          title: string
+          description: string | null
+          due_date: string
+          status: 'pending' | 'completed' | 'cancelled' | 'rescheduled'
+          priority: 'low' | 'medium' | 'high' | 'urgent'
+          completed_at: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          contact_id: string
+          interaction_id?: string | null
+          title: string
+          description?: string | null
+          due_date: string
+          status?: 'pending' | 'completed' | 'cancelled' | 'rescheduled'
+          priority?: 'low' | 'medium' | 'high' | 'urgent'
+          completed_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          contact_id?: string
+          interaction_id?: string | null
+          title?: string
+          description?: string | null
+          due_date?: string
+          status?: 'pending' | 'completed' | 'cancelled' | 'rescheduled'
+          priority?: 'low' | 'medium' | 'high' | 'urgent'
+          completed_at?: string | null
+          updated_at?: string
+        }
+      }
+      opportunities: {
+        Row: {
+          id: string
+          workspace_id: string
+          contact_id: string | null
+          company_id: string | null
+          title: string
+          type: 'growth_strategy' | 'defi_research' | 'tokenomics' | 'advisory' | 'pevra_partnership' | 'investment' | 'collaboration' | 'other'
+          description: string | null
+          value_estimate: number | null
+          currency: string
+          pipeline_stage: 'lead' | 'discovery' | 'proposal' | 'negotiation' | 'won' | 'lost' | 'on_hold'
+          probability: number
+          next_action: string | null
+          expected_close_date: string | null
+          notes: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          contact_id?: string | null
+          company_id?: string | null
+          title: string
+          type?: 'growth_strategy' | 'defi_research' | 'tokenomics' | 'advisory' | 'pevra_partnership' | 'investment' | 'collaboration' | 'other'
+          description?: string | null
+          value_estimate?: number | null
+          currency?: string
+          pipeline_stage?: 'lead' | 'discovery' | 'proposal' | 'negotiation' | 'won' | 'lost' | 'on_hold'
+          probability?: number
+          next_action?: string | null
+          expected_close_date?: string | null
+          notes?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          contact_id?: string | null
+          company_id?: string | null
+          title?: string
+          type?: 'growth_strategy' | 'defi_research' | 'tokenomics' | 'advisory' | 'pevra_partnership' | 'investment' | 'collaboration' | 'other'
+          description?: string | null
+          value_estimate?: number | null
+          currency?: string
+          pipeline_stage?: 'lead' | 'discovery' | 'proposal' | 'negotiation' | 'won' | 'lost' | 'on_hold'
+          probability?: number
+          next_action?: string | null
+          expected_close_date?: string | null
+          notes?: string | null
+          updated_at?: string
         }
       }
     }
