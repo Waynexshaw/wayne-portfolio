@@ -1,5 +1,6 @@
 import { getVaultContext, getWorkspaceProjects } from '@/lib/vault/actions'
 import { FolderGit2, Calendar, Shield } from 'lucide-react'
+import { ProjectCreateButton } from './create-button'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,6 +25,12 @@ export default async function VaultProjectsPage() {
             Operational ventures and private initiatives. Distinct from public portfolio showcases.
           </p>
         </div>
+
+        <ProjectCreateButton
+          workspaceId={activeWorkspace?.id}
+          workspaceName={activeWorkspace?.name}
+          identities={context?.identities || []}
+        />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -510,6 +510,51 @@ export async function getWorkspaceProjects(workspaceId?: string) {
   return (data || []) as any[]
 }
 
+export async function createWorkspaceProject(formData: {
+  workspaceId: string
+  identityId?: string
+  title: string
+  description?: string
+  status?: 'planning' | 'active' | 'paused' | 'completed' | 'archived'
+  priority?: 'low' | 'medium' | 'high' | 'urgent'
+  startDate?: string
+  targetDate?: string
+}) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  const baseSlug = formData.title
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '') || 'project'
+  const slug = `${baseSlug}-${Math.random().toString(36).substring(2, 7)}`
+
+  const { data, error } = await (supabase as any)
+    .from('workspace_projects')
+    .insert({
+      workspace_id: formData.workspaceId,
+      identity_id: formData.identityId || null,
+      title: formData.title.trim(),
+      slug,
+      description: formData.description?.trim() || null,
+      status: formData.status || 'active',
+      priority: formData.priority || 'medium',
+      start_date: formData.startDate || null,
+      target_date: formData.targetDate || null,
+      created_by: user.id
+    })
+    .select()
+    .single()
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/vault/projects')
+  revalidatePath('/vault')
+  return data
+}
+
 // ---------------------------------------------------------------------------
 // Contact Detail & Relationship Management
 // ---------------------------------------------------------------------------

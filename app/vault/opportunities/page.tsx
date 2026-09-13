@@ -1,12 +1,18 @@
-import { getVaultContext, getOpportunities } from '@/lib/vault/actions'
+import { getVaultContext, getOpportunities, getContacts, getCompanies } from '@/lib/vault/actions'
 import { TrendingUp, DollarSign, Calendar, Building2, User, ArrowRight } from 'lucide-react'
+import { OpportunityCreateButton } from './create-button'
 
 export const dynamic = 'force-dynamic'
 
 export default async function VaultOpportunitiesPage() {
   const context = await getVaultContext()
   const activeWorkspace = context?.activeWorkspace
-  const opportunities = await getOpportunities(activeWorkspace?.id).catch(() => [])
+
+  const [opportunities, contacts, companies] = await Promise.all([
+    getOpportunities(activeWorkspace?.id).catch(() => []),
+    getContacts(activeWorkspace?.id).catch(() => []),
+    getCompanies(activeWorkspace?.id).catch(() => []),
+  ])
 
   const oppList: any[] = opportunities || []
   const totalValue = oppList.reduce<number>((sum, opp) => sum + (Number(opp.value_estimate) || 0), 0)
@@ -28,12 +34,21 @@ export default async function VaultOpportunitiesPage() {
           </p>
         </div>
 
-        <div className="px-4 py-2 rounded-xl bg-card border border-border flex items-center gap-3">
-          <DollarSign className="w-5 h-5 text-emerald-400" />
-          <div>
-            <div className="text-[10px] font-mono uppercase text-muted-foreground">Estimated Pipeline Value</div>
-            <div className="text-lg font-bold font-serif text-foreground">${totalValue.toLocaleString()}</div>
+        <div className="flex items-center gap-3">
+          <div className="px-4 py-2 rounded-xl bg-card border border-border flex items-center gap-3">
+            <DollarSign className="w-5 h-5 text-emerald-400" />
+            <div>
+              <div className="text-[10px] font-mono uppercase text-muted-foreground">Estimated Pipeline Value</div>
+              <div className="text-lg font-bold font-serif text-foreground">${totalValue.toLocaleString()}</div>
+            </div>
           </div>
+
+          <OpportunityCreateButton
+            workspaceId={activeWorkspace?.id}
+            workspaceName={activeWorkspace?.name}
+            contacts={contacts}
+            companies={companies}
+          />
         </div>
       </div>
 
