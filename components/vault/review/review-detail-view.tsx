@@ -23,16 +23,19 @@ import {
   ReviewItem, 
   ReviewType, 
   ReviewStatus, 
+  ReviewConnectionItem,
   setReviewStatus, 
   archiveReview, 
   restoreReview 
 } from '@/lib/vault/actions'
 import { ReviewEditModal } from './review-edit-modal'
+import { ReviewConnectionsSection } from './review-connections-section'
 
 interface ReviewDetailViewProps {
   review: ReviewItem
   workspaceId: string
   workspaceName?: string
+  connections?: ReviewConnectionItem[]
 }
 
 function getTypeBadge(type: ReviewType) {
@@ -87,6 +90,7 @@ export function ReviewDetailView({
   review,
   workspaceId,
   workspaceName,
+  connections = [],
 }: ReviewDetailViewProps) {
   const router = useRouter()
   const [isEditOpen, setIsEditOpen] = useState(false)
@@ -412,6 +416,13 @@ export function ReviewDetailView({
           </p>
         </div>
       )}
+
+      {/* Section: Review Context (Connections) */}
+      <ReviewConnectionsSection
+        reviewId={review.id}
+        workspaceId={workspaceId}
+        connections={connections}
+      />
 
       {/* Edit Modal */}
       <ReviewEditModal

@@ -3474,3 +3474,520 @@ export async function restoreReview(id: string, workspaceId: string): Promise<Re
   revalidatePath('/vault')
   return data as ReviewItem
 }
+
+// ---------------------------------------------------------------------------
+// REVIEW CONNECTIONS (PHASE 2)
+// ---------------------------------------------------------------------------
+
+export type ReviewConnectionRelationshipType =
+  | 'subject'
+  | 'informed_by'
+  | 'stakeholder'
+  | 'resulted_in'
+
+export interface ReviewConnectionItem {
+  id: string
+  workspace_id: string
+  review_id: string
+  project_id: string | null
+  opportunity_id: string | null
+  research_record_id: string | null
+  company_id: string | null
+  contact_id: string | null
+  relationship_type: ReviewConnectionRelationshipType
+  notes: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  project?: {
+    id: string
+    title: string
+    status: string
+    priority: string
+  } | null
+  opportunity?: {
+    id: string
+    title: string
+    type: string
+    pipeline_stage: string
+    value_estimate: number | null
+    currency: string | null
+  } | null
+  research?: {
+    id: string
+    title: string
+    research_question?: string | null
+    objective: string | null
+    status: string
+  } | null
+  company?: {
+    id: string
+    name: string
+    industry: string | null
+    domain: string | null
+  } | null
+  contact?: {
+    id: string
+    full_name: string
+    role_title: string | null
+    avatar_url?: string | null
+    email?: string | null
+  } | null
+}
+
+// Compatibility matrix: which relationship types are valid for each entity category
+const REVIEW_CONNECTION_COMPATIBILITY: Record<string, ReviewConnectionRelationshipType[]> = {
+  project: ['subject', 'resulted_in'],
+  opportunity: ['subject', 'resulted_in'],
+  research: ['informed_by', 'resulted_in'],
+  company: ['subject', 'stakeholder'],
+  contact: ['subject', 'stakeholder'],
+}
+
+const REVIEW_CONNECTION_SELECT = `
+  id,
+  workspace_id,
+  review_id,
+  project_id,
+  opportunity_id,
+  research_record_id,
+  company_id,
+  contact_id,
+  relationship_type,
+  notes,
+  created_by,
+  created_at,
+  updated_at,
+  workspace_contacts(
+    contact:contacts(
+      id,
+      full_name,
+      role_title,
+      avatar_url,
+      email
+    )
+  ),
+  workspace_companies(
+    company:companies(
+      id,
+      name,
+      industry,
+      domain
+    )
+  ),
+  opportunity:opportunities(
+    id,
+    title,
+    type,
+    pipeline_stage,
+    value_estimate,
+    currency
+  ),
+  project:workspace_projects(
+    id,
+    title,
+    status,
+    priority
+  ),
+  research:research_records(
+    id,
+    title,
+    research_question,
+    objective,
+    status
+  )
+`
+
+function mapReviewConnectionRow(row: any): ReviewConnectionItem {
+  return {
+    id: row.id,
+    workspace_id: row.workspace_id,
+    review_id: row.review_id,
+    project_id: row.project_id,
+    opportunity_id: row.opportunity_id,
+    research_record_id: row.research_record_id,
+    company_id: row.company_id,
+    contact_id: row.contact_id,
+    relationship_type: row.relationship_type,
+    notes: row.notes,
+    created_by: row.created_by,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    contact: row.workspace_contacts?.contact || null,
+    company: row.workspace_companies?.company || null,
+    opportunity: row.opportunity || null,
+    project: row.project || null,
+    research: row.research || null,
+  }
+}
+
+export async function getReviewConnections(
+  reviewId: string,
+  workspaceId: string
+): Promise<ReviewConnectionItem[]> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  const { data, error } = await (supabase as any)
+    .from('review_connections')
+    .select(REVIEW_CONNECTION_SELECT)
+    .eq('review_id', reviewId)
+    .eq('workspace_id', workspaceId)
+    .order('created_at', { ascending: false })
+
+  if (error) throw new Error(error.message)
+
+  return (data || []).map(mapReviewConnectionRow)
+}
+
+export async function getReviewConnectableEntities(workspaceId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // 1. Contacts
+  const { data: contactsData } = await (supabase as any)
+    .from('workspace_contacts')
+    .select(`
+      contact_id,
+      contact:contacts(
+        id,
+        full_name,
+        role_title,
+        avatar_url,
+        archived_at
+      )
+    `)
+    .eq('workspace_id', workspaceId)
+
+  const contacts = (contactsData || [])
+    .filter((c: any) => c.contact && !c.contact.archived_at)
+    .map((c: any) => ({
+      id: c.contact.id,
+      fullName: c.contact.full_name as string,
+      roleTitle: (c.contact.role_title || null) as string | null,
+      avatarUrl: (c.contact.avatar_url || null) as string | null,
+    }))
+    .sort((a: any, b: any) => a.fullName.localeCompare(b.fullName))
+
+  // 2. Companies
+  const { data: companiesData } = await (supabase as any)
+    .from('workspace_companies')
+    .select(`
+      company_id,
+      tier,
+      company:companies(
+        id,
+        name,
+        industry,
+        domain,
+        archived_at
+      )
+    `)
+    .eq('workspace_id', workspaceId)
+    .neq('tier', 'archived')
+
+  const companies = (companiesData || [])
+    .filter((c: any) => c.company && !c.company.archived_at)
+    .map((c: any) => ({
+      id: c.company.id,
+      name: c.company.name as string,
+      industry: (c.company.industry || null) as string | null,
+      domain: (c.company.domain || null) as string | null,
+      tier: c.tier as string,
+    }))
+    .sort((a: any, b: any) => a.name.localeCompare(b.name))
+
+  // 3. Opportunities
+  const { data: opportunitiesData } = await (supabase as any)
+    .from('opportunities')
+    .select('id, title, type, pipeline_stage, value_estimate, currency')
+    .eq('workspace_id', workspaceId)
+    .order('title', { ascending: true })
+
+  const opportunities = (opportunitiesData || []).map((o: any) => ({
+    id: o.id,
+    title: o.title as string,
+    type: o.type as string,
+    pipelineStage: o.pipeline_stage as string,
+    valueEstimate: (o.value_estimate || null) as number | null,
+    currency: (o.currency || 'USD') as string,
+  }))
+
+  // 4. Projects
+  const { data: projectsData } = await (supabase as any)
+    .from('workspace_projects')
+    .select('id, title, status, priority')
+    .eq('workspace_id', workspaceId)
+    .neq('status', 'archived')
+    .order('title', { ascending: true })
+
+  const projects = (projectsData || []).map((p: any) => ({
+    id: p.id,
+    title: p.title as string,
+    status: p.status as string,
+    priority: p.priority as string,
+  }))
+
+  // 5. Research records
+  const { data: researchData } = await (supabase as any)
+    .from('research_records')
+    .select('id, title, research_question, objective, status')
+    .eq('workspace_id', workspaceId)
+    .neq('status', 'archived')
+    .order('title', { ascending: true })
+
+  const researchRecords = (researchData || []).map((r: any) => ({
+    id: r.id,
+    title: r.title as string,
+    researchQuestion: (r.research_question || null) as string | null,
+    objective: (r.objective || null) as string | null,
+    status: r.status as string,
+  }))
+
+  return {
+    contacts,
+    companies,
+    opportunities,
+    projects,
+    researchRecords,
+  }
+}
+
+export async function createReviewConnection(formData: {
+  workspaceId: string
+  reviewId: string
+  projectId?: string | null
+  opportunityId?: string | null
+  researchRecordId?: string | null
+  companyId?: string | null
+  contactId?: string | null
+  relationshipType: ReviewConnectionRelationshipType
+  notes?: string | null
+}) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // 1. Verify workspace access
+  const { data: ws } = await (supabase as any)
+    .from('workspaces')
+    .select('id')
+    .eq('id', formData.workspaceId)
+    .maybeSingle()
+  if (!ws) throw new Error('Workspace not found or access denied')
+
+  // 2. Verify review exists and belongs to workspace
+  const { data: review } = await (supabase as any)
+    .from('reviews')
+    .select('id, workspace_id')
+    .eq('id', formData.reviewId)
+    .eq('workspace_id', formData.workspaceId)
+    .maybeSingle()
+  if (!review) throw new Error('Review not found or access denied')
+
+  // 3. Enforce exactly one target entity
+  const targets = [
+    formData.projectId ? { type: 'project', id: formData.projectId } : null,
+    formData.opportunityId ? { type: 'opportunity', id: formData.opportunityId } : null,
+    formData.researchRecordId ? { type: 'research', id: formData.researchRecordId } : null,
+    formData.companyId ? { type: 'company', id: formData.companyId } : null,
+    formData.contactId ? { type: 'contact', id: formData.contactId } : null,
+  ].filter(Boolean)
+
+  if (targets.length !== 1) {
+    throw new Error('Exactly one target entity must be specified')
+  }
+
+  const targetType = targets[0]!.type
+
+  // 4. Enforce compatibility matrix
+  const compatibleTypes = REVIEW_CONNECTION_COMPATIBILITY[targetType]
+  if (!compatibleTypes || !compatibleTypes.includes(formData.relationshipType)) {
+    throw new Error(`Relationship type '${formData.relationshipType}' is not valid for ${targetType} entities`)
+  }
+
+  // 5. Validate target entity exists within same workspace
+  if (formData.contactId) {
+    const { data: contact } = await (supabase as any)
+      .from('workspace_contacts')
+      .select('contact_id')
+      .eq('workspace_id', formData.workspaceId)
+      .eq('contact_id', formData.contactId)
+      .maybeSingle()
+    if (!contact) throw new Error('Contact not found or not associated with this workspace')
+  } else if (formData.companyId) {
+    const { data: company } = await (supabase as any)
+      .from('workspace_companies')
+      .select('company_id')
+      .eq('workspace_id', formData.workspaceId)
+      .eq('company_id', formData.companyId)
+      .maybeSingle()
+    if (!company) throw new Error('Company not found or not associated with this workspace')
+  } else if (formData.opportunityId) {
+    const { data: opp } = await (supabase as any)
+      .from('opportunities')
+      .select('id')
+      .eq('workspace_id', formData.workspaceId)
+      .eq('id', formData.opportunityId)
+      .maybeSingle()
+    if (!opp) throw new Error('Opportunity not found or not associated with this workspace')
+  } else if (formData.projectId) {
+    const { data: proj } = await (supabase as any)
+      .from('workspace_projects')
+      .select('id')
+      .eq('workspace_id', formData.workspaceId)
+      .eq('id', formData.projectId)
+      .maybeSingle()
+    if (!proj) throw new Error('Project not found or not associated with this workspace')
+  } else if (formData.researchRecordId) {
+    const { data: rec } = await (supabase as any)
+      .from('research_records')
+      .select('id')
+      .eq('workspace_id', formData.workspaceId)
+      .eq('id', formData.researchRecordId)
+      .maybeSingle()
+    if (!rec) throw new Error('Research record not found or not associated with this workspace')
+  }
+
+  // 6. Insert connection
+  const { data, error } = await (supabase as any)
+    .from('review_connections')
+    .insert({
+      workspace_id: formData.workspaceId,
+      review_id: formData.reviewId,
+      project_id: formData.projectId || null,
+      opportunity_id: formData.opportunityId || null,
+      research_record_id: formData.researchRecordId || null,
+      company_id: formData.companyId || null,
+      contact_id: formData.contactId || null,
+      relationship_type: formData.relationshipType,
+      notes: formData.notes?.trim() || null,
+      created_by: user.id,
+    })
+    .select(REVIEW_CONNECTION_SELECT)
+    .single()
+
+  if (error) {
+    if (error.code === '23505') {
+      throw new Error('This entity is already connected to this review')
+    }
+    if (error.code === '23514') {
+      throw new Error('Invalid entity/relationship combination. Check compatibility matrix.')
+    }
+    throw new Error(error.message)
+  }
+
+  revalidatePath(`/vault/reviews/${formData.reviewId}`)
+  revalidatePath('/vault/reviews')
+
+  return mapReviewConnectionRow(data)
+}
+
+export async function updateReviewConnection(
+  connectionId: string,
+  formData: {
+    workspaceId: string
+    relationshipType?: ReviewConnectionRelationshipType
+    notes?: string | null
+  }
+) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // Verify workspace authorization
+  const { data: ws } = await (supabase as any)
+    .from('workspaces')
+    .select('id')
+    .eq('id', formData.workspaceId)
+    .maybeSingle()
+  if (!ws) throw new Error('Workspace not found or access denied')
+
+  // Verify connection belongs to workspace and get current data for compatibility check
+  const { data: existing } = await (supabase as any)
+    .from('review_connections')
+    .select('id, review_id, workspace_id, project_id, opportunity_id, research_record_id, company_id, contact_id')
+    .eq('id', connectionId)
+    .eq('workspace_id', formData.workspaceId)
+    .maybeSingle()
+  if (!existing) throw new Error('Connection not found or access denied')
+
+  const updates: any = {
+    updated_at: new Date().toISOString(),
+  }
+
+  if (formData.relationshipType !== undefined) {
+    // Determine entity category for compatibility check
+    let entityCategory = ''
+    if (existing.project_id) entityCategory = 'project'
+    else if (existing.opportunity_id) entityCategory = 'opportunity'
+    else if (existing.research_record_id) entityCategory = 'research'
+    else if (existing.company_id) entityCategory = 'company'
+    else if (existing.contact_id) entityCategory = 'contact'
+
+    const compatibleTypes = REVIEW_CONNECTION_COMPATIBILITY[entityCategory]
+    if (!compatibleTypes || !compatibleTypes.includes(formData.relationshipType)) {
+      throw new Error(`Relationship type '${formData.relationshipType}' is not valid for ${entityCategory} entities`)
+    }
+    updates.relationship_type = formData.relationshipType
+  }
+
+  if (formData.notes !== undefined) {
+    updates.notes = formData.notes ? formData.notes.trim() : null
+  }
+
+  const { data, error } = await (supabase as any)
+    .from('review_connections')
+    .update(updates)
+    .eq('id', connectionId)
+    .eq('workspace_id', formData.workspaceId)
+    .select(REVIEW_CONNECTION_SELECT)
+    .single()
+
+  if (error) {
+    if (error.code === '23514') {
+      throw new Error('Invalid entity/relationship combination. Check compatibility matrix.')
+    }
+    throw new Error(error.message)
+  }
+
+  revalidatePath(`/vault/reviews/${existing.review_id}`)
+  revalidatePath('/vault/reviews')
+
+  return mapReviewConnectionRow(data)
+}
+
+export async function deleteReviewConnection(connectionId: string, workspaceId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  const { data: ws } = await (supabase as any)
+    .from('workspaces')
+    .select('id')
+    .eq('id', workspaceId)
+    .maybeSingle()
+  if (!ws) throw new Error('Workspace not found or access denied')
+
+  const { data: existing } = await (supabase as any)
+    .from('review_connections')
+    .select('id, review_id')
+    .eq('id', connectionId)
+    .eq('workspace_id', workspaceId)
+    .maybeSingle()
+  if (!existing) throw new Error('Connection not found or access denied')
+
+  const { error } = await (supabase as any)
+    .from('review_connections')
+    .delete()
+    .eq('id', connectionId)
+    .eq('workspace_id', workspaceId)
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath(`/vault/reviews/${existing.review_id}`)
+  revalidatePath('/vault/reviews')
+  return true
+}

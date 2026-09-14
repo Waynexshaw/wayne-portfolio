@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ArrowLeft, RotateCcw, Database } from 'lucide-react'
-import { getVaultContext, getReviewDetail } from '@/lib/vault/actions'
+import { getVaultContext, getReviewDetail, getReviewConnections } from '@/lib/vault/actions'
 import { ReviewDetailView } from '@/components/vault/review/review-detail-view'
 
 export const dynamic = 'force-dynamic'
@@ -15,10 +15,14 @@ export default async function ReviewDetailPage({ params }: ReviewDetailPageProps
   const activeWorkspace = context?.activeWorkspace
 
   let review: any = null
+  let connections: any[] = []
   let dbError: string | null = null
 
   try {
     review = await getReviewDetail(id, activeWorkspace?.id)
+    if (review && activeWorkspace?.id) {
+      connections = await getReviewConnections(id, activeWorkspace.id)
+    }
   } catch (err: any) {
     console.error('[Vault Review Detail Error]:', err?.message || err)
     dbError = 'Database query failure encountered while loading review details.'
@@ -83,6 +87,7 @@ export default async function ReviewDetailPage({ params }: ReviewDetailPageProps
       review={review}
       workspaceId={activeWorkspace.id}
       workspaceName={activeWorkspace.name}
+      connections={connections}
     />
   )
 }
