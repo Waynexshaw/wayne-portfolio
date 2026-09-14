@@ -2,14 +2,32 @@ import Link from 'next/link'
 import { getVaultContext, getContacts, getCompanies } from '@/lib/vault/actions'
 import { Users, Plus, Building2, Mail, Phone, ExternalLink, Shield, ArrowRight } from 'lucide-react'
 import { ContactCreateButton } from './create-button'
+import { ContactSearchFilters } from '@/components/vault/contact/contact-search-filters'
 
 export const dynamic = 'force-dynamic'
 
-export default async function VaultContactsPage() {
+export default async function VaultContactsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; stage?: string; priority?: string }>
+}) {
+  const resolvedParams = await searchParams
+  const q = resolvedParams?.q || ''
+  const stage = resolvedParams?.stage || 'all'
+  const priority = resolvedParams?.priority || 'all'
+
   const context = await getVaultContext()
   const activeWorkspace = context?.activeWorkspace
-  const contacts = await getContacts(activeWorkspace?.id).catch(() => [])
+  const contacts = await getContacts(activeWorkspace?.id, {
+    q,
+    stage,
+    priority,
+  }).catch(() => [])
   const companies = await getCompanies(activeWorkspace?.id).catch(() => [])
+
+  const hasActiveFilters = Boolean(
+    q.trim() !== '' || (stage && stage !== 'all') || (priority && priority !== 'all')
+  )
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -21,7 +39,7 @@ export default async function VaultContactsPage() {
               Contacts Directory
             </h1>
             <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
-              {contacts.length} Total
+              {contacts.length} {hasActiveFilters ? 'Found' : 'Total'}
             </span>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
@@ -35,13 +53,39 @@ export default async function VaultContactsPage() {
         />
       </div>
 
+      {/* Search & Filter Toolbar */}
+      <ContactSearchFilters
+        initialSearch={q}
+        initialStage={stage}
+        initialPriority={priority}
+      />
+
       {/* Contacts List */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {contacts.length === 0 ? (
-          <div className="col-span-full py-16 text-center text-muted-foreground text-sm bg-card border border-border rounded-xl">
-            <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
-            <p>No contacts found. Add your first contact to begin managing relationships.</p>
-          </div>
+          hasActiveFilters ? (
+            <div className="col-span-full py-16 text-center text-muted-foreground text-sm bg-card border border-border rounded-xl px-4">
+              <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <p className="font-medium text-foreground mb-1">No contacts found</p>
+              <p className="text-xs text-muted-foreground mb-4">
+                No contacts match your current search or filter criteria. Try adjusting your search or clearing filters.
+              </p>
+              <Link
+                href="/vault/contacts"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary text-xs font-medium text-foreground hover:bg-secondary/80 transition-colors"
+              >
+                Clear filters
+              </Link>
+            </div>
+          ) : (
+            <div className="col-span-full py-16 text-center text-muted-foreground text-sm bg-card border border-border rounded-xl px-4">
+              <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <p className="font-medium text-foreground mb-1">No contacts yet</p>
+              <p className="text-xs text-muted-foreground">
+                Add your first professional relationship to begin managing contacts in this workspace.
+              </p>
+            </div>
+          )
         ) : (
           contacts.map((contact: any) => {
             const wsRel = contact.workspace_contacts?.[0]

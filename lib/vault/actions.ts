@@ -132,11 +132,36 @@ export async function setActiveWorkspace(workspaceId: string) {
 // Contacts
 // ---------------------------------------------------------------------------
 
-export async function getContacts(workspaceId?: string) {
+export async function getContacts(
+  workspaceId?: string,
+  options?: {
+    q?: string
+    stage?: string
+    priority?: string
+  }
+) {
   const supabase = await createClient()
+  const q = options?.q?.trim()
+  const stage = options?.stage && options.stage !== 'all' ? options.stage : undefined
+  const priority = options?.priority && options.priority !== 'all' ? options.priority : undefined
+
+  // If search query is provided, find matching company IDs for cross-entity matching
+  let matchedCompanyIds: string[] = []
+  if (q) {
+    const sanitizedQuery = q.replace(/[,()]/g, ' ').trim()
+    if (sanitizedQuery) {
+      const { data: matchedCompanies } = await (supabase as any)
+        .from('companies')
+        .select('id')
+        .ilike('name', `%${sanitizedQuery}%`)
+      if (matchedCompanies && matchedCompanies.length > 0) {
+        matchedCompanyIds = matchedCompanies.map((c: any) => c.id)
+      }
+    }
+  }
   
   if (workspaceId) {
-    const { data, error } = await (supabase as any)
+    let query = (supabase as any)
       .from('contacts')
       .select(`
         *,
@@ -146,13 +171,37 @@ export async function getContacts(workspaceId?: string) {
       `)
       .eq('workspace_contacts.workspace_id', workspaceId)
       .is('archived_at', null)
-      .order('created_at', { ascending: false })
 
+    if (stage) {
+      query = query.eq('workspace_contacts.relationship_stage', stage)
+    }
+
+    if (priority) {
+      query = query.eq('workspace_contacts.priority', priority)
+    }
+
+    if (q) {
+      const sanitizedQuery = q.replace(/[,()]/g, ' ').trim()
+      if (sanitizedQuery) {
+        const orClauses = [
+          `full_name.ilike.%${sanitizedQuery}%`,
+          `role_title.ilike.%${sanitizedQuery}%`
+        ]
+        if (matchedCompanyIds.length > 0) {
+          orClauses.push(`company_id.in.(${matchedCompanyIds.join(',')})`)
+        }
+        query = query.or(orClauses.join(','))
+      }
+    }
+
+    query = query.order('created_at', { ascending: false })
+
+    const { data, error } = await query
     if (error) throw new Error(error.message)
     return (data || []) as any[]
   }
 
-  const { data, error } = await (supabase as any)
+  let query = (supabase as any)
     .from('contacts')
     .select(`
       *,
@@ -161,8 +210,24 @@ export async function getContacts(workspaceId?: string) {
       social_profiles(*)
     `)
     .is('archived_at', null)
-    .order('created_at', { ascending: false })
 
+  if (q) {
+    const sanitizedQuery = q.replace(/[,()]/g, ' ').trim()
+    if (sanitizedQuery) {
+      const orClauses = [
+        `full_name.ilike.%${sanitizedQuery}%`,
+        `role_title.ilike.%${sanitizedQuery}%`
+      ]
+      if (matchedCompanyIds.length > 0) {
+        orClauses.push(`company_id.in.(${matchedCompanyIds.join(',')})`)
+      }
+      query = query.or(orClauses.join(','))
+    }
+  }
+
+  query = query.order('created_at', { ascending: false })
+
+  const { data, error } = await query
   if (error) throw new Error(error.message)
   return (data || []) as any[]
 }
@@ -469,8 +534,45 @@ export async function toggleFollowUpStatus(id: string, currentStatus: string) {
 // Opportunities
 // ---------------------------------------------------------------------------
 
-export async function getOpportunities(workspaceId?: string) {
+export async function getOpportunities(
+  workspaceId?: string,
+  options?: {
+    q?: string
+    stage?: string
+    type?: string
+  }
+) {
   const supabase = await createClient()
+  const q = options?.q?.trim()
+  const stage = options?.stage && options.stage !== 'all' ? options.stage : undefined
+  const type = options?.type && options.type !== 'all' ? options.type : undefined
+
+  let matchedContactIds: string[] = []
+  let matchedCompanyIds: string[] = []
+
+  if (q) {
+    const sanitizedQuery = q.replace(/[,()]/g, ' ').trim()
+    if (sanitizedQuery) {
+      const [contactRes, companyRes] = await Promise.all([
+        (supabase as any)
+          .from('contacts')
+          .select('id')
+          .ilike('full_name', `%${sanitizedQuery}%`),
+        (supabase as any)
+          .from('companies')
+          .select('id')
+          .ilike('name', `%${sanitizedQuery}%`),
+      ])
+
+      if (contactRes.data && contactRes.data.length > 0) {
+        matchedContactIds = contactRes.data.map((c: any) => c.id)
+      }
+      if (companyRes.data && companyRes.data.length > 0) {
+        matchedCompanyIds = companyRes.data.map((c: any) => c.id)
+      }
+    }
+  }
+
   let query = (supabase as any)
     .from('opportunities')
     .select(`
@@ -479,11 +581,34 @@ export async function getOpportunities(workspaceId?: string) {
       company:companies(id, name),
       workspace:workspaces(id, name)
     `)
-    .order('created_at', { ascending: false })
 
   if (workspaceId) {
     query = query.eq('workspace_id', workspaceId)
   }
+
+  if (stage) {
+    query = query.eq('pipeline_stage', stage)
+  }
+
+  if (type) {
+    query = query.eq('type', type)
+  }
+
+  if (q) {
+    const sanitizedQuery = q.replace(/[,()]/g, ' ').trim()
+    if (sanitizedQuery) {
+      const orClauses = [`title.ilike.%${sanitizedQuery}%`]
+      if (matchedContactIds.length > 0) {
+        orClauses.push(`contact_id.in.(${matchedContactIds.join(',')})`)
+      }
+      if (matchedCompanyIds.length > 0) {
+        orClauses.push(`company_id.in.(${matchedCompanyIds.join(',')})`)
+      }
+      query = query.or(orClauses.join(','))
+    }
+  }
+
+  query = query.order('created_at', { ascending: false })
 
   const { data, error } = await query
   if (error) throw new Error(error.message)
