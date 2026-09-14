@@ -926,6 +926,65 @@ export interface Database {
           updated_at?: string
         }
       }
+      research_records: {
+        Row: {
+          id: string
+          workspace_id: string
+          title: string
+          research_type: 'protocol' | 'market' | 'tokenomics' | 'growth' | 'company' | 'person' | 'product' | 'technology' | 'regulatory' | 'pevra' | 'other'
+          status: 'planning' | 'active' | 'paused' | 'completed' | 'archived'
+          priority: 'low' | 'medium' | 'high' | 'urgent'
+          research_question: string | null
+          objective: string | null
+          summary: string | null
+          findings: string | null
+          conclusion: string | null
+          next_action: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+          completed_at: string | null
+          archived_at: string | null
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          title: string
+          research_type?: 'protocol' | 'market' | 'tokenomics' | 'growth' | 'company' | 'person' | 'product' | 'technology' | 'regulatory' | 'pevra' | 'other'
+          status?: 'planning' | 'active' | 'paused' | 'completed' | 'archived'
+          priority?: 'low' | 'medium' | 'high' | 'urgent'
+          research_question?: string | null
+          objective?: string | null
+          summary?: string | null
+          findings?: string | null
+          conclusion?: string | null
+          next_action?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+          completed_at?: string | null
+          archived_at?: string | null
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          title?: string
+          research_type?: 'protocol' | 'market' | 'tokenomics' | 'growth' | 'company' | 'person' | 'product' | 'technology' | 'regulatory' | 'pevra' | 'other'
+          status?: 'planning' | 'active' | 'paused' | 'completed' | 'archived'
+          priority?: 'low' | 'medium' | 'high' | 'urgent'
+          research_question?: string | null
+          objective?: string | null
+          summary?: string | null
+          findings?: string | null
+          conclusion?: string | null
+          next_action?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+          completed_at?: string | null
+          archived_at?: string | null
+        }
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>

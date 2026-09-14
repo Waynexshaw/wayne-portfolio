@@ -1568,3 +1568,289 @@ export async function createOpportunity(formData: {
   revalidatePath('/vault')
   return data
 }
+
+// ---------------------------------------------------------------------------
+// RESEARCH RECORDS ACTIONS (PHASE 1)
+// ---------------------------------------------------------------------------
+
+export type ResearchType =
+  | 'protocol'
+  | 'market'
+  | 'tokenomics'
+  | 'growth'
+  | 'company'
+  | 'person'
+  | 'product'
+  | 'technology'
+  | 'regulatory'
+  | 'pevra'
+  | 'other'
+
+export type ResearchStatus = 'planning' | 'active' | 'paused' | 'completed' | 'archived'
+export type ResearchPriority = 'low' | 'medium' | 'high' | 'urgent'
+
+export async function getResearchRecords(
+  workspaceId?: string,
+  options?: {
+    q?: string
+    status?: string
+    type?: string
+    priority?: string
+  }
+) {
+  const supabase = await createClient()
+  const q = options?.q?.trim()
+  const status = options?.status && options.status !== 'all' ? options.status : undefined
+  const type = options?.type && options.type !== 'all' ? options.type : undefined
+  const priority = options?.priority && options.priority !== 'all' ? options.priority : undefined
+
+  if (!workspaceId) return []
+
+  // Verify workspace authorization
+  const { data: ws } = await (supabase as any)
+    .from('workspaces')
+    .select('id')
+    .eq('id', workspaceId)
+    .maybeSingle()
+  if (!ws) return []
+
+  let query = (supabase as any)
+    .from('research_records')
+    .select('*')
+    .eq('workspace_id', workspaceId)
+
+  if (status) {
+    query = query.eq('status', status)
+  } else {
+    // By default exclude archived unless explicitly requested
+    query = query.neq('status', 'archived')
+  }
+
+  if (type) {
+    query = query.eq('research_type', type)
+  }
+
+  if (priority) {
+    query = query.eq('priority', priority)
+  }
+
+  if (q) {
+    const sanitizedQuery = q.replace(/[,()]/g, ' ').trim()
+    if (sanitizedQuery) {
+      const orClauses = [
+        `title.ilike.%${sanitizedQuery}%`,
+        `research_question.ilike.%${sanitizedQuery}%`,
+        `objective.ilike.%${sanitizedQuery}%`,
+        `summary.ilike.%${sanitizedQuery}%`,
+        `findings.ilike.%${sanitizedQuery}%`,
+        `conclusion.ilike.%${sanitizedQuery}%`,
+        `next_action.ilike.%${sanitizedQuery}%`,
+      ]
+      query = query.or(orClauses.join(','))
+    }
+  }
+
+  query = query.order('updated_at', { ascending: false })
+
+  const { data, error } = await query
+  if (error) throw new Error(error.message)
+  return (data || []) as any[]
+}
+
+export async function getResearchDetail(id: string, workspaceId?: string) {
+  if (!workspaceId || !id) return null
+  const supabase = await createClient()
+
+  // Verify workspace authorization
+  const { data: ws } = await (supabase as any)
+    .from('workspaces')
+    .select('id')
+    .eq('id', workspaceId)
+    .maybeSingle()
+  if (!ws) return null
+
+  const { data, error } = await (supabase as any)
+    .from('research_records')
+    .select('*')
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(error.message)
+  }
+  return data
+}
+
+export async function createResearchRecord(formData: {
+  workspaceId: string
+  title: string
+  researchType?: ResearchType
+  status?: ResearchStatus
+  priority?: ResearchPriority
+  researchQuestion?: string
+  objective?: string
+  summary?: string
+  findings?: string
+  conclusion?: string
+  nextAction?: string
+}) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // Verify workspace authorization
+  const { data: ws } = await (supabase as any)
+    .from('workspaces')
+    .select('id')
+    .eq('id', formData.workspaceId)
+    .maybeSingle()
+  if (!ws) throw new Error('Workspace not found or access denied')
+
+  if (!formData.title || !formData.title.trim()) {
+    throw new Error('Title is required')
+  }
+
+  const { data, error } = await (supabase as any)
+    .from('research_records')
+    .insert({
+      workspace_id: formData.workspaceId,
+      title: formData.title.trim(),
+      research_type: formData.researchType || 'market',
+      status: formData.status || 'planning',
+      priority: formData.priority || 'medium',
+      research_question: formData.researchQuestion?.trim() || null,
+      objective: formData.objective?.trim() || null,
+      summary: formData.summary?.trim() || null,
+      findings: formData.findings?.trim() || null,
+      conclusion: formData.conclusion?.trim() || null,
+      next_action: formData.nextAction?.trim() || null,
+      created_by: user.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      completed_at: formData.status === 'completed' ? new Date().toISOString() : null,
+      archived_at: formData.status === 'archived' ? new Date().toISOString() : null,
+    })
+    .select()
+    .single()
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/vault/research')
+  revalidatePath('/vault')
+  return data
+}
+
+export async function updateResearchRecord(
+  id: string,
+  formData: {
+    workspaceId: string
+    title?: string
+    researchType?: ResearchType
+    status?: ResearchStatus
+    priority?: ResearchPriority
+    researchQuestion?: string
+    objective?: string
+    summary?: string
+    findings?: string
+    conclusion?: string
+    nextAction?: string
+  }
+) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // Verify workspace authorization
+  const { data: ws } = await (supabase as any)
+    .from('workspaces')
+    .select('id')
+    .eq('id', formData.workspaceId)
+    .maybeSingle()
+  if (!ws) throw new Error('Workspace not found or access denied')
+
+  // Verify record exists in workspace
+  const { data: existing } = await (supabase as any)
+    .from('research_records')
+    .select('id, status')
+    .eq('id', id)
+    .eq('workspace_id', formData.workspaceId)
+    .maybeSingle()
+  if (!existing) throw new Error('Research record not found or access denied')
+
+  const updates: any = {
+    updated_at: new Date().toISOString(),
+  }
+
+  if (formData.title !== undefined) updates.title = formData.title.trim()
+  if (formData.researchType !== undefined) updates.research_type = formData.researchType
+  if (formData.status !== undefined) {
+    updates.status = formData.status
+    if (formData.status === 'completed') {
+      updates.completed_at = new Date().toISOString()
+    } else if (existing.status === 'completed') {
+      updates.completed_at = null
+    }
+    if (formData.status === 'archived') {
+      updates.archived_at = new Date().toISOString()
+    } else if (existing.status === 'archived') {
+      updates.archived_at = null
+    }
+  }
+  if (formData.priority !== undefined) updates.priority = formData.priority
+  if (formData.researchQuestion !== undefined) updates.research_question = formData.researchQuestion.trim() || null
+  if (formData.objective !== undefined) updates.objective = formData.objective.trim() || null
+  if (formData.summary !== undefined) updates.summary = formData.summary.trim() || null
+  if (formData.findings !== undefined) updates.findings = formData.findings.trim() || null
+  if (formData.conclusion !== undefined) updates.conclusion = formData.conclusion.trim() || null
+  if (formData.nextAction !== undefined) updates.next_action = formData.nextAction.trim() || null
+
+  const { data, error } = await (supabase as any)
+    .from('research_records')
+    .update(updates)
+    .eq('id', id)
+    .eq('workspace_id', formData.workspaceId)
+    .select()
+    .single()
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath(`/vault/research/${id}`)
+  revalidatePath('/vault/research')
+  revalidatePath('/vault')
+  return data
+}
+
+export async function archiveResearchRecord(id: string, workspaceId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // Verify workspace authorization
+  const { data: ws } = await (supabase as any)
+    .from('workspaces')
+    .select('id')
+    .eq('id', workspaceId)
+    .maybeSingle()
+  if (!ws) throw new Error('Workspace not found or access denied')
+
+  const now = new Date().toISOString()
+  const { data, error } = await (supabase as any)
+    .from('research_records')
+    .update({
+      status: 'archived',
+      archived_at: now,
+      updated_at: now,
+    })
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .select()
+    .single()
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath(`/vault/research/${id}`)
+  revalidatePath('/vault/research')
+  revalidatePath('/vault')
+  return data
+}
