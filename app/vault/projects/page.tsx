@@ -1,5 +1,6 @@
+import Link from 'next/link'
 import { getVaultContext, getWorkspaceProjects } from '@/lib/vault/actions'
-import { FolderGit2, Calendar, Shield } from 'lucide-react'
+import { FolderGit2, Calendar, Shield, ArrowUpRight } from 'lucide-react'
 import { ProjectCreateButton } from './create-button'
 
 export const dynamic = 'force-dynamic'
@@ -41,12 +42,16 @@ export default async function VaultProjectsPage() {
           </div>
         ) : (
           internalProjects.map((proj: any) => (
-            <div 
+            <Link
               key={proj.id} 
-              className="p-5 rounded-xl bg-card border border-border space-y-3 hover:border-primary/40 transition-colors"
+              href={`/vault/projects/${proj.id}`}
+              className="block p-5 rounded-xl bg-card border border-border space-y-3 hover:border-primary/40 transition-colors group cursor-pointer"
             >
               <div className="flex items-start justify-between">
-                <h3 className="text-base font-medium text-foreground">{proj.title}</h3>
+                <h3 className="text-base font-medium text-foreground group-hover:text-primary transition-colors flex items-center gap-1.5">
+                  {proj.title}
+                  <ArrowUpRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground" />
+                </h3>
                 <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-primary/10 text-primary">
                   {proj.status}
                 </span>
@@ -67,7 +72,7 @@ export default async function VaultProjectsPage() {
                 )}
                 <span>Priority: {proj.priority}</span>
               </div>
-            </div>
+            </Link>
           ))
         )}
       </div>

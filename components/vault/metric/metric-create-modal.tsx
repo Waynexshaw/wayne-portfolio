@@ -19,6 +19,7 @@ export interface MetricCreateModalProps {
   workspaceId: string
   projects?: { id: string; title: string }[]
   onSuccess?: (newMetricId?: string) => void
+  defaultProjectId?: string
 }
 
 const CATEGORIES: { value: MetricCategory; label: string }[] = [
@@ -75,6 +76,7 @@ export function MetricCreateModal({
   workspaceId,
   projects: initialProjects,
   onSuccess,
+  defaultProjectId,
 }: MetricCreateModalProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -90,7 +92,7 @@ export function MetricCreateModal({
   const [direction, setDirection] = useState<MetricDirection>('higher_is_better')
   const [measurementType, setMeasurementType] = useState<MetricMeasurementType>('point')
   const [cadence, setCadence] = useState<string>('')
-  const [projectId, setProjectId] = useState<string>('')
+  const [projectId, setProjectId] = useState<string>(defaultProjectId || '')
 
   const [projects, setProjects] = useState<{ id: string; title: string }[]>(initialProjects || [])
 
@@ -120,6 +122,7 @@ export function MetricCreateModal({
           setProjects(res.map((p) => ({ id: p.id, title: p.title })))
         }).catch(() => {})
       }
+      setProjectId(defaultProjectId || '')
       setError(null)
     } else {
       setName('')
@@ -132,10 +135,10 @@ export function MetricCreateModal({
       setDirection('higher_is_better')
       setMeasurementType('point')
       setCadence('')
-      setProjectId('')
+      setProjectId(defaultProjectId || '')
       setError(null)
     }
-  }, [isOpen, workspaceId, initialProjects])
+  }, [isOpen, workspaceId, initialProjects, defaultProjectId])
 
   if (!isOpen) return null
 

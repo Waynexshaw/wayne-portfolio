@@ -1191,6 +1191,261 @@ export async function createWorkspaceProject(formData: {
   return data
 }
 
+export type WorkspaceProjectStatus = 'planning' | 'active' | 'paused' | 'completed' | 'archived'
+export type WorkspaceProjectPriority = 'low' | 'medium' | 'high' | 'urgent'
+export type ProjectLifecycleAction =
+  | 'start'
+  | 'pause'
+  | 'resume'
+  | 'complete'
+  | 'reopen'
+  | 'archive'
+  | 'restore'
+
+export interface WorkspaceProjectDetail {
+  id: string
+  workspace_id: string
+  identity_id: string | null
+  title: string
+  slug: string
+  description: string | null
+  status: WorkspaceProjectStatus
+  priority: WorkspaceProjectPriority
+  start_date: string | null
+  target_date: string | null
+  completed_at: string | null
+  archived_at: string | null
+  metadata: any
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  identity?: {
+    id: string
+    name: string
+    handle?: string
+    avatar_url?: string | null
+    primary_color?: string | null
+  } | null
+}
+
+export async function getWorkspaceProjectDetail(
+  id: string,
+  workspaceId: string
+): Promise<WorkspaceProjectDetail | null> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  // Verify workspace membership
+  const { data: membership } = await (supabase as any)
+    .from('workspace_members')
+    .select('role')
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (!membership) return null
+
+  const { data, error } = await (supabase as any)
+    .from('workspace_projects')
+    .select('*, identity:identities(*)')
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .maybeSingle()
+
+  if (error || !data) return null
+  return data as WorkspaceProjectDetail
+}
+
+export async function updateWorkspaceProject(
+  id: string,
+  workspaceId: string,
+  formData: {
+    title?: string
+    description?: string | null
+    priority?: WorkspaceProjectPriority
+    identityId?: string | null
+    startDate?: string | null
+    targetDate?: string | null
+  }
+): Promise<WorkspaceProjectDetail> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // Verify membership
+  const { data: membership } = await (supabase as any)
+    .from('workspace_members')
+    .select('role')
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (!membership) throw new Error('Unauthorized')
+
+  // Verify project exists in this workspace
+  const { data: existing } = await (supabase as any)
+    .from('workspace_projects')
+    .select('id, workspace_id, status, identity_id')
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .maybeSingle()
+
+  if (!existing) throw new Error('Project not found or access denied')
+
+  const updates: any = {
+    updated_at: new Date().toISOString(),
+  }
+
+  if (formData.title !== undefined) {
+    const t = formData.title.trim()
+    if (!t) throw new Error('Title is required')
+    updates.title = t
+  }
+  if (formData.description !== undefined) {
+    updates.description = formData.description?.trim() || null
+  }
+  if (formData.priority !== undefined) {
+    updates.priority = formData.priority
+  }
+  if (formData.identityId !== undefined) {
+    updates.identity_id = formData.identityId || null
+  }
+  if (formData.startDate !== undefined) {
+    updates.start_date = formData.startDate || null
+  }
+  if (formData.targetDate !== undefined) {
+    updates.target_date = formData.targetDate || null
+  }
+
+  const { data, error } = await (supabase as any)
+    .from('workspace_projects')
+    .update(updates)
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .select('*, identity:identities(*)')
+    .single()
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/vault/projects')
+  revalidatePath(`/vault/projects/${id}`)
+  revalidatePath('/vault')
+
+  return data as WorkspaceProjectDetail
+}
+
+export async function updateProjectLifecycle(
+  id: string,
+  workspaceId: string,
+  action: ProjectLifecycleAction
+): Promise<WorkspaceProjectDetail> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // Verify membership
+  const { data: membership } = await (supabase as any)
+    .from('workspace_members')
+    .select('role')
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (!membership) throw new Error('Unauthorized')
+
+  // Verify project exists in this workspace
+  const { data: existing } = await (supabase as any)
+    .from('workspace_projects')
+    .select('id, workspace_id, status, completed_at, archived_at')
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .maybeSingle()
+
+  if (!existing) throw new Error('Project not found or access denied')
+
+  const now = new Date().toISOString()
+  const updates: any = {
+    updated_at: now,
+  }
+
+  switch (action) {
+    case 'start': // planning -> active
+      if (existing.status !== 'planning') {
+        throw new Error(`Cannot start project from status '${existing.status}'`)
+      }
+      updates.status = 'active'
+      break
+
+    case 'pause': // active -> paused
+      if (existing.status !== 'active') {
+        throw new Error(`Cannot pause project from status '${existing.status}'`)
+      }
+      updates.status = 'paused'
+      break
+
+    case 'resume': // paused -> active
+      if (existing.status !== 'paused') {
+        throw new Error(`Cannot resume project from status '${existing.status}'`)
+      }
+      updates.status = 'active'
+      break
+
+    case 'complete': // active or paused -> completed
+      if (existing.status !== 'active' && existing.status !== 'paused') {
+        throw new Error(`Cannot complete project from status '${existing.status}'`)
+      }
+      updates.status = 'completed'
+      updates.completed_at = now
+      break
+
+    case 'reopen': // completed -> active
+      if (existing.status !== 'completed') {
+        throw new Error(`Cannot reopen project from status '${existing.status}'`)
+      }
+      updates.status = 'active'
+      updates.completed_at = null
+      break
+
+    case 'archive': // from any non-archived state -> archived
+      if (existing.status === 'archived') {
+        throw new Error('Project is already archived')
+      }
+      updates.status = 'archived'
+      updates.archived_at = now
+      // Preserve existing completed_at (per Prompt section 8)
+      break
+
+    case 'restore': // archived -> active
+      if (existing.status !== 'archived') {
+        throw new Error('Project is not archived')
+      }
+      updates.status = 'active'
+      updates.archived_at = null
+      // Preserve existing completed_at (per Prompt section 8)
+      break
+
+    default:
+      throw new Error(`Invalid lifecycle action: ${action}`)
+  }
+
+  const { data, error } = await (supabase as any)
+    .from('workspace_projects')
+    .update(updates)
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .select('*, identity:identities(*)')
+    .single()
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/vault/projects')
+  revalidatePath(`/vault/projects/${id}`)
+  revalidatePath('/vault')
+
+  return data as WorkspaceProjectDetail
+}
+
 // ---------------------------------------------------------------------------
 // Contact Detail & Relationship Management
 // ---------------------------------------------------------------------------
@@ -3990,6 +4245,144 @@ export async function deleteReviewConnection(connectionId: string, workspaceId: 
   revalidatePath(`/vault/reviews/${existing.review_id}`)
   revalidatePath('/vault/reviews')
   return true
+}
+
+export type RelatedReviewEntityType = 'contact' | 'company' | 'opportunity' | 'project' | 'research'
+
+export interface RelatedReviewItem {
+  id: string
+  review_id: string
+  relationship_type: string
+  notes: string | null
+  created_at: string
+  review: {
+    id: string
+    workspace_id: string
+    title: string
+    review_type: ReviewType
+    status: ReviewStatus
+    period_start: string | null
+    period_end: string | null
+    summary: string | null
+    created_at: string
+    updated_at: string
+    archived_at: string | null
+    completed_at: string | null
+  }
+}
+
+export async function getRelatedReviewsForEntity(
+  workspaceId: string,
+  entityType: RelatedReviewEntityType,
+  entityId: string
+): Promise<RelatedReviewItem[]> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+
+  // 1. Verify workspace membership
+  const { data: membership } = await (supabase as any)
+    .from('workspace_members')
+    .select('role')
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+  if (!membership) return []
+
+  // 2. Verify target entity exists in workspace
+  if (entityType === 'contact') {
+    const { data: contact } = await (supabase as any)
+      .from('workspace_contacts')
+      .select('contact_id')
+      .eq('workspace_id', workspaceId)
+      .eq('contact_id', entityId)
+      .maybeSingle()
+    if (!contact) return []
+  } else if (entityType === 'company') {
+    const { data: company } = await (supabase as any)
+      .from('workspace_companies')
+      .select('company_id')
+      .eq('workspace_id', workspaceId)
+      .eq('company_id', entityId)
+      .maybeSingle()
+    if (!company) return []
+  } else if (entityType === 'opportunity') {
+    const { data: opp } = await (supabase as any)
+      .from('opportunities')
+      .select('id')
+      .eq('workspace_id', workspaceId)
+      .eq('id', entityId)
+      .maybeSingle()
+    if (!opp) return []
+  } else if (entityType === 'project') {
+    const { data: proj } = await (supabase as any)
+      .from('workspace_projects')
+      .select('id')
+      .eq('workspace_id', workspaceId)
+      .eq('id', entityId)
+      .maybeSingle()
+    if (!proj) return []
+  } else if (entityType === 'research') {
+    const { data: res } = await (supabase as any)
+      .from('research_records')
+      .select('id')
+      .eq('workspace_id', workspaceId)
+      .eq('id', entityId)
+      .maybeSingle()
+    if (!res) return []
+  } else {
+    return []
+  }
+
+  // 3. Map entityType to target column
+  const columnMap: Record<RelatedReviewEntityType, string> = {
+    contact: 'contact_id',
+    company: 'company_id',
+    opportunity: 'opportunity_id',
+    project: 'project_id',
+    research: 'research_record_id',
+  }
+  const targetCol = columnMap[entityType]
+
+  // 4. Query review_connections and join reviews
+  const { data, error } = await (supabase as any)
+    .from('review_connections')
+    .select(`
+      id,
+      relationship_type,
+      notes,
+      created_at,
+      review:reviews(
+        id,
+        workspace_id,
+        title,
+        review_type,
+        status,
+        period_start,
+        period_end,
+        summary,
+        created_at,
+        updated_at,
+        archived_at,
+        completed_at
+      )
+    `)
+    .eq('workspace_id', workspaceId)
+    .eq(targetCol, entityId)
+    .order('created_at', { ascending: false })
+
+  if (error || !data) return []
+
+  return data
+    .filter((row: any) => row.review && row.review.id)
+    .map((row: any) => ({
+      id: row.id,
+      review_id: row.review.id,
+      relationship_type: row.relationship_type,
+      notes: row.notes,
+      created_at: row.created_at,
+      review: row.review,
+    }))
 }
 
 // ---------------------------------------------------------------------------
