@@ -164,7 +164,7 @@ function VaultLoginForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="defiwaynex@gmail.com"
-                className="w-full px-3.5 py-2.5 rounded-lg bg-secondary/40 border border-border text-foreground text-xs focus:outline-none focus:border-primary transition-colors"
+                className="w-full px-3.5 py-2.5 rounded-lg bg-secondary/40 border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
               />
             </div>
 
@@ -178,14 +178,14 @@ function VaultLoginForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
-                className="w-full px-3.5 py-2.5 rounded-lg bg-secondary/40 border border-border text-foreground text-xs focus:outline-none focus:border-primary transition-colors"
+                className="w-full px-3.5 py-2.5 rounded-lg bg-secondary/40 border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
               />
             </div>
 
             <button
               type="submit"
               disabled={isEmailLoading || isGoogleLoading}
-              className="w-full py-2.5 px-4 rounded-lg bg-primary text-primary-foreground text-xs font-medium flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors disabled:opacity-50"
+              className="w-full py-2.5 px-4 rounded-lg bg-primary text-primary-foreground text-xs font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50"
             >
               {isEmailLoading ? (
                 <>
@@ -204,7 +204,7 @@ function VaultLoginForm() {
 
         {/* Security Assurance Badge */}
         <div className="pt-2 border-t border-border/50 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground font-mono">
-          <Lock className="w-3 h-3 text-emerald-400" />
+          <Lock className="w-3 h-3 text-[#2DB52D]" />
           <span>Supabase Auth · Row Level Security</span>
         </div>
       </div>

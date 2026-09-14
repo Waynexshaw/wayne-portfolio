@@ -19,7 +19,7 @@ export default async function VaultLayout({
   const vaultContext = await getVaultContext()
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex">
+    <div className="vault-theme min-h-screen bg-background text-foreground flex">
       <VaultSidebar
         workspaces={vaultContext?.workspaces || []}
         activeWorkspace={vaultContext?.activeWorkspace}

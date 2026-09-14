@@ -40,7 +40,7 @@ export function VaultHeader({
         {/* Active Identity Badge */}
         {activeIdentity && (
           <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary/80 border border-border text-xs">
-            <Shield className="w-3.5 h-3.5 text-electric" />
+            <Shield className="w-3.5 h-3.5 text-primary" />
             <span className="text-muted-foreground font-mono">Operating:</span>
             <strong className="text-foreground font-medium">{activeIdentity.name}</strong>
             {activeIdentity.handle && (

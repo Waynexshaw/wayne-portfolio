@@ -63,13 +63,13 @@ export function WorkspaceSwitcher({
   const getTypeIcon = (type: string) => {
     switch (type) {
       case 'venture':
-        return <Sparkles className="w-3.5 h-3.5 text-primary" />
+        return <Sparkles className="w-3.5 h-3.5 text-[hsl(var(--vault-sidebar-active-border))]" />
       case 'advisory':
-        return <Briefcase className="w-3.5 h-3.5 text-electric" />
+        return <Briefcase className="w-3.5 h-3.5 text-[hsl(var(--vault-sidebar-active-border))]" />
       case 'personal':
-        return <User className="w-3.5 h-3.5 text-amber-400" />
+        return <User className="w-3.5 h-3.5 text-[hsl(var(--vault-sidebar-active-border))]" />
       default:
-        return <Layers className="w-3.5 h-3.5 text-primary" />
+        return <Layers className="w-3.5 h-3.5 text-[hsl(var(--vault-sidebar-active-border))]" />
     }
   }
 
@@ -80,47 +80,47 @@ export function WorkspaceSwitcher({
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         disabled={isPending}
-        className={`w-full text-left p-2.5 rounded-lg bg-secondary/50 border transition-all ${
-          isOpen 
-            ? 'border-primary/60 shadow-sm bg-secondary/80' 
-            : 'border-border/80 hover:border-primary/40 hover:bg-secondary/70'
+        className={`w-full text-left p-2.5 rounded-lg border transition-all ${
+          isOpen
+            ? 'bg-black/20 border-[hsl(var(--vault-sidebar-active-border))] shadow-xs'
+            : 'bg-black/10 border-[hsl(var(--vault-sidebar-border))] hover:border-[hsl(var(--vault-sidebar-active-border))]/50 hover:bg-black/15'
         }`}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
       >
-        <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+        <div className="flex items-center justify-between text-xs text-[hsl(var(--vault-sidebar-muted))] mb-1">
           <span className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider">
-            <Layers className="w-3 h-3 text-primary" />
+            <Layers className="w-3 h-3 text-[hsl(var(--vault-sidebar-active-border))]" />
             Active Workspace
           </span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium uppercase font-mono">
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[hsl(var(--vault-sidebar-active-bg))] text-[hsl(var(--vault-sidebar-active-fg))] font-medium uppercase font-mono">
             {activeWorkspace?.workspace_type || 'venture'}
           </span>
         </div>
 
         <div className="flex items-center justify-between gap-2">
-          <div className="text-sm font-medium text-foreground truncate flex items-center gap-1.5">
+          <div className="text-sm font-medium text-[hsl(var(--vault-sidebar-fg))] truncate flex items-center gap-1.5">
             {isPending ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-[hsl(var(--vault-sidebar-active-border))]" />
             ) : (
               getTypeIcon(activeWorkspace?.workspace_type || 'venture')
             )}
             <span className="truncate">{activeWorkspace?.name || 'Select Workspace'}</span>
           </div>
-          <ChevronsUpDown className="w-3.5 h-3.5 text-muted-foreground shrink-0 opacity-60" />
+          <ChevronsUpDown className="w-3.5 h-3.5 text-[hsl(var(--vault-sidebar-muted))] shrink-0 opacity-60" />
         </div>
 
         {/* Operating Identity Display */}
         {activeIdentity && (
-          <div className="mt-2 pt-2 border-t border-border/50 flex items-center justify-between text-[11px] text-muted-foreground">
+          <div className="mt-2 pt-2 border-t border-[hsl(var(--vault-sidebar-border))] flex items-center justify-between text-[11px] text-[hsl(var(--vault-sidebar-muted))]">
             <div className="flex items-center gap-1.5 truncate">
-              <Shield className="w-3 h-3 text-electric shrink-0" />
+              <Shield className="w-3 h-3 text-[hsl(var(--vault-sidebar-active-border))] shrink-0" />
               <span className="truncate">
-                Identity: <strong className="text-foreground">{activeIdentity.name}</strong>
+                Identity: <strong className="text-[hsl(var(--vault-sidebar-fg))]">{activeIdentity.name}</strong>
               </span>
             </div>
             {activeIdentity.handle && (
-              <span className="font-mono text-[10px] text-muted-foreground shrink-0">
+              <span className="font-mono text-[10px] text-[hsl(var(--vault-sidebar-muted))] shrink-0">
                 {activeIdentity.handle}
               </span>
             )}

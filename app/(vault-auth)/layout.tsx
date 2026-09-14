@@ -15,7 +15,7 @@ export default function VaultAuthLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+    <div className="vault-theme min-h-screen flex items-center justify-center bg-background px-4">
       {children}
     </div>
   )

@@ -48,21 +48,16 @@ export function VaultSidebar({
   const pathname = usePathname()
 
   return (
-    <aside className="w-64 border-r border-border bg-card/60 backdrop-blur-md flex flex-col fixed inset-y-0 z-30">
+    <aside className="w-64 border-r border-[hsl(var(--vault-sidebar-border))] bg-[hsl(var(--vault-sidebar-bg))] text-[hsl(var(--vault-sidebar-fg))] flex flex-col fixed inset-y-0 z-30 transition-colors duration-200">
       {/* Brand Header */}
-      <div className="p-5 border-b border-border">
+      <div className="p-5 border-b border-[hsl(var(--vault-sidebar-border))]">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-primary/20 border border-primary/40 flex items-center justify-center font-serif text-lg font-bold text-primary">
+          <div className="w-8 h-8 rounded-lg bg-[hsl(var(--vault-sidebar-active-bg))] border border-[hsl(var(--vault-sidebar-active-border))] flex items-center justify-center font-serif text-lg font-bold text-[hsl(var(--vault-sidebar-active-fg))]">
             WV
           </div>
-          <div>
-            <h1 className="font-serif text-base font-medium tracking-tight text-foreground">
-              Waynex Vault
-            </h1>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono">
-              Professional OS
-            </p>
-          </div>
+          <h1 className="font-serif text-base font-medium tracking-tight text-[hsl(var(--vault-sidebar-fg))]">
+            Waynex Vault
+          </h1>
         </div>
 
         {/* Interactive Workspace Switcher */}
@@ -88,8 +83,8 @@ export function VaultSidebar({
               className={cn(
                 'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-primary/15 text-primary border border-primary/20'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60'
+                  ? 'bg-[hsl(var(--vault-sidebar-active-bg))] text-[hsl(var(--vault-sidebar-active-fg))] border border-[hsl(var(--vault-sidebar-active-border))] font-semibold'
+                  : 'text-[hsl(var(--vault-sidebar-muted))] hover:text-[hsl(var(--vault-sidebar-fg))] hover:bg-[hsl(var(--vault-sidebar-hover))]'
               )}
             >
               <Icon className="w-4 h-4 shrink-0" />
@@ -100,13 +95,13 @@ export function VaultSidebar({
       </nav>
 
       {/* Bottom Switcher Links */}
-      <div className="p-3 border-t border-border space-y-1 bg-card/40">
+      <div className="p-3 border-t border-[hsl(var(--vault-sidebar-border))] space-y-1 bg-black/10">
         <Link
           href="/admin"
-          className="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors"
+          className="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-[hsl(var(--vault-sidebar-muted))] hover:text-[hsl(var(--vault-sidebar-fg))] hover:bg-[hsl(var(--vault-sidebar-hover))] transition-colors"
         >
           <span className="flex items-center gap-2">
-            <Briefcase className="w-3.5 h-3.5 text-primary" />
+            <Briefcase className="w-3.5 h-3.5 text-[hsl(var(--vault-sidebar-active-border))]" />
             Admin Portfolio CMS
           </span>
           <ExternalLink className="w-3 h-3 opacity-60" />
@@ -114,13 +109,13 @@ export function VaultSidebar({
         <Link
           href="/"
           target="_blank"
-          className="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors"
+          className="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-[hsl(var(--vault-sidebar-muted))] hover:text-[hsl(var(--vault-sidebar-fg))] hover:bg-[hsl(var(--vault-sidebar-hover))] transition-colors"
         >
           <span className="flex items-center gap-2">
-            <ExternalLink className="w-3.5 h-3.5 text-electric" />
+            <ExternalLink className="w-3.5 h-3.5 text-[hsl(var(--vault-sidebar-active-border))]" />
             Public Portfolio
           </span>
-          <span className="text-[10px] font-mono text-muted-foreground">Live</span>
+          <span className="text-[10px] font-mono text-[hsl(var(--vault-sidebar-muted))]">Live</span>
         </Link>
       </div>
     </aside>

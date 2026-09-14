@@ -51,6 +51,74 @@
     --input: 38 20% 82%;
     --ring: 263 70% 48%;
   }
+
+  /* Waynex Vault — Brand System V1 (Scoped Theme) */
+  /* Dark Mode (Default for Vault) */
+  .vault-theme {
+    --background: 240 8% 5%;          /* Rich Black #0B0B0D */
+    --foreground: 36 24% 96%;         /* Warm White #F7F5F2 */
+    --card: 250 12% 8%;               /* Near-black #131217 */
+    --card-foreground: 36 24% 96%;
+    --popover: 250 12% 8%;
+    --popover-foreground: 36 24% 96%;
+    --primary: 268 60% 65%;           /* Soft Violet #A270DB */
+    --primary-foreground: 240 8% 5%;  /* Rich Black #0B0B0D */
+    --secondary: 250 15% 12%;         /* Near-black neutral #1B1922 */
+    --secondary-foreground: 36 24% 96%;
+    --muted: 250 14% 11%;             /* Near-black muted #18161E */
+    --muted-foreground: 250 8% 66%;   /* Muted Lavender-Gray #A5A2B0 */
+    --accent: 260 25% 15%;            /* Subtle dark purple accent */
+    --accent-foreground: 268 60% 75%;
+    --destructive: 348 83% 47%;       /* Crimson #DC143C */
+    --destructive-foreground: 36 24% 96%;
+    --border: 250 15% 15%;            /* Subtle border #23202C */
+    --input: 250 15% 15%;
+    --ring: 268 60% 65%;              /* Soft Violet #A270DB */
+
+    /* Vault Sidebar Custom Tokens */
+    --vault-sidebar-bg: 250 15% 7%;           /* Near-black #0F0E14 */
+    --vault-sidebar-fg: 36 24% 96%;          /* Warm White #F7F5F2 */
+    --vault-sidebar-border: 250 20% 15%;      /* Subtle dark purple border */
+    --vault-sidebar-muted: 250 8% 65%;
+    --vault-sidebar-hover: 260 25% 12%;
+    --vault-sidebar-active-bg: 268 60% 65% / 0.14;
+    --vault-sidebar-active-fg: 268 60% 75%;
+    --vault-sidebar-active-border: 268 60% 65%; /* Soft Violet #A270DB */
+  }
+
+  /* Light Mode Override */
+  .light .vault-theme,
+  .vault-theme.light {
+    --background: 36 24% 96%;         /* Warm White #F7F5F2 */
+    --foreground: 240 8% 5%;          /* Rich Black #0B0B0D */
+    --card: 0 0% 100%;                /* Pure White #FFFFFF */
+    --card-foreground: 240 8% 5%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 8% 5%;
+    --primary: 265 54% 26%;           /* Deep Purple #3B1E65 */
+    --primary-foreground: 36 24% 96%; /* Warm White #F7F5F2 */
+    --secondary: 36 14% 89%;          /* Warm Neutral Biscuit #EAE6DF */
+    --secondary-foreground: 240 8% 5%;
+    --muted: 36 16% 92%;              /* Warm Neutral Muted #F0ECE5 */
+    --muted-foreground: 260 5% 38%;   /* Muted Charcoal #605C66 */
+    --accent: 265 30% 94%;            /* Soft Warm Lavender Wash */
+    --accent-foreground: 265 54% 26%;
+    --destructive: 348 83% 47%;       /* Crimson #DC143C */
+    --destructive-foreground: 36 24% 96%;
+    --border: 36 14% 86%;             /* Warm Neutral Border #E2DDD5 */
+    --input: 36 14% 86%;
+    --ring: 268 60% 65%;              /* Soft Violet #A270DB */
+
+    /* Vault Sidebar Custom Tokens (Deep Purple Container in Light Mode) */
+    --vault-sidebar-bg: 265 54% 26%;          /* Deep Purple #3B1E65 */
+    --vault-sidebar-fg: 36 24% 96%;          /* Warm White #F7F5F2 */
+    --vault-sidebar-border: 265 45% 20%;      /* Dark Deep Purple border */
+    --vault-sidebar-muted: 268 25% 75%;
+    --vault-sidebar-hover: 265 50% 32%;
+    --vault-sidebar-active-bg: 268 60% 65% / 0.22;
+    --vault-sidebar-active-fg: 36 24% 98%;
+    --vault-sidebar-active-border: 268 60% 65%; /* Soft Violet #A270DB indicator */
+  }
 }
 
 @layer base {
