@@ -631,21 +631,110 @@ export async function archiveCompany(companyId: string) {
 // Interactions
 // ---------------------------------------------------------------------------
 
-export async function getInteractions(workspaceId?: string) {
+export async function getInteractions(
+  workspaceId?: string,
+  options?: {
+    q?: string
+    channel?: string
+    direction?: string
+    identityId?: string
+  }
+) {
   const supabase = await createClient()
+  const q = options?.q?.trim()
+  const channel = options?.channel && options.channel !== 'all' ? options.channel : undefined
+  const direction = options?.direction && options.direction !== 'all' ? options.direction : undefined
+  const identityId = options?.identityId && options.identityId !== 'all' ? options.identityId : undefined
+
+  if (!workspaceId) return []
+
+  // Verify workspace authorization
+  const { data: ws } = await (supabase as any)
+    .from('workspaces')
+    .select('id')
+    .eq('id', workspaceId)
+    .maybeSingle()
+  if (!ws) return []
+
+  let matchedContactIds: string[] = []
+
+  if (q) {
+    const sanitizedQuery = q.replace(/[,()]/g, ' ').trim()
+    if (sanitizedQuery) {
+      const [contactRes, companyRes] = await Promise.all([
+        (supabase as any)
+          .from('contacts')
+          .select('id')
+          .ilike('full_name', `%${sanitizedQuery}%`),
+        (supabase as any)
+          .from('companies')
+          .select('id')
+          .ilike('name', `%${sanitizedQuery}%`),
+      ])
+
+      if (contactRes.data && contactRes.data.length > 0) {
+        matchedContactIds.push(...contactRes.data.map((c: any) => c.id))
+      }
+      if (companyRes.data && companyRes.data.length > 0) {
+        const compIds = companyRes.data.map((c: any) => c.id)
+        const { data: compContacts } = await (supabase as any)
+          .from('contacts')
+          .select('id')
+          .in('company_id', compIds)
+        if (compContacts && compContacts.length > 0) {
+          matchedContactIds.push(...compContacts.map((c: any) => c.id))
+        }
+      }
+      matchedContactIds = Array.from(new Set(matchedContactIds))
+    }
+  }
+
   let query = (supabase as any)
     .from('interactions')
     .select(`
       *,
-      contact:contacts(id, full_name, email, role_title),
-      identity:identities(id, name, handle),
+      contact:contacts(
+        id,
+        full_name,
+        email,
+        role_title,
+        company:companies(id, name)
+      ),
+      identity:identities(id, name, handle, type),
       workspace:workspaces(id, name)
     `)
-    .order('interaction_date', { ascending: false })
+    .eq('workspace_id', workspaceId)
 
-  if (workspaceId) {
-    query = query.eq('workspace_id', workspaceId)
+  if (channel) {
+    query = query.eq('channel', channel)
   }
+
+  if (direction) {
+    query = query.eq('direction', direction)
+  }
+
+  if (identityId) {
+    query = query.eq('identity_id', identityId)
+  }
+
+  if (q) {
+    const sanitizedQuery = q.replace(/[,()]/g, ' ').trim()
+    if (sanitizedQuery) {
+      const orClauses = [
+        `content.ilike.%${sanitizedQuery}%`,
+        `purpose.ilike.%${sanitizedQuery}%`,
+        `response.ilike.%${sanitizedQuery}%`,
+        `next_action.ilike.%${sanitizedQuery}%`,
+        `subject.ilike.%${sanitizedQuery}%`,
+      ]
+      if (matchedContactIds.length > 0) {
+        orClauses.push(`contact_id.in.(${matchedContactIds.join(',')})`)
+      }
+      query = query.or(orClauses.join(','))
+    }
+  }
+
+  query = query.order('interaction_date', { ascending: false })
 
   const { data, error } = await query
   if (error) throw new Error(error.message)
@@ -667,17 +756,60 @@ export async function logInteraction(formData: {
   nextAction?: string
   followUpAt?: string
   notes?: string
+  interactionDate?: string
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Unauthorized')
 
+  // 1. Verify workspace authorization
+  const { data: ws } = await (supabase as any)
+    .from('workspaces')
+    .select('id')
+    .eq('id', formData.workspaceId)
+    .maybeSingle()
+  if (!ws) throw new Error('Workspace not found or access denied')
+
+  // 2. Verify contact exists, belongs to authenticated owner, and is linked to workspace
+  const { data: contact } = await (supabase as any)
+    .from('contacts')
+    .select('id, workspace_contacts!inner(workspace_id)')
+    .eq('id', formData.contactId)
+    .eq('owner_id', user.id)
+    .is('archived_at', null)
+    .eq('workspace_contacts.workspace_id', formData.workspaceId)
+    .maybeSingle()
+  if (!contact) throw new Error('Contact not found or not associated with this workspace')
+
+  // 3. Verify identity if supplied (must exist and belong to owner)
+  let validatedIdentityId: string | null = null
+  if (formData.identityId) {
+    const { data: ident } = await (supabase as any)
+      .from('identities')
+      .select('id')
+      .eq('id', formData.identityId)
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (!ident) throw new Error('Operating identity not found or access denied')
+    validatedIdentityId = ident.id
+  }
+
+  // 4. Validate and parse interaction_date
+  let parsedDate = new Date().toISOString()
+  if (formData.interactionDate) {
+    const customDate = new Date(formData.interactionDate)
+    if (!isNaN(customDate.getTime())) {
+      parsedDate = customDate.toISOString()
+    }
+  }
+
+  // 5. Insert interaction
   const { data, error } = await (supabase as any)
     .from('interactions')
     .insert({
       workspace_id: formData.workspaceId,
       contact_id: formData.contactId,
-      identity_id: formData.identityId || null,
+      identity_id: validatedIdentityId,
       channel: formData.channel,
       direction: formData.direction,
       purpose: formData.purpose || null,
@@ -689,6 +821,7 @@ export async function logInteraction(formData: {
       next_action: formData.nextAction || null,
       follow_up_at: formData.followUpAt || null,
       notes: formData.notes || null,
+      interaction_date: parsedDate,
       created_by: user.id,
     })
     .select()
@@ -696,31 +829,18 @@ export async function logInteraction(formData: {
 
   if (error) throw new Error(error.message)
 
-  // If followUpAt is set, auto-create a pending follow-up
-  if (formData.followUpAt) {
-    await (supabase as any).from('follow_ups').insert({
-      workspace_id: formData.workspaceId,
-      contact_id: formData.contactId,
-      interaction_id: data.id,
-      title: formData.nextAction || `Follow up on: ${formData.subject || formData.channel}`,
-      due_date: formData.followUpAt,
-      status: 'pending',
-      created_by: user.id,
-    })
-  }
-
-  // Update contact's last_contacted_at in workspace_contacts
+  // 6. Update contact's last_contacted_at in workspace_contacts
   await (supabase as any)
     .from('workspace_contacts')
     .update({ 
-      last_contacted_at: new Date().toISOString(),
+      last_contacted_at: parsedDate,
       ...(formData.followUpAt ? { next_follow_up_at: formData.followUpAt } : {})
     })
     .match({ workspace_id: formData.workspaceId, contact_id: formData.contactId })
 
   revalidatePath('/vault/interactions')
-  revalidatePath('/vault/follow-ups')
   revalidatePath('/vault/contacts')
+  revalidatePath(`/vault/contacts/${formData.contactId}`)
   revalidatePath('/vault')
   return data
 }
