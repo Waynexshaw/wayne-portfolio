@@ -251,6 +251,32 @@ export async function createContact(formData: {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Unauthorized')
 
+  // Verify workspace authorization
+  const { data: ws } = await (supabase as any)
+    .from('workspaces')
+    .select('id')
+    .eq('id', formData.workspaceId)
+    .maybeSingle()
+  if (!ws) throw new Error('Workspace not found or access denied')
+
+  // Validate companyId if provided
+  let validatedCompanyId: string | null = null
+  if (formData.companyId) {
+    const { data: comp } = await (supabase as any)
+      .from('companies')
+      .select('id, workspace_companies!inner(workspace_id)')
+      .eq('id', formData.companyId)
+      .eq('owner_id', user.id)
+      .is('archived_at', null)
+      .eq('workspace_companies.workspace_id', formData.workspaceId)
+      .maybeSingle()
+
+    if (!comp) {
+      throw new Error('Invalid organization or organization not associated with this workspace')
+    }
+    validatedCompanyId = comp.id
+  }
+
   // 1. Create global contact
   const { data: contact, error: contactError } = await (supabase as any)
     .from('contacts')
@@ -262,7 +288,7 @@ export async function createContact(formData: {
       role_title: formData.roleTitle || null,
       location: formData.location || null,
       bio: formData.bio || null,
-      company_id: formData.companyId || null,
+      company_id: validatedCompanyId,
     })
     .select()
     .single()
@@ -285,6 +311,9 @@ export async function createContact(formData: {
 
   if (wsError) throw new Error(wsError.message)
 
+  if (formData.companyId) {
+    revalidatePath(`/vault/companies/${formData.companyId}`)
+  }
   revalidatePath('/vault/contacts')
   revalidatePath('/vault')
   return contact
@@ -384,6 +413,14 @@ export async function createCompany(formData: {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Unauthorized')
 
+  // Verify workspace authorization
+  const { data: ws } = await (supabase as any)
+    .from('workspaces')
+    .select('id')
+    .eq('id', formData.workspaceId)
+    .maybeSingle()
+  if (!ws) throw new Error('Workspace not found or access denied')
+
   // 1. Create global company
   const { data: company, error: compError } = await (supabase as any)
     .from('companies')
@@ -419,6 +456,175 @@ export async function createCompany(formData: {
   revalidatePath('/vault/companies')
   revalidatePath('/vault')
   return company
+}
+
+export async function getCompanyDetail(companyId: string, workspaceId?: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !workspaceId) return null
+
+  // 0. Verify workspace authorization
+  const { data: ws } = await (supabase as any)
+    .from('workspaces')
+    .select('id')
+    .eq('id', workspaceId)
+    .maybeSingle()
+  if (!ws) return null
+
+  // 1. Fetch global company record, ensuring it belongs to owner and is not archived
+  const { data: company, error: companyError } = await (supabase as any)
+    .from('companies')
+    .select('*')
+    .eq('id', companyId)
+    .eq('owner_id', user.id)
+    .is('archived_at', null)
+    .maybeSingle()
+
+  if (companyError || !company) return null
+
+  // 2. Fetch and verify workspace relationship
+  const { data: wsCompany, error: wsError } = await (supabase as any)
+    .from('workspace_companies')
+    .select('*')
+    .eq('company_id', companyId)
+    .eq('workspace_id', workspaceId)
+    .maybeSingle()
+
+  // Enforce strict workspace isolation: do not reveal company existence if not linked to active workspace
+  if (wsError || !wsCompany) return null
+
+  // 3. Fetch connected contacts in this workspace
+  const { data: contacts } = await (supabase as any)
+    .from('contacts')
+    .select(`
+      *,
+      workspace_contacts!inner(*, identity:identities(*))
+    `)
+    .eq('company_id', companyId)
+    .eq('workspace_contacts.workspace_id', workspaceId)
+    .is('archived_at', null)
+    .order('created_at', { ascending: false })
+
+  // 4. Fetch connected opportunities in this workspace
+  const { data: opportunities } = await (supabase as any)
+    .from('opportunities')
+    .select(`
+      *,
+      contact:contacts(id, full_name, email)
+    `)
+    .eq('company_id', companyId)
+    .eq('workspace_id', workspaceId)
+    .order('created_at', { ascending: false })
+
+  return {
+    company,
+    workspaceRelationship: wsCompany,
+    contacts: contacts || [],
+    opportunities: opportunities || [],
+  }
+}
+
+export async function updateWorkspaceCompany(
+  workspaceId: string,
+  companyId: string,
+  data: {
+    tier?: string
+    status?: string
+    notes?: string
+  }
+) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // Verify workspace authorization
+  const { data: ws } = await (supabase as any)
+    .from('workspaces')
+    .select('id')
+    .eq('id', workspaceId)
+    .maybeSingle()
+  if (!ws) throw new Error('Workspace not found or access denied')
+
+  const updatePayload: Record<string, any> = {
+    updated_at: new Date().toISOString(),
+  }
+  if (data.tier !== undefined) updatePayload.tier = data.tier
+  if (data.status !== undefined) updatePayload.status = data.status
+  if (data.notes !== undefined) updatePayload.notes = data.notes || null
+
+  const { error } = await (supabase as any)
+    .from('workspace_companies')
+    .update(updatePayload)
+    .eq('workspace_id', workspaceId)
+    .eq('company_id', companyId)
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath(`/vault/companies/${companyId}`)
+  revalidatePath('/vault/companies')
+  revalidatePath('/vault')
+  return true
+}
+
+export async function updateCompanyGlobal(
+  companyId: string,
+  data: {
+    name: string
+    domain?: string
+    industry?: string
+    website?: string
+    linkedinUrl?: string
+    xHandle?: string
+    description?: string
+  }
+) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  const { error } = await (supabase as any)
+    .from('companies')
+    .update({
+      name: data.name,
+      domain: data.domain || null,
+      industry: data.industry || null,
+      website: data.website || null,
+      linkedin_url: data.linkedinUrl || null,
+      x_handle: data.xHandle || null,
+      description: data.description || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', companyId)
+    .eq('owner_id', user.id)
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath(`/vault/companies/${companyId}`)
+  revalidatePath('/vault/companies')
+  revalidatePath('/vault')
+  return true
+}
+
+export async function archiveCompany(companyId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  const { error } = await (supabase as any)
+    .from('companies')
+    .update({
+      archived_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', companyId)
+    .eq('owner_id', user.id)
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/vault/companies')
+  revalidatePath(`/vault/companies/${companyId}`)
+  revalidatePath('/vault')
+  return true
 }
 
 // ---------------------------------------------------------------------------
@@ -969,12 +1175,56 @@ export async function createOpportunity(formData: {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Unauthorized')
 
+  // Verify workspace authorization
+  const { data: ws } = await (supabase as any)
+    .from('workspaces')
+    .select('id')
+    .eq('id', formData.workspaceId)
+    .maybeSingle()
+  if (!ws) throw new Error('Workspace not found or access denied')
+
+  // Validate companyId if provided
+  let validatedCompanyId: string | null = null
+  if (formData.companyId) {
+    const { data: comp } = await (supabase as any)
+      .from('companies')
+      .select('id, workspace_companies!inner(workspace_id)')
+      .eq('id', formData.companyId)
+      .eq('owner_id', user.id)
+      .is('archived_at', null)
+      .eq('workspace_companies.workspace_id', formData.workspaceId)
+      .maybeSingle()
+
+    if (!comp) {
+      throw new Error('Invalid organization or organization not associated with this workspace')
+    }
+    validatedCompanyId = comp.id
+  }
+
+  // Validate contactId if provided
+  let validatedContactId: string | null = null
+  if (formData.contactId) {
+    const { data: ct } = await (supabase as any)
+      .from('contacts')
+      .select('id, workspace_contacts!inner(workspace_id)')
+      .eq('id', formData.contactId)
+      .eq('owner_id', user.id)
+      .is('archived_at', null)
+      .eq('workspace_contacts.workspace_id', formData.workspaceId)
+      .maybeSingle()
+
+    if (!ct) {
+      throw new Error('Invalid contact or contact not associated with this workspace')
+    }
+    validatedContactId = ct.id
+  }
+
   const { data, error } = await (supabase as any)
     .from('opportunities')
     .insert({
       workspace_id: formData.workspaceId,
-      contact_id: formData.contactId || null,
-      company_id: formData.companyId || null,
+      contact_id: validatedContactId,
+      company_id: validatedCompanyId,
       title: formData.title,
       type: formData.type || 'growth_strategy',
       description: formData.description || null,
@@ -994,6 +1244,9 @@ export async function createOpportunity(formData: {
 
   if (formData.contactId) {
     revalidatePath(`/vault/contacts/${formData.contactId}`)
+  }
+  if (formData.companyId) {
+    revalidatePath(`/vault/companies/${formData.companyId}`)
   }
   revalidatePath('/vault/opportunities')
   revalidatePath('/vault')

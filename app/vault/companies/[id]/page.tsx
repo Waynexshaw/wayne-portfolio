@@ -1,0 +1,58 @@
+import Link from 'next/link'
+import { ArrowLeft, Building2 } from 'lucide-react'
+import { getVaultContext, getCompanyDetail } from '@/lib/vault/actions'
+import { CompanyDetailView } from '@/components/vault/company/company-detail-view'
+
+export const dynamic = 'force-dynamic'
+
+interface CompanyDetailPageProps {
+  params: Promise<{ id: string }>
+}
+
+export default async function CompanyDetailPage({ params }: CompanyDetailPageProps) {
+  const { id } = await params
+  const context = await getVaultContext()
+  const activeWorkspace = context?.activeWorkspace
+
+  // Fetch company detail scoped to active workspace
+  const detail = await getCompanyDetail(id, activeWorkspace?.id)
+
+  // Handle company not found or unauthorized
+  if (!detail || !detail.company) {
+    return (
+      <div className="py-24 text-center space-y-4 max-w-md mx-auto">
+        <div className="w-12 h-12 rounded-2xl bg-secondary/80 border border-border flex items-center justify-center mx-auto text-muted-foreground shadow-sm">
+          <Building2 className="w-6 h-6" />
+        </div>
+        <div className="space-y-1">
+          <h2 className="font-serif text-xl font-medium text-foreground">
+            Company Not Found
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            This organization record does not exist, has been archived, or you do not have permission to view it in this workspace.
+          </p>
+        </div>
+        <div className="pt-2">
+          <Link
+            href="/vault/companies"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors shadow-sm"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Return to Companies Directory
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <CompanyDetailView
+      company={detail.company}
+      workspaceRelationship={detail.workspaceRelationship}
+      contacts={detail.contacts}
+      opportunities={detail.opportunities}
+      activeWorkspace={activeWorkspace}
+      identities={context?.identities || []}
+    />
+  )
+}

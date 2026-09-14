@@ -88,7 +88,14 @@ export default async function VaultCompaniesPage({
                 <div className="space-y-3">
                   <div className="flex items-start justify-between">
                     <div>
-                      <h3 className="text-base font-medium text-foreground">{company.name}</h3>
+                      <Link
+                        href={`/vault/companies/${company.id}`}
+                        className="hover:text-primary transition-colors inline-block"
+                      >
+                        <h3 className="text-base font-medium text-foreground hover:text-primary transition-colors">
+                          {company.name}
+                        </h3>
+                      </Link>
                       {company.industry && (
                         <p className="text-xs text-muted-foreground">{company.industry}</p>
                       )}
@@ -118,16 +125,25 @@ export default async function VaultCompaniesPage({
                   <span className="font-mono text-[11px]">
                     Status: {wsRel?.status || 'Prospect'}
                   </span>
-                  {company.website && (
-                    <a 
-                      href={company.website} 
-                      target="_blank" 
-                      rel="noreferrer"
-                      className="p-1 hover:text-foreground transition-colors"
+                  <div className="flex items-center gap-3">
+                    {company.website && (
+                      <a
+                        href={company.website.startsWith('http') ? company.website : `https://${company.website}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="p-1 hover:text-foreground transition-colors"
+                        title="Open Website"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    )}
+                    <Link
+                      href={`/vault/companies/${company.id}`}
+                      className="font-mono text-[11px] text-primary hover:underline"
                     >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
-                  )}
+                      View Record →
+                    </Link>
+                  </div>
                 </div>
               </div>
             )
