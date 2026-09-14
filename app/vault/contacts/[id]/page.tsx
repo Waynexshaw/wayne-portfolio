@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ArrowLeft, Users } from 'lucide-react'
-import { getVaultContext, getContactDetail, getCompanies } from '@/lib/vault/actions'
+import { getVaultContext, getContactDetail, getCompanies, getRelatedResearchForEntity } from '@/lib/vault/actions'
 import { ContactDetailView } from '@/components/vault/contact/contact-detail-view'
 
 export const dynamic = 'force-dynamic'
@@ -14,10 +14,11 @@ export default async function ContactDetailPage({ params }: ContactDetailPagePro
   const context = await getVaultContext()
   const activeWorkspace = context?.activeWorkspace
 
-  // Fetch contact detail scoped to active workspace
-  const [detail, companies] = await Promise.all([
+  // Fetch contact detail and related research scoped to active workspace
+  const [detail, companies, relatedResearch] = await Promise.all([
     getContactDetail(id, activeWorkspace?.id),
     getCompanies(activeWorkspace?.id).catch(() => []),
+    activeWorkspace?.id ? getRelatedResearchForEntity('contact', id, activeWorkspace.id).catch(() => []) : Promise.resolve([]),
   ])
 
   // Handle contact not found or unauthorized
@@ -55,6 +56,7 @@ export default async function ContactDetailPage({ params }: ContactDetailPagePro
       interactions={detail.interactions}
       followUps={detail.followUps}
       opportunities={detail.opportunities}
+      relatedResearch={relatedResearch}
       activeWorkspace={activeWorkspace}
       identities={context?.identities || []}
       companies={companies}

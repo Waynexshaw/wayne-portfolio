@@ -2968,3 +2968,139 @@ export async function getWorkspaceConnectableEntities(workspaceId: string) {
     projects,
   }
 }
+
+// -------------------------------------------------------------
+// WAYNEX VAULT — RESEARCH PHASE 3B: REVERSE RESEARCH VIEWS
+// -------------------------------------------------------------
+
+export type RelatedResearchEntityType = 'contact' | 'company' | 'opportunity' | 'project'
+
+export interface RelatedResearchItem {
+  id: string
+  research_record_id: string
+  relationship_type: ResearchConnectionType
+  notes: string | null
+  created_at: string
+  research_record: {
+    id: string
+    workspace_id: string
+    title: string
+    research_type: string
+    status: string
+    priority: string
+    research_question: string | null
+    objective: string | null
+    summary: string | null
+    findings: string | null
+    conclusion: string | null
+    archived_at: string | null
+    created_at: string
+    updated_at: string
+  }
+}
+
+export async function getRelatedResearchForEntity(
+  entityType: RelatedResearchEntityType,
+  entityId: string,
+  workspaceId?: string
+): Promise<RelatedResearchItem[]> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !workspaceId || !entityId) return []
+
+  // 1. Verify workspace authorization
+  const { data: ws } = await (supabase as any)
+    .from('workspaces')
+    .select('id')
+    .eq('id', workspaceId)
+    .maybeSingle()
+  if (!ws) return []
+
+  // 2. Strict entity type validation and workspace membership check
+  if (entityType === 'contact') {
+    const { data: contact } = await (supabase as any)
+      .from('workspace_contacts')
+      .select('contact_id')
+      .eq('workspace_id', workspaceId)
+      .eq('contact_id', entityId)
+      .maybeSingle()
+    if (!contact) return []
+  } else if (entityType === 'company') {
+    const { data: company } = await (supabase as any)
+      .from('workspace_companies')
+      .select('company_id')
+      .eq('workspace_id', workspaceId)
+      .eq('company_id', entityId)
+      .maybeSingle()
+    if (!company) return []
+  } else if (entityType === 'opportunity') {
+    const { data: opp } = await (supabase as any)
+      .from('opportunities')
+      .select('id')
+      .eq('workspace_id', workspaceId)
+      .eq('id', entityId)
+      .maybeSingle()
+    if (!opp) return []
+  } else if (entityType === 'project') {
+    const { data: proj } = await (supabase as any)
+      .from('workspace_projects')
+      .select('id')
+      .eq('workspace_id', workspaceId)
+      .eq('id', entityId)
+      .maybeSingle()
+    if (!proj) return []
+  } else {
+    return []
+  }
+
+  // 3. Map entityType to target column
+  const columnMap: Record<RelatedResearchEntityType, string> = {
+    contact: 'contact_id',
+    company: 'company_id',
+    opportunity: 'opportunity_id',
+    project: 'project_id',
+  }
+  const targetCol = columnMap[entityType]
+
+  // 4. Query connections and join research_records
+  const { data, error } = await (supabase as any)
+    .from('research_connections')
+    .select(`
+      id,
+      relationship_type,
+      notes,
+      created_at,
+      research_record:research_records(
+        id,
+        workspace_id,
+        title,
+        research_type,
+        status,
+        priority,
+        research_question,
+        objective,
+        summary,
+        findings,
+        conclusion,
+        archived_at,
+        created_at,
+        updated_at
+      )
+    `)
+    .eq('workspace_id', workspaceId)
+    .eq(targetCol, entityId)
+    .order('created_at', { ascending: false })
+
+  if (error || !data) return []
+
+  return data
+    .filter((row: any) => row.research_record && row.research_record.id)
+    .map((row: any) => ({
+      id: row.id,
+      research_record_id: row.research_record.id,
+      relationship_type: row.relationship_type,
+      notes: row.notes,
+      created_at: row.created_at,
+      research_record: row.research_record,
+    }))
+}

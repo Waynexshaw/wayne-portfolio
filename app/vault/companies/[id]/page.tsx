@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ArrowLeft, Building2 } from 'lucide-react'
-import { getVaultContext, getCompanyDetail } from '@/lib/vault/actions'
+import { getVaultContext, getCompanyDetail, getRelatedResearchForEntity } from '@/lib/vault/actions'
 import { CompanyDetailView } from '@/components/vault/company/company-detail-view'
 
 export const dynamic = 'force-dynamic'
@@ -14,8 +14,11 @@ export default async function CompanyDetailPage({ params }: CompanyDetailPagePro
   const context = await getVaultContext()
   const activeWorkspace = context?.activeWorkspace
 
-  // Fetch company detail scoped to active workspace
-  const detail = await getCompanyDetail(id, activeWorkspace?.id)
+  // Fetch company detail and related research scoped to active workspace
+  const [detail, relatedResearch] = await Promise.all([
+    getCompanyDetail(id, activeWorkspace?.id),
+    activeWorkspace?.id ? getRelatedResearchForEntity('company', id, activeWorkspace.id).catch(() => []) : Promise.resolve([]),
+  ])
 
   // Handle company not found or unauthorized
   if (!detail || !detail.company) {
@@ -51,6 +54,7 @@ export default async function CompanyDetailPage({ params }: CompanyDetailPagePro
       workspaceRelationship={detail.workspaceRelationship}
       contacts={detail.contacts}
       opportunities={detail.opportunities}
+      relatedResearch={relatedResearch}
       activeWorkspace={activeWorkspace}
       identities={context?.identities || []}
     />

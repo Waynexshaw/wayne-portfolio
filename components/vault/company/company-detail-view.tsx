@@ -6,12 +6,14 @@ import { CompanyRelationshipCard } from './company-relationship-card'
 import { CompanyContacts } from './company-contacts'
 import { CompanyOpportunities } from './company-opportunities'
 import { CompanyModals } from './company-modals'
+import { RelatedResearchSection } from '@/components/vault/research/related-research-section'
 
 interface CompanyDetailViewProps {
   company: any
   workspaceRelationship: any
   contacts: any[]
   opportunities: any[]
+  relatedResearch?: any[]
   activeWorkspace: any
   identities: any[]
 }
@@ -21,6 +23,7 @@ export function CompanyDetailView({
   workspaceRelationship,
   contacts,
   opportunities,
+  relatedResearch = [],
   activeWorkspace,
   identities,
 }: CompanyDetailViewProps) {
@@ -61,6 +64,13 @@ export function CompanyDetailView({
       <CompanyOpportunities
         opportunities={opportunities}
         onOpenCreateOpportunity={() => setIsCreateOpportunityOpen(true)}
+      />
+
+      {/* 5. Connected Research Inquiries */}
+      <RelatedResearchSection
+        relatedResearch={relatedResearch}
+        entityType="company"
+        entityName={company.name}
       />
 
       {/* Modals for Editing and Creation */}

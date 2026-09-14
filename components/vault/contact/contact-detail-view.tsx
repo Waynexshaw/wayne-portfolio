@@ -7,6 +7,7 @@ import { ContactTimeline } from './contact-timeline'
 import { ContactFollowUps } from './contact-follow-ups'
 import { ContactOpportunities } from './contact-opportunities'
 import { ContactModals } from './contact-modals'
+import { RelatedResearchSection } from '@/components/vault/research/related-research-section'
 
 interface ContactDetailViewProps {
   contact: any
@@ -14,6 +15,7 @@ interface ContactDetailViewProps {
   interactions: any[]
   followUps: any[]
   opportunities: any[]
+  relatedResearch?: any[]
   activeWorkspace: any
   identities: any[]
   companies: any[]
@@ -25,6 +27,7 @@ export function ContactDetailView({
   interactions,
   followUps,
   opportunities,
+  relatedResearch = [],
   activeWorkspace,
   identities,
   companies,
@@ -78,6 +81,12 @@ export function ContactDetailView({
           <ContactOpportunities
             opportunities={opportunities}
             onOpenCreateOpportunity={() => setIsCreateOpportunityOpen(true)}
+          />
+
+          <RelatedResearchSection
+            relatedResearch={relatedResearch}
+            entityType="contact"
+            entityName={contact.full_name}
           />
         </div>
       </div>
