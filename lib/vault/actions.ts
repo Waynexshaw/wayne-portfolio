@@ -294,11 +294,21 @@ export async function createContact(formData: {
 // Companies
 // ---------------------------------------------------------------------------
 
-export async function getCompanies(workspaceId?: string) {
+export async function getCompanies(
+  workspaceId?: string,
+  options?: {
+    q?: string
+    tier?: string
+    status?: string
+  }
+) {
   const supabase = await createClient()
+  const q = options?.q?.trim()
+  const tier = options?.tier && options.tier !== 'all' ? options.tier : undefined
+  const status = options?.status && options.status !== 'all' ? options.status : undefined
   
   if (workspaceId) {
-    const { data, error } = await (supabase as any)
+    let query = (supabase as any)
       .from('companies')
       .select(`
         *,
@@ -307,13 +317,32 @@ export async function getCompanies(workspaceId?: string) {
       `)
       .eq('workspace_companies.workspace_id', workspaceId)
       .is('archived_at', null)
-      .order('name', { ascending: true })
 
+    if (tier) {
+      query = query.eq('workspace_companies.tier', tier)
+    }
+
+    if (status) {
+      query = query.eq('workspace_companies.status', status)
+    }
+
+    if (q) {
+      const sanitizedQuery = q.replace(/[,()]/g, ' ').trim()
+      if (sanitizedQuery) {
+        query = query.or(
+          `name.ilike.%${sanitizedQuery}%,industry.ilike.%${sanitizedQuery}%,domain.ilike.%${sanitizedQuery}%,website.ilike.%${sanitizedQuery}%`
+        )
+      }
+    }
+
+    query = query.order('name', { ascending: true })
+
+    const { data, error } = await query
     if (error) throw new Error(error.message)
     return (data || []) as any[]
   }
 
-  const { data, error } = await (supabase as any)
+  let query = (supabase as any)
     .from('companies')
     .select(`
       *,
@@ -321,8 +350,19 @@ export async function getCompanies(workspaceId?: string) {
       contacts:contacts(count)
     `)
     .is('archived_at', null)
-    .order('name', { ascending: true })
 
+  if (q) {
+    const sanitizedQuery = q.replace(/[,()]/g, ' ').trim()
+    if (sanitizedQuery) {
+      query = query.or(
+        `name.ilike.%${sanitizedQuery}%,industry.ilike.%${sanitizedQuery}%,domain.ilike.%${sanitizedQuery}%,website.ilike.%${sanitizedQuery}%`
+      )
+    }
+  }
+
+  query = query.order('name', { ascending: true })
+
+  const { data, error } = await query
   if (error) throw new Error(error.message)
   return (data || []) as any[]
 }

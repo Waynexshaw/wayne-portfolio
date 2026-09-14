@@ -1,13 +1,28 @@
+import Link from 'next/link'
 import { getVaultContext, getCompanies } from '@/lib/vault/actions'
 import { Building2, Globe, ExternalLink } from 'lucide-react'
 import { CompanyCreateButton } from './create-button'
+import { CompanySearchFilters } from '@/components/vault/company/company-search-filters'
 
 export const dynamic = 'force-dynamic'
 
-export default async function VaultCompaniesPage() {
+export default async function VaultCompaniesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; tier?: string; status?: string }>
+}) {
+  const resolvedParams = await searchParams
+  const q = resolvedParams?.q || ''
+  const tier = resolvedParams?.tier || 'all'
+  const status = resolvedParams?.status || 'all'
+
   const context = await getVaultContext()
   const activeWorkspace = context?.activeWorkspace
-  const companies = await getCompanies(activeWorkspace?.id).catch(() => [])
+  const companies = await getCompanies(activeWorkspace?.id, { q, tier, status }).catch(() => [])
+
+  const hasActiveFilters = Boolean(
+    q.trim() !== '' || (tier && tier !== 'all') || (status && status !== 'all')
+  )
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -18,7 +33,7 @@ export default async function VaultCompaniesPage() {
               Organizations & Ecosystem
             </h1>
             <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
-              {companies.length} Total
+              {companies.length} {hasActiveFilters ? 'Found' : 'Total'}
             </span>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
@@ -29,12 +44,38 @@ export default async function VaultCompaniesPage() {
         <CompanyCreateButton workspaceId={activeWorkspace?.id} />
       </div>
 
+      {/* Search & Filter Toolbar */}
+      <CompanySearchFilters
+        initialSearch={q}
+        initialTier={tier}
+        initialStatus={status}
+      />
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {companies.length === 0 ? (
-          <div className="col-span-full py-16 text-center text-muted-foreground text-sm bg-card border border-border rounded-xl">
-            <Building2 className="w-8 h-8 mx-auto mb-2 opacity-30" />
-            <p>No organizations registered yet. Add companies to track partnerships and deals.</p>
-          </div>
+          hasActiveFilters ? (
+            <div className="col-span-full py-16 text-center text-muted-foreground text-sm bg-card border border-border rounded-xl px-4">
+              <Building2 className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <p className="font-medium text-foreground mb-1">No organizations found</p>
+              <p className="text-xs text-muted-foreground mb-4">
+                No organizations match your current search or filter criteria. Try adjusting your search or clearing filters.
+              </p>
+              <Link
+                href="/vault/companies"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary text-xs font-medium text-foreground hover:bg-secondary/80 transition-colors"
+              >
+                Clear filters
+              </Link>
+            </div>
+          ) : (
+            <div className="col-span-full py-16 text-center text-muted-foreground text-sm bg-card border border-border rounded-xl px-4">
+              <Building2 className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <p className="font-medium text-foreground mb-1">No organizations yet</p>
+              <p className="text-xs text-muted-foreground">
+                No organizations registered in this workspace yet. Add companies to begin tracking partnerships and deals.
+              </p>
+            </div>
+          )
         ) : (
           companies.map((company: any) => {
             const wsRel = company.workspace_companies?.[0]
