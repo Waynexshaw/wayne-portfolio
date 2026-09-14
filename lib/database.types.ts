@@ -985,6 +985,103 @@ export interface Database {
           archived_at?: string | null
         }
       }
+      research_sources: {
+        Row: {
+          id: string
+          workspace_id: string
+          research_record_id: string
+          title: string
+          source_type: 'article' | 'research_report' | 'documentation' | 'whitepaper' | 'official_website' | 'social_post' | 'interview' | 'dataset' | 'academic_paper' | 'regulatory_document' | 'video' | 'other'
+          url: string | null
+          publisher: string | null
+          author: string | null
+          published_at: string | null
+          accessed_at: string
+          notes: string | null
+          archived_at: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          research_record_id: string
+          title: string
+          source_type?: 'article' | 'research_report' | 'documentation' | 'whitepaper' | 'official_website' | 'social_post' | 'interview' | 'dataset' | 'academic_paper' | 'regulatory_document' | 'video' | 'other'
+          url?: string | null
+          publisher?: string | null
+          author?: string | null
+          published_at?: string | null
+          accessed_at?: string
+          notes?: string | null
+          archived_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          research_record_id?: string
+          title?: string
+          source_type?: 'article' | 'research_report' | 'documentation' | 'whitepaper' | 'official_website' | 'social_post' | 'interview' | 'dataset' | 'academic_paper' | 'regulatory_document' | 'video' | 'other'
+          url?: string | null
+          publisher?: string | null
+          author?: string | null
+          published_at?: string | null
+          accessed_at?: string
+          notes?: string | null
+          archived_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      research_evidence: {
+        Row: {
+          id: string
+          workspace_id: string
+          research_record_id: string
+          source_id: string
+          evidence_text: string
+          claim_summary: string | null
+          context_location: string | null
+          notes: string | null
+          archived_at: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          research_record_id: string
+          source_id: string
+          evidence_text: string
+          claim_summary?: string | null
+          context_location?: string | null
+          notes?: string | null
+          archived_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          research_record_id?: string
+          source_id?: string
+          evidence_text?: string
+          claim_summary?: string | null
+          context_location?: string | null
+          notes?: string | null
+          archived_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>

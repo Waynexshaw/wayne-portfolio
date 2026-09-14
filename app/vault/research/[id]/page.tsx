@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ArrowLeft, BookOpen, Database } from 'lucide-react'
-import { getVaultContext, getResearchDetail } from '@/lib/vault/actions'
+import { getVaultContext, getResearchDetail, getResearchSources, getResearchEvidence } from '@/lib/vault/actions'
 import { ResearchDetailView } from '@/components/vault/research/research-detail-view'
 
 export const dynamic = 'force-dynamic'
@@ -15,10 +15,16 @@ export default async function ResearchDetailPage({ params }: ResearchDetailPageP
   const activeWorkspace = context?.activeWorkspace
 
   let record: any = null
+  let sources: any[] = []
+  let evidence: any[] = []
   let dbError: string | null = null
 
   try {
     record = await getResearchDetail(id, activeWorkspace?.id)
+    if (record && activeWorkspace?.id) {
+      sources = await getResearchSources(id, activeWorkspace.id, true)
+      evidence = await getResearchEvidence(id, activeWorkspace.id, true)
+    }
   } catch (err: any) {
     console.error('[Vault Research Detail Error]:', err?.message || err)
     dbError = 'Database query failure encountered while loading research record details.'
@@ -83,6 +89,8 @@ export default async function ResearchDetailPage({ params }: ResearchDetailPageP
       record={record}
       workspaceId={activeWorkspace.id}
       workspaceName={activeWorkspace.name}
+      initialSources={sources}
+      initialEvidence={evidence}
     />
   )
 }

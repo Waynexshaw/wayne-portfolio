@@ -24,11 +24,17 @@ import {
 } from 'lucide-react'
 import { updateResearchRecord, archiveResearchRecord, ResearchStatus } from '@/lib/vault/actions'
 import { ResearchEditModal } from './research-edit-modal'
+import { ResearchSourcesSection } from './research-sources-section'
+import { ResearchEvidenceSection } from './research-evidence-section'
+import { SourceModal } from './source-modal'
+import { EvidenceModal } from './evidence-modal'
 
 interface ResearchDetailViewProps {
   record: any
   workspaceId: string
   workspaceName?: string
+  initialSources?: any[]
+  initialEvidence?: any[]
 }
 
 function getStatusBadge(status: string) {
@@ -67,12 +73,25 @@ export function ResearchDetailView({
   record,
   workspaceId,
   workspaceName,
+  initialSources = [],
+  initialEvidence = [],
 }: ResearchDetailViewProps) {
   const router = useRouter()
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false)
+
+  const [selectedSourceForEvidence, setSelectedSourceForEvidence] = useState<string | null>(null)
+  const [isSourceModalOpen, setIsSourceModalOpen] = useState(false)
+  const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false)
+
+  const evidenceCountBySourceId: Record<string, number> = {}
+  for (const item of initialEvidence) {
+    if (!item.archived_at) {
+      evidenceCountBySourceId[item.source_id] = (evidenceCountBySourceId[item.source_id] || 0) + 1
+    }
+  }
 
   const handleStatusChange = (newStatus: ResearchStatus) => {
     setError(null)
@@ -341,7 +360,33 @@ export function ResearchDetailView({
             {record.summary || 'No background summary provided.'}
           </p>
         </div>
+      </div>
 
+      {/* Traceability: Sources & Grounded Evidence */}
+      <div className="space-y-6 pt-2">
+        <ResearchSourcesSection
+          researchRecordId={record.id}
+          workspaceId={workspaceId}
+          sources={initialSources}
+          evidenceCountBySourceId={evidenceCountBySourceId}
+          onAddEvidenceForSource={(srcId) => {
+            setSelectedSourceForEvidence(srcId)
+            setIsEvidenceModalOpen(true)
+          }}
+        />
+
+        <ResearchEvidenceSection
+          researchRecordId={record.id}
+          workspaceId={workspaceId}
+          evidence={initialEvidence}
+          sources={initialSources}
+          selectedSourceId={selectedSourceForEvidence}
+          onOpenAddSource={() => setIsSourceModalOpen(true)}
+        />
+      </div>
+
+      {/* Synthesis: Findings & Conclusion */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* Findings & Analysis */}
         <div className="rounded-xl border border-border bg-card p-5 space-y-2 md:col-span-2 shadow-sm">
           <div className="flex items-center gap-2 text-primary font-mono text-xs uppercase tracking-wider">
@@ -371,6 +416,28 @@ export function ResearchDetailView({
         workspaceId={workspaceId}
         isOpen={isEditOpen}
         onClose={() => setIsEditOpen(false)}
+      />
+
+      {/* Direct Source Modal */}
+      <SourceModal
+        researchRecordId={record.id}
+        workspaceId={workspaceId}
+        isOpen={isSourceModalOpen}
+        onClose={() => setIsSourceModalOpen(false)}
+      />
+
+      {/* Direct Evidence Modal */}
+      <EvidenceModal
+        researchRecordId={record.id}
+        workspaceId={workspaceId}
+        sources={initialSources}
+        defaultSourceId={selectedSourceForEvidence || undefined}
+        isOpen={isEvidenceModalOpen}
+        onClose={() => {
+          setIsEvidenceModalOpen(false)
+          setSelectedSourceForEvidence(null)
+        }}
+        onOpenAddSource={() => setIsSourceModalOpen(true)}
       />
     </div>
   )
