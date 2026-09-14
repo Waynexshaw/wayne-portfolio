@@ -1082,6 +1082,50 @@ export interface Database {
           updated_at?: string
         }
       }
+      research_connections: {
+        Row: {
+          id: string
+          workspace_id: string
+          research_record_id: string
+          contact_id: string | null
+          company_id: string | null
+          opportunity_id: string | null
+          project_id: string | null
+          relationship_type: 'subject' | 'stakeholder' | 'partner' | 'competitor' | 'due_diligence' | 'supporting'
+          notes: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          research_record_id: string
+          contact_id?: string | null
+          company_id?: string | null
+          opportunity_id?: string | null
+          project_id?: string | null
+          relationship_type?: 'subject' | 'stakeholder' | 'partner' | 'competitor' | 'due_diligence' | 'supporting'
+          notes?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          research_record_id?: string
+          contact_id?: string | null
+          company_id?: string | null
+          opportunity_id?: string | null
+          project_id?: string | null
+          relationship_type?: 'subject' | 'stakeholder' | 'partner' | 'competitor' | 'due_diligence' | 'supporting'
+          notes?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>

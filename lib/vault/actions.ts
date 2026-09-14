@@ -2391,3 +2391,580 @@ export async function restoreResearchEvidence(id: string, workspaceId: string) {
   revalidatePath('/vault/research')
   return data
 }
+
+// -------------------------------------------------------------
+// WAYNEX VAULT — RESEARCH PHASE 3A: CONNECTIONS
+// -------------------------------------------------------------
+
+export type ResearchConnectionType =
+  | 'subject'
+  | 'stakeholder'
+  | 'partner'
+  | 'competitor'
+  | 'due_diligence'
+  | 'supporting'
+
+export interface ResearchConnectionItem {
+  id: string
+  workspace_id: string
+  research_record_id: string
+  contact_id: string | null
+  company_id: string | null
+  opportunity_id: string | null
+  project_id: string | null
+  relationship_type: ResearchConnectionType
+  notes: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  contact?: {
+    id: string
+    full_name: string
+    role_title: string | null
+    avatar_url?: string | null
+    email?: string | null
+  } | null
+  company?: {
+    id: string
+    name: string
+    industry: string | null
+    domain: string | null
+  } | null
+  opportunity?: {
+    id: string
+    title: string
+    type: string
+    pipeline_stage: string
+    value_estimate: number | null
+    currency: string | null
+  } | null
+  project?: {
+    id: string
+    title: string
+    status: string
+    priority: string
+  } | null
+}
+
+export async function getResearchConnections(
+  researchRecordId: string,
+  workspaceId: string
+): Promise<ResearchConnectionItem[]> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  const { data, error } = await (supabase as any)
+    .from('research_connections')
+    .select(`
+      id,
+      workspace_id,
+      research_record_id,
+      contact_id,
+      company_id,
+      opportunity_id,
+      project_id,
+      relationship_type,
+      notes,
+      created_by,
+      created_at,
+      updated_at,
+      workspace_contacts(
+        contact:contacts(
+          id,
+          full_name,
+          role_title,
+          avatar_url,
+          email
+        )
+      ),
+      workspace_companies(
+        company:companies(
+          id,
+          name,
+          industry,
+          domain
+        )
+      ),
+      opportunity:opportunities(
+        id,
+        title,
+        type,
+        pipeline_stage,
+        value_estimate,
+        currency
+      ),
+      project:workspace_projects(
+        id,
+        title,
+        status,
+        priority
+      )
+    `)
+    .eq('research_record_id', researchRecordId)
+    .eq('workspace_id', workspaceId)
+    .order('created_at', { ascending: false })
+
+  if (error) throw new Error(error.message)
+
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    workspace_id: row.workspace_id,
+    research_record_id: row.research_record_id,
+    contact_id: row.contact_id,
+    company_id: row.company_id,
+    opportunity_id: row.opportunity_id,
+    project_id: row.project_id,
+    relationship_type: row.relationship_type,
+    notes: row.notes,
+    created_by: row.created_by,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    contact: row.workspace_contacts?.contact || null,
+    company: row.workspace_companies?.company || null,
+    opportunity: row.opportunity || null,
+    project: row.project || null,
+  }))
+}
+
+export async function createResearchConnection(formData: {
+  workspaceId: string
+  researchRecordId: string
+  contactId?: string | null
+  companyId?: string | null
+  opportunityId?: string | null
+  projectId?: string | null
+  relationshipType?: ResearchConnectionType
+  notes?: string | null
+}) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // 1. Verify workspace access
+  const { data: ws } = await (supabase as any)
+    .from('workspaces')
+    .select('id')
+    .eq('id', formData.workspaceId)
+    .maybeSingle()
+  if (!ws) throw new Error('Workspace not found or access denied')
+
+  // 2. Verify research record exists and belongs to workspace
+  const { data: record } = await (supabase as any)
+    .from('research_records')
+    .select('id, workspace_id')
+    .eq('id', formData.researchRecordId)
+    .eq('workspace_id', formData.workspaceId)
+    .maybeSingle()
+  if (!record) throw new Error('Research record not found or access denied')
+
+  // 3. Enforce exactly one target entity
+  const targets = [
+    formData.contactId ? { type: 'contact', id: formData.contactId } : null,
+    formData.companyId ? { type: 'company', id: formData.companyId } : null,
+    formData.opportunityId ? { type: 'opportunity', id: formData.opportunityId } : null,
+    formData.projectId ? { type: 'project', id: formData.projectId } : null,
+  ].filter(Boolean)
+
+  if (targets.length !== 1) {
+    throw new Error('Exactly one target entity (contact, company, opportunity, or project) must be specified')
+  }
+
+  // 4. Validate target entity exists within the same workspace
+  if (formData.contactId) {
+    const { data: contact } = await (supabase as any)
+      .from('workspace_contacts')
+      .select('contact_id')
+      .eq('workspace_id', formData.workspaceId)
+      .eq('contact_id', formData.contactId)
+      .maybeSingle()
+    if (!contact) throw new Error('Contact not found or not associated with this workspace')
+  } else if (formData.companyId) {
+    const { data: company } = await (supabase as any)
+      .from('workspace_companies')
+      .select('company_id')
+      .eq('workspace_id', formData.workspaceId)
+      .eq('company_id', formData.companyId)
+      .maybeSingle()
+    if (!company) throw new Error('Company not found or not associated with this workspace')
+  } else if (formData.opportunityId) {
+    const { data: opp } = await (supabase as any)
+      .from('opportunities')
+      .select('id')
+      .eq('workspace_id', formData.workspaceId)
+      .eq('id', formData.opportunityId)
+      .maybeSingle()
+    if (!opp) throw new Error('Opportunity not found or not associated with this workspace')
+  } else if (formData.projectId) {
+    const { data: proj } = await (supabase as any)
+      .from('workspace_projects')
+      .select('id')
+      .eq('workspace_id', formData.workspaceId)
+      .eq('id', formData.projectId)
+      .maybeSingle()
+    if (!proj) throw new Error('Project not found or not associated with this workspace')
+  }
+
+  // 5. Validate relationship type
+  const validRelTypes: ResearchConnectionType[] = [
+    'subject',
+    'stakeholder',
+    'partner',
+    'competitor',
+    'due_diligence',
+    'supporting'
+  ]
+  const relType = formData.relationshipType || 'subject'
+  if (!validRelTypes.includes(relType)) {
+    throw new Error(`Invalid relationship type: ${relType}`)
+  }
+
+  // 6. Insert connection
+  const { data, error } = await (supabase as any)
+    .from('research_connections')
+    .insert({
+      workspace_id: formData.workspaceId,
+      research_record_id: formData.researchRecordId,
+      contact_id: formData.contactId || null,
+      company_id: formData.companyId || null,
+      opportunity_id: formData.opportunityId || null,
+      project_id: formData.projectId || null,
+      relationship_type: relType,
+      notes: formData.notes?.trim() || null,
+      created_by: user.id
+    })
+    .select(`
+      id,
+      workspace_id,
+      research_record_id,
+      contact_id,
+      company_id,
+      opportunity_id,
+      project_id,
+      relationship_type,
+      notes,
+      created_by,
+      created_at,
+      updated_at,
+      workspace_contacts(
+        contact:contacts(
+          id,
+          full_name,
+          role_title,
+          avatar_url,
+          email
+        )
+      ),
+      workspace_companies(
+        company:companies(
+          id,
+          name,
+          industry,
+          domain
+        )
+      ),
+      opportunity:opportunities(
+        id,
+        title,
+        type,
+        pipeline_stage,
+        value_estimate,
+        currency
+      ),
+      project:workspace_projects(
+        id,
+        title,
+        status,
+        priority
+      )
+    `)
+    .single()
+
+  if (error) {
+    if (error.code === '23505') {
+      throw new Error('This entity is already connected to this research record')
+    }
+    throw new Error(error.message)
+  }
+
+  revalidatePath(`/vault/research/${formData.researchRecordId}`)
+  revalidatePath('/vault/research')
+
+  return {
+    id: data.id,
+    workspace_id: data.workspace_id,
+    research_record_id: data.research_record_id,
+    contact_id: data.contact_id,
+    company_id: data.company_id,
+    opportunity_id: data.opportunity_id,
+    project_id: data.project_id,
+    relationship_type: data.relationship_type,
+    notes: data.notes,
+    created_by: data.created_by,
+    created_at: data.created_at,
+    updated_at: data.updated_at,
+    contact: data.workspace_contacts?.contact || null,
+    company: data.workspace_companies?.company || null,
+    opportunity: data.opportunity || null,
+    project: data.project || null,
+  }
+}
+
+export async function updateResearchConnection(
+  connectionId: string,
+  formData: {
+    workspaceId: string
+    relationshipType?: ResearchConnectionType
+    notes?: string | null
+  }
+) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // Verify workspace authorization
+  const { data: ws } = await (supabase as any)
+    .from('workspaces')
+    .select('id')
+    .eq('id', formData.workspaceId)
+    .maybeSingle()
+  if (!ws) throw new Error('Workspace not found or access denied')
+
+  // Verify connection belongs to workspace
+  const { data: existing } = await (supabase as any)
+    .from('research_connections')
+    .select('id, research_record_id, workspace_id')
+    .eq('id', connectionId)
+    .eq('workspace_id', formData.workspaceId)
+    .maybeSingle()
+  if (!existing) throw new Error('Connection not found or access denied')
+
+  const updates: any = {
+    updated_at: new Date().toISOString()
+  }
+
+  if (formData.relationshipType !== undefined) {
+    const validRelTypes: ResearchConnectionType[] = [
+      'subject',
+      'stakeholder',
+      'partner',
+      'competitor',
+      'due_diligence',
+      'supporting'
+    ]
+    if (!validRelTypes.includes(formData.relationshipType)) {
+      throw new Error(`Invalid relationship type: ${formData.relationshipType}`)
+    }
+    updates.relationship_type = formData.relationshipType
+  }
+
+  if (formData.notes !== undefined) {
+    updates.notes = formData.notes ? formData.notes.trim() : null
+  }
+
+  const { data, error } = await (supabase as any)
+    .from('research_connections')
+    .update(updates)
+    .eq('id', connectionId)
+    .eq('workspace_id', formData.workspaceId)
+    .select(`
+      id,
+      workspace_id,
+      research_record_id,
+      contact_id,
+      company_id,
+      opportunity_id,
+      project_id,
+      relationship_type,
+      notes,
+      created_by,
+      created_at,
+      updated_at,
+      workspace_contacts(
+        contact:contacts(
+          id,
+          full_name,
+          role_title,
+          avatar_url,
+          email
+        )
+      ),
+      workspace_companies(
+        company:companies(
+          id,
+          name,
+          industry,
+          domain
+        )
+      ),
+      opportunity:opportunities(
+        id,
+        title,
+        type,
+        pipeline_stage,
+        value_estimate,
+        currency
+      ),
+      project:workspace_projects(
+        id,
+        title,
+        status,
+        priority
+      )
+    `)
+    .single()
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath(`/vault/research/${existing.research_record_id}`)
+  revalidatePath('/vault/research')
+
+  return {
+    id: data.id,
+    workspace_id: data.workspace_id,
+    research_record_id: data.research_record_id,
+    contact_id: data.contact_id,
+    company_id: data.company_id,
+    opportunity_id: data.opportunity_id,
+    project_id: data.project_id,
+    relationship_type: data.relationship_type,
+    notes: data.notes,
+    created_by: data.created_by,
+    created_at: data.created_at,
+    updated_at: data.updated_at,
+    contact: data.workspace_contacts?.contact || null,
+    company: data.workspace_companies?.company || null,
+    opportunity: data.opportunity || null,
+    project: data.project || null,
+  }
+}
+
+export async function deleteResearchConnection(connectionId: string, workspaceId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  const { data: ws } = await (supabase as any)
+    .from('workspaces')
+    .select('id')
+    .eq('id', workspaceId)
+    .maybeSingle()
+  if (!ws) throw new Error('Workspace not found or access denied')
+
+  const { data: existing } = await (supabase as any)
+    .from('research_connections')
+    .select('id, research_record_id')
+    .eq('id', connectionId)
+    .eq('workspace_id', workspaceId)
+    .maybeSingle()
+  if (!existing) throw new Error('Connection not found or access denied')
+
+  const { error } = await (supabase as any)
+    .from('research_connections')
+    .delete()
+    .eq('id', connectionId)
+    .eq('workspace_id', workspaceId)
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath(`/vault/research/${existing.research_record_id}`)
+  revalidatePath('/vault/research')
+  return true
+}
+
+export async function getWorkspaceConnectableEntities(workspaceId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // 1. Fetch contacts in this workspace
+  const { data: contactsData } = await (supabase as any)
+    .from('workspace_contacts')
+    .select(`
+      contact_id,
+      contact:contacts(
+        id,
+        full_name,
+        role_title,
+        avatar_url,
+        archived_at
+      )
+    `)
+    .eq('workspace_id', workspaceId)
+
+  const contacts = (contactsData || [])
+    .filter((c: any) => c.contact && !c.contact.archived_at)
+    .map((c: any) => ({
+      id: c.contact.id,
+      fullName: c.contact.full_name as string,
+      roleTitle: (c.contact.role_title || null) as string | null,
+      avatarUrl: (c.contact.avatar_url || null) as string | null,
+    }))
+    .sort((a: any, b: any) => a.fullName.localeCompare(b.fullName))
+
+  // 2. Fetch companies in this workspace
+  const { data: companiesData } = await (supabase as any)
+    .from('workspace_companies')
+    .select(`
+      company_id,
+      tier,
+      company:companies(
+        id,
+        name,
+        industry,
+        domain,
+        archived_at
+      )
+    `)
+    .eq('workspace_id', workspaceId)
+    .neq('tier', 'archived')
+
+  const companies = (companiesData || [])
+    .filter((c: any) => c.company && !c.company.archived_at)
+    .map((c: any) => ({
+      id: c.company.id,
+      name: c.company.name as string,
+      industry: (c.company.industry || null) as string | null,
+      domain: (c.company.domain || null) as string | null,
+      tier: c.tier as string,
+    }))
+    .sort((a: any, b: any) => a.name.localeCompare(b.name))
+
+  // 3. Fetch opportunities in this workspace
+  const { data: opportunitiesData } = await (supabase as any)
+    .from('opportunities')
+    .select('id, title, type, pipeline_stage, value_estimate, currency')
+    .eq('workspace_id', workspaceId)
+    .order('title', { ascending: true })
+
+  const opportunities = (opportunitiesData || []).map((o: any) => ({
+    id: o.id,
+    title: o.title as string,
+    type: o.type as string,
+    pipelineStage: o.pipeline_stage as string,
+    valueEstimate: (o.value_estimate || null) as number | null,
+    currency: (o.currency || 'USD') as string,
+  }))
+
+  // 4. Fetch projects in this workspace
+  const { data: projectsData } = await (supabase as any)
+    .from('workspace_projects')
+    .select('id, title, status, priority')
+    .eq('workspace_id', workspaceId)
+    .neq('status', 'archived')
+    .order('title', { ascending: true })
+
+  const projects = (projectsData || []).map((p: any) => ({
+    id: p.id,
+    title: p.title as string,
+    status: p.status as string,
+    priority: p.priority as string,
+  }))
+
+  return {
+    contacts,
+    companies,
+    opportunities,
+    projects,
+  }
+}

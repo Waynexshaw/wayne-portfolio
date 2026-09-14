@@ -26,6 +26,7 @@ import { updateResearchRecord, archiveResearchRecord, ResearchStatus } from '@/l
 import { ResearchEditModal } from './research-edit-modal'
 import { ResearchSourcesSection } from './research-sources-section'
 import { ResearchEvidenceSection } from './research-evidence-section'
+import { ResearchConnectionsSection } from './research-connections-section'
 import { SourceModal } from './source-modal'
 import { EvidenceModal } from './evidence-modal'
 
@@ -35,6 +36,7 @@ interface ResearchDetailViewProps {
   workspaceName?: string
   initialSources?: any[]
   initialEvidence?: any[]
+  initialConnections?: any[]
 }
 
 function getStatusBadge(status: string) {
@@ -75,6 +77,7 @@ export function ResearchDetailView({
   workspaceName,
   initialSources = [],
   initialEvidence = [],
+  initialConnections = [],
 }: ResearchDetailViewProps) {
   const router = useRouter()
   const [isEditOpen, setIsEditOpen] = useState(false)
@@ -360,6 +363,15 @@ export function ResearchDetailView({
             {record.summary || 'No background summary provided.'}
           </p>
         </div>
+      </div>
+
+      {/* Connected Vault Operational Entities */}
+      <div className="pt-2">
+        <ResearchConnectionsSection
+          researchRecordId={record.id}
+          workspaceId={workspaceId}
+          connections={initialConnections}
+        />
       </div>
 
       {/* Traceability: Sources & Grounded Evidence */}

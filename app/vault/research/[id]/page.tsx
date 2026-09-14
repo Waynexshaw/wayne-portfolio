@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ArrowLeft, BookOpen, Database } from 'lucide-react'
-import { getVaultContext, getResearchDetail, getResearchSources, getResearchEvidence } from '@/lib/vault/actions'
+import { getVaultContext, getResearchDetail, getResearchSources, getResearchEvidence, getResearchConnections } from '@/lib/vault/actions'
 import { ResearchDetailView } from '@/components/vault/research/research-detail-view'
 
 export const dynamic = 'force-dynamic'
@@ -17,13 +17,20 @@ export default async function ResearchDetailPage({ params }: ResearchDetailPageP
   let record: any = null
   let sources: any[] = []
   let evidence: any[] = []
+  let connections: any[] = []
   let dbError: string | null = null
 
   try {
     record = await getResearchDetail(id, activeWorkspace?.id)
     if (record && activeWorkspace?.id) {
-      sources = await getResearchSources(id, activeWorkspace.id, true)
-      evidence = await getResearchEvidence(id, activeWorkspace.id, true)
+      const [sourcesRes, evidenceRes, connectionsRes] = await Promise.all([
+        getResearchSources(id, activeWorkspace.id, true),
+        getResearchEvidence(id, activeWorkspace.id, true),
+        getResearchConnections(id, activeWorkspace.id)
+      ])
+      sources = sourcesRes
+      evidence = evidenceRes
+      connections = connectionsRes
     }
   } catch (err: any) {
     console.error('[Vault Research Detail Error]:', err?.message || err)
@@ -91,6 +98,7 @@ export default async function ResearchDetailPage({ params }: ResearchDetailPageP
       workspaceName={activeWorkspace.name}
       initialSources={sources}
       initialEvidence={evidence}
+      initialConnections={connections}
     />
   )
 }
