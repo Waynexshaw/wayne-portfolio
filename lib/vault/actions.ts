@@ -3104,3 +3104,373 @@ export async function getRelatedResearchForEntity(
       research_record: row.research_record,
     }))
 }
+
+// ---------------------------------------------------------------------------
+// REVIEWS ACTIONS (PHASE 1)
+// ---------------------------------------------------------------------------
+
+export type ReviewType =
+  | 'project'
+  | 'campaign'
+  | 'growth'
+  | 'strategy'
+  | 'opportunity'
+  | 'partnership'
+  | 'period'
+  | 'other'
+
+export type ReviewStatus = 'draft' | 'completed' | 'archived'
+
+export interface ReviewItem {
+  id: string
+  workspace_id: string
+  title: string
+  review_type: ReviewType
+  status: ReviewStatus
+  period_start: string | null
+  period_end: string | null
+  objective: string | null
+  expected_outcome: string | null
+  actual_outcome: string | null
+  what_worked: string | null
+  what_did_not_work: string | null
+  why: string | null
+  lessons: string | null
+  next_changes: string | null
+  summary: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  completed_at: string | null
+  archived_at: string | null
+}
+
+export async function getReviews(
+  workspaceId?: string,
+  options?: {
+    q?: string
+    status?: string
+    type?: string
+  }
+): Promise<ReviewItem[]> {
+  if (!workspaceId) return []
+  const supabase = await createClient()
+
+  // Verify workspace authorization
+  const { data: ws } = await (supabase as any)
+    .from('workspaces')
+    .select('id')
+    .eq('id', workspaceId)
+    .maybeSingle()
+  if (!ws) return []
+
+  const q = options?.q?.trim()
+  const status = options?.status && options.status !== 'all' ? options.status : undefined
+  const type = options?.type && options.type !== 'all' ? options.type : undefined
+
+  let query = (supabase as any)
+    .from('reviews')
+    .select('*')
+    .eq('workspace_id', workspaceId)
+
+  if (status) {
+    query = query.eq('status', status)
+  } else {
+    query = query.neq('status', 'archived')
+  }
+
+  if (type) {
+    query = query.eq('review_type', type)
+  }
+
+  if (q) {
+    const sanitizedQuery = q.replace(/[,()]/g, ' ').trim()
+    if (sanitizedQuery) {
+      const orClauses = [
+        `title.ilike.%${sanitizedQuery}%`,
+        `objective.ilike.%${sanitizedQuery}%`,
+        `expected_outcome.ilike.%${sanitizedQuery}%`,
+        `actual_outcome.ilike.%${sanitizedQuery}%`,
+        `what_worked.ilike.%${sanitizedQuery}%`,
+        `what_did_not_work.ilike.%${sanitizedQuery}%`,
+        `why.ilike.%${sanitizedQuery}%`,
+        `lessons.ilike.%${sanitizedQuery}%`,
+        `next_changes.ilike.%${sanitizedQuery}%`,
+        `summary.ilike.%${sanitizedQuery}%`,
+      ]
+      query = query.or(orClauses.join(','))
+    }
+  }
+
+  query = query.order('updated_at', { ascending: false })
+
+  const { data, error } = await query
+  if (error) throw new Error(error.message)
+  return (data || []) as ReviewItem[]
+}
+
+export async function getReviewDetail(id: string, workspaceId?: string): Promise<ReviewItem | null> {
+  if (!workspaceId || !id) return null
+  const supabase = await createClient()
+
+  const { data: ws } = await (supabase as any)
+    .from('workspaces')
+    .select('id')
+    .eq('id', workspaceId)
+    .maybeSingle()
+  if (!ws) return null
+
+  const { data, error } = await (supabase as any)
+    .from('reviews')
+    .select('*')
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(error.message)
+  }
+  return (data || null) as ReviewItem | null
+}
+
+export async function createReview(formData: {
+  workspaceId: string
+  title: string
+  reviewType?: ReviewType
+  status?: ReviewStatus
+  periodStart?: string | null
+  periodEnd?: string | null
+  objective?: string | null
+  expectedOutcome?: string | null
+  actualOutcome?: string | null
+  whatWorked?: string | null
+  whatDidNotWork?: string | null
+  why?: string | null
+  lessons?: string | null
+  nextChanges?: string | null
+  summary?: string | null
+}): Promise<ReviewItem> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  const { data: ws } = await (supabase as any)
+    .from('workspaces')
+    .select('id')
+    .eq('id', formData.workspaceId)
+    .maybeSingle()
+  if (!ws) throw new Error('Workspace not found or access denied')
+
+  if (!formData.title || !formData.title.trim()) {
+    throw new Error('Title is required')
+  }
+
+  const periodStart = formData.periodStart || null
+  const periodEnd = formData.periodEnd || null
+  if (periodStart && periodEnd && periodStart > periodEnd) {
+    throw new Error('Period start date cannot be after period end date')
+  }
+
+  const now = new Date().toISOString()
+  const status = formData.status || 'draft'
+  const completedAt = status === 'completed' ? now : null
+
+  const { data, error } = await (supabase as any)
+    .from('reviews')
+    .insert({
+      workspace_id: formData.workspaceId,
+      title: formData.title.trim(),
+      review_type: formData.reviewType || 'other',
+      status,
+      period_start: periodStart,
+      period_end: periodEnd,
+      objective: formData.objective?.trim() || null,
+      expected_outcome: formData.expectedOutcome?.trim() || null,
+      actual_outcome: formData.actualOutcome?.trim() || null,
+      what_worked: formData.whatWorked?.trim() || null,
+      what_did_not_work: formData.whatDidNotWork?.trim() || null,
+      why: formData.why?.trim() || null,
+      lessons: formData.lessons?.trim() || null,
+      next_changes: formData.nextChanges?.trim() || null,
+      summary: formData.summary?.trim() || null,
+      created_by: user.id,
+      completed_at: completedAt,
+      archived_at: null,
+    })
+    .select()
+    .single()
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/vault/reviews')
+  revalidatePath('/vault')
+  return data as ReviewItem
+}
+
+export async function updateReview(
+  id: string,
+  formData: {
+    workspaceId: string
+    title?: string
+    reviewType?: ReviewType
+    status?: ReviewStatus
+    periodStart?: string | null
+    periodEnd?: string | null
+    objective?: string | null
+    expectedOutcome?: string | null
+    actualOutcome?: string | null
+    whatWorked?: string | null
+    whatDidNotWork?: string | null
+    why?: string | null
+    lessons?: string | null
+    nextChanges?: string | null
+    summary?: string | null
+  }
+): Promise<ReviewItem> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  const { data: existing } = await (supabase as any)
+    .from('reviews')
+    .select('*')
+    .eq('id', id)
+    .eq('workspace_id', formData.workspaceId)
+    .maybeSingle()
+  if (!existing) throw new Error('Review not found or access denied')
+
+  const periodStart = formData.periodStart !== undefined ? (formData.periodStart || null) : existing.period_start
+  const periodEnd = formData.periodEnd !== undefined ? (formData.periodEnd || null) : existing.period_end
+  if (periodStart && periodEnd && periodStart > periodEnd) {
+    throw new Error('Period start date cannot be after period end date')
+  }
+
+  const now = new Date().toISOString()
+  const updates: any = {
+    updated_at: now,
+  }
+
+  if (formData.title !== undefined) updates.title = formData.title.trim()
+  if (formData.reviewType !== undefined) updates.review_type = formData.reviewType
+  if (formData.periodStart !== undefined) updates.period_start = formData.periodStart || null
+  if (formData.periodEnd !== undefined) updates.period_end = formData.periodEnd || null
+  if (formData.objective !== undefined) updates.objective = formData.objective?.trim() || null
+  if (formData.expectedOutcome !== undefined) updates.expected_outcome = formData.expectedOutcome?.trim() || null
+  if (formData.actualOutcome !== undefined) updates.actual_outcome = formData.actualOutcome?.trim() || null
+  if (formData.whatWorked !== undefined) updates.what_worked = formData.whatWorked?.trim() || null
+  if (formData.whatDidNotWork !== undefined) updates.what_did_not_work = formData.whatDidNotWork?.trim() || null
+  if (formData.why !== undefined) updates.why = formData.why?.trim() || null
+  if (formData.lessons !== undefined) updates.lessons = formData.lessons?.trim() || null
+  if (formData.nextChanges !== undefined) updates.next_changes = formData.nextChanges?.trim() || null
+  if (formData.summary !== undefined) updates.summary = formData.summary?.trim() || null
+
+  if (formData.status !== undefined) {
+    updates.status = formData.status
+    if (formData.status === 'completed') {
+      updates.completed_at = now
+      updates.archived_at = null
+    } else if (formData.status === 'draft') {
+      updates.completed_at = null
+      updates.archived_at = null
+    } else if (formData.status === 'archived') {
+      updates.archived_at = now
+    }
+  }
+
+  const { data, error } = await (supabase as any)
+    .from('reviews')
+    .update(updates)
+    .eq('id', id)
+    .eq('workspace_id', formData.workspaceId)
+    .select()
+    .single()
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath(`/vault/reviews/${id}`)
+  revalidatePath('/vault/reviews')
+  revalidatePath('/vault')
+  return data as ReviewItem
+}
+
+export async function setReviewStatus(
+  id: string,
+  workspaceId: string,
+  status: ReviewStatus
+): Promise<ReviewItem> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  const now = new Date().toISOString()
+  const updates: any = {
+    status,
+    updated_at: now,
+  }
+
+  if (status === 'completed') {
+    updates.completed_at = now
+    updates.archived_at = null
+  } else if (status === 'draft') {
+    updates.completed_at = null
+    updates.archived_at = null
+  } else if (status === 'archived') {
+    updates.archived_at = now
+  }
+
+  const { data, error } = await (supabase as any)
+    .from('reviews')
+    .update(updates)
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .select()
+    .single()
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath(`/vault/reviews/${id}`)
+  revalidatePath('/vault/reviews')
+  revalidatePath('/vault')
+  return data as ReviewItem
+}
+
+export async function archiveReview(id: string, workspaceId: string): Promise<ReviewItem> {
+  return setReviewStatus(id, workspaceId, 'archived')
+}
+
+export async function restoreReview(id: string, workspaceId: string): Promise<ReviewItem> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  const { data: current } = await (supabase as any)
+    .from('reviews')
+    .select('completed_at')
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .maybeSingle()
+
+  if (!current) throw new Error('Review not found or access denied')
+
+  const now = new Date().toISOString()
+  const targetStatus: ReviewStatus = current.completed_at ? 'completed' : 'draft'
+
+  const { data, error } = await (supabase as any)
+    .from('reviews')
+    .update({
+      status: targetStatus,
+      archived_at: null,
+      updated_at: now,
+    })
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .select()
+    .single()
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath(`/vault/reviews/${id}`)
+  revalidatePath('/vault/reviews')
+  revalidatePath('/vault')
+  return data as ReviewItem
+}

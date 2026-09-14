@@ -1126,6 +1126,77 @@ export interface Database {
           updated_at?: string
         }
       }
+      reviews: {
+        Row: {
+          id: string
+          workspace_id: string
+          title: string
+          review_type: 'project' | 'campaign' | 'growth' | 'strategy' | 'opportunity' | 'partnership' | 'period' | 'other'
+          status: 'draft' | 'completed' | 'archived'
+          period_start: string | null
+          period_end: string | null
+          objective: string | null
+          expected_outcome: string | null
+          actual_outcome: string | null
+          what_worked: string | null
+          what_did_not_work: string | null
+          why: string | null
+          lessons: string | null
+          next_changes: string | null
+          summary: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+          completed_at: string | null
+          archived_at: string | null
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          title: string
+          review_type?: 'project' | 'campaign' | 'growth' | 'strategy' | 'opportunity' | 'partnership' | 'period' | 'other'
+          status?: 'draft' | 'completed' | 'archived'
+          period_start?: string | null
+          period_end?: string | null
+          objective?: string | null
+          expected_outcome?: string | null
+          actual_outcome?: string | null
+          what_worked?: string | null
+          what_did_not_work?: string | null
+          why?: string | null
+          lessons?: string | null
+          next_changes?: string | null
+          summary?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+          completed_at?: string | null
+          archived_at?: string | null
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          title?: string
+          review_type?: 'project' | 'campaign' | 'growth' | 'strategy' | 'opportunity' | 'partnership' | 'period' | 'other'
+          status?: 'draft' | 'completed' | 'archived'
+          period_start?: string | null
+          period_end?: string | null
+          objective?: string | null
+          expected_outcome?: string | null
+          actual_outcome?: string | null
+          what_worked?: string | null
+          what_did_not_work?: string | null
+          why?: string | null
+          lessons?: string | null
+          next_changes?: string | null
+          summary?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+          completed_at?: string | null
+          archived_at?: string | null
+        }
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>

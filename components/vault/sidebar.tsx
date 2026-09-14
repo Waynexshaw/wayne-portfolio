@@ -11,6 +11,7 @@ import {
   TrendingUp, 
   FolderGit2, 
   BookOpen,
+  RotateCcw,
   Briefcase, 
   ExternalLink,
   Shield,
@@ -28,6 +29,7 @@ const navItems = [
   { href: '/vault/opportunities', label: 'Opportunities', icon: TrendingUp },
   { href: '/vault/projects', label: 'Projects', icon: FolderGit2 },
   { href: '/vault/research', label: 'Research', icon: BookOpen },
+  { href: '/vault/reviews', label: 'Reviews', icon: RotateCcw },
 ]
 
 export function VaultSidebar({ 
