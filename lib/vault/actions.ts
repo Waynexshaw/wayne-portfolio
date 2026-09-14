@@ -3991,3 +3991,969 @@ export async function deleteReviewConnection(connectionId: string, workspaceId: 
   revalidatePath('/vault/reviews')
   return true
 }
+
+// ---------------------------------------------------------------------------
+// METRICS & PERFORMANCE (PHASE 1)
+// ---------------------------------------------------------------------------
+
+export type MetricCategory =
+  | 'growth'
+  | 'financial'
+  | 'operational'
+  | 'product'
+  | 'marketing'
+  | 'community'
+  | 'other'
+
+export type MetricUnitType =
+  | 'count'
+  | 'currency'
+  | 'percentage'
+  | 'duration'
+  | 'score'
+
+export type MetricDirection =
+  | 'higher_is_better'
+  | 'lower_is_better'
+  | 'neutral'
+
+export type MetricMeasurementType =
+  | 'point'
+  | 'period'
+
+export type MetricCadence =
+  | 'daily'
+  | 'weekly'
+  | 'biweekly'
+  | 'monthly'
+  | 'quarterly'
+  | 'yearly'
+  | 'ad_hoc'
+
+export type MetricStatus =
+  | 'active'
+  | 'paused'
+  | 'archived'
+
+export interface WorkspaceMetricItem {
+  id: string
+  workspace_id: string
+  project_id: string | null
+  name: string
+  key: string
+  description: string | null
+  category: MetricCategory
+  unit_type: MetricUnitType
+  unit_symbol: string | null
+  direction: MetricDirection
+  measurement_type: MetricMeasurementType
+  cadence: MetricCadence | null
+  status: MetricStatus
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  archived_at: string | null
+  project?: {
+    id: string
+    title: string
+  } | null
+  latest_observation?: MetricObservationItem | null
+  current_target?: MetricTargetItem | null
+  // Derived runtime helpers
+  current_actual?: number | null
+  current_target_value?: number | null
+  active_target?: MetricTargetItem | null
+  attainment_rate?: number | null
+  observations_count?: number
+  targets_count?: number
+}
+
+export interface WorkspaceMetricDetail extends WorkspaceMetricItem {
+  targets: MetricTargetItem[]
+  observations: MetricObservationItem[]
+}
+
+export interface MetricTargetItem {
+  id: string
+  workspace_id: string
+  metric_id: string
+  target_value: number
+  baseline_value: number | null
+  period_start: string | null
+  period_end: string | null
+  notes: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface MetricObservationItem {
+  id: string
+  workspace_id: string
+  metric_id: string
+  value: number
+  observed_at: string
+  period_start: string | null
+  period_end: string | null
+  notes: string | null
+  source_label: string | null
+  source_url: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+function calculateAttainment(
+  actual: number | null | undefined,
+  target: number | null | undefined,
+  direction: MetricDirection,
+  baseline?: number | null | undefined
+): number | null {
+  if (actual === null || actual === undefined || target === null || target === undefined) {
+    return null
+  }
+  const act = Number(actual)
+  const tgt = Number(target)
+  if (isNaN(act) || isNaN(tgt)) return null
+
+  if (direction === 'neutral') {
+    if (tgt === 0) return 100
+    return Math.round((act / tgt) * 1000) / 10
+  }
+
+  if (direction === 'lower_is_better') {
+    if (act <= tgt) {
+      if (act === 0) return 100
+      return Math.round((tgt / act) * 1000) / 10
+    }
+    return Math.max(0, Math.round((tgt / act) * 1000) / 10)
+  }
+
+  // higher_is_better (default)
+  if (baseline !== null && baseline !== undefined && !isNaN(Number(baseline))) {
+    const base = Number(baseline)
+    const needed = tgt - base
+    if (needed > 0) {
+      const progress = act - base
+      return Math.max(0, Math.round((progress / needed) * 1000) / 10)
+    }
+  }
+
+  if (tgt === 0) return act >= 0 ? 100 : 0
+  return Math.max(0, Math.round((act / tgt) * 1000) / 10)
+}
+
+/**
+ * Resolves the current/relevant target from a list of targets for a metric.
+ *
+ * Rules:
+ * Priority 1: Current bounded target where (period_start is null or <= today) AND (period_end is null or >= today).
+ *             Among those, prefer bounded targets with dates, tie-broken by most recent created_at.
+ * Priority 2: Open-ended target where period_start IS NULL AND period_end IS NULL.
+ *             Prefer most recently created.
+ * Priority 3: Historical target (ended in the past).
+ *             Prefer most recently ended (period_end DESC, created_at DESC).
+ * Note: Future targets (period_start > today) are never considered current before their period begins.
+ */
+function normalizeDateStr(d: any): string | null {
+  if (!d) return null
+  if (d instanceof Date) return d.toISOString().split('T')[0]
+  if (typeof d === 'string') return d.includes('T') ? d.split('T')[0] : d
+  return String(d)
+}
+
+function resolveCurrentTarget(targets: MetricTargetItem[], todayStr?: string): MetricTargetItem | null {
+  if (!targets || targets.length === 0) return null
+
+  const today = todayStr || new Date().toISOString().split('T')[0]
+
+  // Filter 1: Valid current-period candidates
+  // Must satisfy: (start is null or <= today) AND (end is null or >= today)
+  const currentCandidates = targets.filter((t) => {
+    const startStr = normalizeDateStr(t.period_start)
+    const endStr = normalizeDateStr(t.period_end)
+    const validStart = !startStr || startStr <= today
+    const validEnd = !endStr || endStr >= today
+    return validStart && validEnd
+  })
+
+  // Priority 1: Current bounded target (at least one of period_start or period_end is provided)
+  const boundedCurrent = currentCandidates.filter((t) => t.period_start || t.period_end)
+  if (boundedCurrent.length > 0) {
+    // Prefer fully bounded (both start & end), then partially bounded, then newest created_at
+    boundedCurrent.sort((a, b) => {
+      const aSpecificity = (a.period_start && a.period_end) ? 2 : 1
+      const bSpecificity = (b.period_start && b.period_end) ? 2 : 1
+      if (bSpecificity !== aSpecificity) return bSpecificity - aSpecificity
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    })
+    return boundedCurrent[0]
+  }
+
+  // Priority 2: Open-ended target (both period_start and period_end are null)
+  const openEnded = targets.filter((t) => !t.period_start && !t.period_end)
+  if (openEnded.length > 0) {
+    openEnded.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    return openEnded[0]
+  }
+
+  // Priority 3: Historical target (already ended: period_end < today)
+  const historical = targets.filter((t) => {
+    const endStr = normalizeDateStr(t.period_end)
+    return endStr && endStr < today
+  })
+  if (historical.length > 0) {
+    historical.sort((a, b) => {
+      const aEnd = normalizeDateStr(a.period_end) || ''
+      const bEnd = normalizeDateStr(b.period_end) || ''
+      if (aEnd !== bEnd) {
+        return bEnd.localeCompare(aEnd)
+      }
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    })
+    return historical[0]
+  }
+
+  // If all remaining targets are in the future, do not label them current before their period begins
+  return null
+}
+
+export async function getWorkspaceMetrics(
+  workspaceId: string,
+  options?: {
+    status?: string
+    category?: string
+    direction?: string
+    measurementType?: string
+    cadence?: string
+    search?: string
+    projectId?: string
+  }
+): Promise<WorkspaceMetricItem[]> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  let query = (supabase as any)
+    .from('workspace_metrics')
+    .select(`
+      id,
+      workspace_id,
+      project_id,
+      name,
+      key,
+      description,
+      category,
+      unit_type,
+      unit_symbol,
+      direction,
+      measurement_type,
+      cadence,
+      status,
+      created_by,
+      created_at,
+      updated_at,
+      archived_at,
+      project:workspace_projects(
+        id,
+        title
+      )
+    `)
+    .eq('workspace_id', workspaceId)
+
+  if (options?.status && options.status !== 'all') {
+    query = query.eq('status', options.status)
+  } else if (!options?.status) {
+    query = query.neq('status', 'archived')
+  }
+
+  if (options?.category && options.category !== 'all') {
+    query = query.eq('category', options.category)
+  }
+
+  if (options?.direction && options.direction !== 'all') {
+    query = query.eq('direction', options.direction)
+  }
+
+  if (options?.measurementType && options.measurementType !== 'all') {
+    query = query.eq('measurement_type', options.measurementType)
+  }
+
+  if (options?.cadence && options.cadence !== 'all') {
+    query = query.eq('cadence', options.cadence)
+  }
+
+  if (options?.projectId && options.projectId !== 'all') {
+    query = query.eq('project_id', options.projectId)
+  }
+
+  if (options?.search) {
+    const s = options.search.trim()
+    query = query.or(`name.ilike.%${s}%,key.ilike.%${s}%,description.ilike.%${s}%`)
+  }
+
+  query = query.order('created_at', { ascending: false })
+
+  const { data, error } = await query
+  if (error) throw new Error(error.message)
+
+  const metrics: WorkspaceMetricItem[] = data || []
+  if (metrics.length === 0) return []
+
+  const metricIds = metrics.map((m) => m.id)
+
+  // Fetch observations for metrics
+  const { data: obsData } = await (supabase as any)
+    .from('workspace_metric_observations')
+    .select('*')
+    .in('metric_id', metricIds)
+    .eq('workspace_id', workspaceId)
+    .order('observed_at', { ascending: false })
+    .order('created_at', { ascending: false })
+
+  const obsByMetric: Record<string, MetricObservationItem> = {}
+  const obsCountByMetric: Record<string, number> = {}
+  for (const obs of obsData || []) {
+    obsCountByMetric[obs.metric_id] = (obsCountByMetric[obs.metric_id] || 0) + 1
+    if (!obsByMetric[obs.metric_id]) {
+      obsByMetric[obs.metric_id] = {
+        ...obs,
+        value: Number(obs.value),
+      }
+    }
+  }
+
+  // Fetch targets for metrics
+  const { data: targetData } = await (supabase as any)
+    .from('workspace_metric_targets')
+    .select('*')
+    .in('metric_id', metricIds)
+    .eq('workspace_id', workspaceId)
+    .order('created_at', { ascending: false })
+
+  const targetsByMetric: Record<string, MetricTargetItem[]> = {}
+  for (const t of targetData || []) {
+    if (!targetsByMetric[t.metric_id]) {
+      targetsByMetric[t.metric_id] = []
+    }
+    targetsByMetric[t.metric_id].push({
+      ...t,
+      target_value: Number(t.target_value),
+      baseline_value: t.baseline_value !== null ? Number(t.baseline_value) : null,
+      period_start: normalizeDateStr(t.period_start),
+      period_end: normalizeDateStr(t.period_end),
+    })
+  }
+
+  return metrics.map((m) => {
+    const latestObs = obsByMetric[m.id] || null
+    const mTargets = targetsByMetric[m.id] || []
+    const currentTarget = resolveCurrentTarget(mTargets)
+    const actualVal = latestObs ? latestObs.value : null
+    const targetVal = currentTarget ? currentTarget.target_value : null
+    const attainment = calculateAttainment(
+      actualVal,
+      targetVal,
+      m.direction,
+      currentTarget?.baseline_value
+    )
+
+    return {
+      ...m,
+      latest_observation: latestObs,
+      current_target: currentTarget,
+      current_actual: actualVal,
+      current_target_value: targetVal,
+      active_target: currentTarget,
+      attainment_rate: attainment,
+      observations_count: obsCountByMetric[m.id] || 0,
+      targets_count: mTargets.length,
+    }
+  })
+}
+
+export async function getWorkspaceMetricDetail(
+  id: string,
+  workspaceId: string
+): Promise<WorkspaceMetricDetail> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  const { data, error } = await (supabase as any)
+    .from('workspace_metrics')
+    .select(`
+      id,
+      workspace_id,
+      project_id,
+      name,
+      key,
+      description,
+      category,
+      unit_type,
+      unit_symbol,
+      direction,
+      measurement_type,
+      cadence,
+      status,
+      created_by,
+      created_at,
+      updated_at,
+      archived_at,
+      project:workspace_projects(
+        id,
+        title
+      )
+    `)
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  if (!data) throw new Error('Metric not found or access denied')
+
+  // Fetch all targets and observations for this metric
+  const [targets, observations] = await Promise.all([
+    getMetricTargets(id, workspaceId),
+    getMetricObservations(id, workspaceId),
+  ])
+
+  const latestObs = observations[0] || null
+  const currentTarget = resolveCurrentTarget(targets)
+  const actualVal = latestObs ? latestObs.value : null
+  const targetVal = currentTarget ? currentTarget.target_value : null
+  const attainment = calculateAttainment(
+    actualVal,
+    targetVal,
+    data.direction,
+    currentTarget?.baseline_value
+  )
+
+  return {
+    ...data,
+    targets,
+    observations,
+    latest_observation: latestObs,
+    current_target: currentTarget,
+    current_actual: actualVal,
+    current_target_value: targetVal,
+    active_target: currentTarget,
+    attainment_rate: attainment,
+    observations_count: observations.length,
+    targets_count: targets.length,
+  } as WorkspaceMetricDetail
+}
+
+export async function createWorkspaceMetric(formData: {
+  workspaceId: string
+  projectId?: string | null
+  name: string
+  key: string
+  description?: string | null
+  category: MetricCategory
+  unitType: MetricUnitType
+  unitSymbol?: string | null
+  direction: MetricDirection
+  measurementType: MetricMeasurementType
+  cadence?: MetricCadence | null
+}): Promise<WorkspaceMetricItem> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // Verify workspace authorization
+  const { data: ws } = await (supabase as any)
+    .from('workspaces')
+    .select('id')
+    .eq('id', formData.workspaceId)
+    .maybeSingle()
+  if (!ws) throw new Error('Workspace not found or access denied')
+
+  // If projectId supplied, verify it belongs to this workspace
+  if (formData.projectId) {
+    const { data: proj } = await (supabase as any)
+      .from('workspace_projects')
+      .select('id')
+      .eq('id', formData.projectId)
+      .eq('workspace_id', formData.workspaceId)
+      .maybeSingle()
+    if (!proj) throw new Error('Project not found or not in this workspace')
+  }
+
+  // Format machine key
+  const cleanKey = formData.key.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_')
+
+  const { data, error } = await (supabase as any)
+    .from('workspace_metrics')
+    .insert({
+      workspace_id: formData.workspaceId,
+      project_id: formData.projectId || null,
+      name: formData.name.trim(),
+      key: cleanKey,
+      description: formData.description?.trim() || null,
+      category: formData.category,
+      unit_type: formData.unitType,
+      unit_symbol: formData.unitSymbol?.trim() || null,
+      direction: formData.direction,
+      measurement_type: formData.measurementType,
+      cadence: formData.cadence || null,
+      status: 'active',
+      created_by: user.id,
+    })
+    .select(`
+      id,
+      workspace_id,
+      project_id,
+      name,
+      key,
+      description,
+      category,
+      unit_type,
+      unit_symbol,
+      direction,
+      measurement_type,
+      cadence,
+      status,
+      created_by,
+      created_at,
+      updated_at,
+      archived_at
+    `)
+    .single()
+
+  if (error) {
+    if (error.code === '23505') {
+      throw new Error(`A metric with key '${cleanKey}' already exists in this workspace`)
+    }
+    throw new Error(error.message)
+  }
+
+  revalidatePath('/vault/metrics')
+  return data as WorkspaceMetricItem
+}
+
+export async function updateWorkspaceMetric(
+  id: string,
+  workspaceId: string,
+  formData: {
+    projectId?: string | null
+    name?: string
+    description?: string | null
+    category?: MetricCategory
+    unitType?: MetricUnitType
+    unitSymbol?: string | null
+    direction?: MetricDirection
+    measurementType?: MetricMeasurementType
+    cadence?: MetricCadence | null
+  }
+): Promise<WorkspaceMetricItem> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // Verify metric exists in workspace
+  const { data: existing } = await (supabase as any)
+    .from('workspace_metrics')
+    .select('id')
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .maybeSingle()
+  if (!existing) throw new Error('Metric not found or access denied')
+
+  const updates: any = {
+    updated_at: new Date().toISOString(),
+  }
+
+  if (formData.name !== undefined) updates.name = formData.name.trim()
+  if (formData.description !== undefined) updates.description = formData.description?.trim() || null
+  if (formData.category !== undefined) updates.category = formData.category
+  if (formData.unitType !== undefined) updates.unit_type = formData.unitType
+  if (formData.unitSymbol !== undefined) updates.unit_symbol = formData.unitSymbol?.trim() || null
+  if (formData.direction !== undefined) updates.direction = formData.direction
+  if (formData.measurementType !== undefined) updates.measurement_type = formData.measurementType
+  if (formData.cadence !== undefined) updates.cadence = formData.cadence || null
+
+  if (formData.projectId !== undefined) {
+    if (formData.projectId) {
+      const { data: proj } = await (supabase as any)
+        .from('workspace_projects')
+        .select('id')
+        .eq('id', formData.projectId)
+        .eq('workspace_id', workspaceId)
+        .maybeSingle()
+      if (!proj) throw new Error('Project not found or not in this workspace')
+      updates.project_id = formData.projectId
+    } else {
+      updates.project_id = null
+    }
+  }
+
+  const { data, error } = await (supabase as any)
+    .from('workspace_metrics')
+    .update(updates)
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .select(`
+      id,
+      workspace_id,
+      project_id,
+      name,
+      key,
+      description,
+      category,
+      unit_type,
+      unit_symbol,
+      direction,
+      measurement_type,
+      cadence,
+      status,
+      created_by,
+      created_at,
+      updated_at,
+      archived_at,
+      project:workspace_projects(
+        id,
+        title
+      )
+    `)
+    .single()
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/vault/metrics')
+  revalidatePath(`/vault/metrics/${id}`)
+  return data as WorkspaceMetricItem
+}
+
+export async function archiveWorkspaceMetric(id: string, workspaceId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  const { data, error } = await (supabase as any)
+    .from('workspace_metrics')
+    .update({
+      status: 'archived',
+      archived_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .select('id, status')
+    .single()
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/vault/metrics')
+  revalidatePath(`/vault/metrics/${id}`)
+  return data
+}
+
+export async function restoreWorkspaceMetric(id: string, workspaceId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  const { data, error } = await (supabase as any)
+    .from('workspace_metrics')
+    .update({
+      status: 'active',
+      archived_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .select('id, status')
+    .single()
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/vault/metrics')
+  revalidatePath(`/vault/metrics/${id}`)
+  return data
+}
+
+// ---------------------------------------------------------------------------
+// TARGETS ACTIONS
+// ---------------------------------------------------------------------------
+
+export async function getMetricTargets(
+  metricId: string,
+  workspaceId: string
+): Promise<MetricTargetItem[]> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  const { data, error } = await (supabase as any)
+    .from('workspace_metric_targets')
+    .select('*')
+    .eq('metric_id', metricId)
+    .eq('workspace_id', workspaceId)
+    .order('period_end', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false })
+
+  if (error) throw new Error(error.message)
+
+  return (data || []).map((t: any) => ({
+    ...t,
+    target_value: Number(t.target_value),
+    baseline_value: t.baseline_value !== null ? Number(t.baseline_value) : null,
+    period_start: normalizeDateStr(t.period_start),
+    period_end: normalizeDateStr(t.period_end),
+  }))
+}
+
+export async function createMetricTarget(formData: {
+  workspaceId: string
+  metricId: string
+  targetValue: number
+  baselineValue?: number | null
+  periodStart?: string | null
+  periodEnd?: string | null
+  notes?: string | null
+}): Promise<MetricTargetItem> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // Verify metric exists in workspace
+  const { data: metric } = await (supabase as any)
+    .from('workspace_metrics')
+    .select('id')
+    .eq('id', formData.metricId)
+    .eq('workspace_id', formData.workspaceId)
+    .maybeSingle()
+  if (!metric) throw new Error('Metric not found or access denied')
+
+  if (formData.periodStart && formData.periodEnd && formData.periodEnd < formData.periodStart) {
+    throw new Error('Target period end date cannot be earlier than start date')
+  }
+
+  const { data, error } = await (supabase as any)
+    .from('workspace_metric_targets')
+    .insert({
+      workspace_id: formData.workspaceId,
+      metric_id: formData.metricId,
+      target_value: formData.targetValue,
+      baseline_value: formData.baselineValue !== undefined && formData.baselineValue !== null ? formData.baselineValue : null,
+      period_start: formData.periodStart || null,
+      period_end: formData.periodEnd || null,
+      notes: formData.notes?.trim() || null,
+      created_by: user.id,
+    })
+    .select('*')
+    .single()
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath(`/vault/metrics/${formData.metricId}`)
+  revalidatePath('/vault/metrics')
+  return {
+    ...data,
+    target_value: Number(data.target_value),
+    baseline_value: data.baseline_value !== null ? Number(data.baseline_value) : null,
+  }
+}
+
+export async function updateMetricTarget(
+  id: string,
+  workspaceId: string,
+  formData: {
+    targetValue?: number
+    baselineValue?: number | null
+    periodStart?: string | null
+    periodEnd?: string | null
+    notes?: string | null
+  }
+): Promise<MetricTargetItem> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  const { data: existing } = await (supabase as any)
+    .from('workspace_metric_targets')
+    .select('id, metric_id, period_start, period_end')
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .maybeSingle()
+  if (!existing) throw new Error('Target not found or access denied')
+
+  const pStart = formData.periodStart !== undefined ? formData.periodStart : existing.period_start
+  const pEnd = formData.periodEnd !== undefined ? formData.periodEnd : existing.period_end
+  if (pStart && pEnd && pEnd < pStart) {
+    throw new Error('Target period end date cannot be earlier than start date')
+  }
+
+  const updates: any = {
+    updated_at: new Date().toISOString(),
+  }
+
+  if (formData.targetValue !== undefined) updates.target_value = formData.targetValue
+  if (formData.baselineValue !== undefined) updates.baseline_value = formData.baselineValue
+  if (formData.periodStart !== undefined) updates.period_start = formData.periodStart || null
+  if (formData.periodEnd !== undefined) updates.period_end = formData.periodEnd || null
+  if (formData.notes !== undefined) updates.notes = formData.notes?.trim() || null
+
+  const { data, error } = await (supabase as any)
+    .from('workspace_metric_targets')
+    .update(updates)
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .select('*')
+    .single()
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath(`/vault/metrics/${existing.metric_id}`)
+  revalidatePath('/vault/metrics')
+  return {
+    ...data,
+    target_value: Number(data.target_value),
+    baseline_value: data.baseline_value !== null ? Number(data.baseline_value) : null,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// OBSERVATIONS ACTIONS
+// ---------------------------------------------------------------------------
+
+export async function getMetricObservations(
+  metricId: string,
+  workspaceId: string
+): Promise<MetricObservationItem[]> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  const { data, error } = await (supabase as any)
+    .from('workspace_metric_observations')
+    .select('*')
+    .eq('metric_id', metricId)
+    .eq('workspace_id', workspaceId)
+    .order('observed_at', { ascending: false })
+    .order('created_at', { ascending: false })
+
+  if (error) throw new Error(error.message)
+
+  return (data || []).map((o: any) => ({
+    ...o,
+    value: Number(o.value),
+  }))
+}
+
+export async function createMetricObservation(formData: {
+  workspaceId: string
+  metricId: string
+  value: number
+  observedAt?: string
+  periodStart?: string | null
+  periodEnd?: string | null
+  notes?: string | null
+  sourceLabel?: string | null
+  sourceUrl?: string | null
+}): Promise<MetricObservationItem> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // Verify metric exists in workspace
+  const { data: metric } = await (supabase as any)
+    .from('workspace_metrics')
+    .select('id')
+    .eq('id', formData.metricId)
+    .eq('workspace_id', formData.workspaceId)
+    .maybeSingle()
+  if (!metric) throw new Error('Metric not found or access denied')
+
+  if (formData.periodStart && formData.periodEnd && formData.periodEnd < formData.periodStart) {
+    throw new Error('Observation period end date cannot be earlier than start date')
+  }
+
+  const { data, error } = await (supabase as any)
+    .from('workspace_metric_observations')
+    .insert({
+      workspace_id: formData.workspaceId,
+      metric_id: formData.metricId,
+      value: formData.value,
+      observed_at: formData.observedAt || new Date().toISOString().split('T')[0],
+      period_start: formData.periodStart || null,
+      period_end: formData.periodEnd || null,
+      notes: formData.notes?.trim() || null,
+      source_label: formData.sourceLabel?.trim() || null,
+      source_url: formData.sourceUrl?.trim() || null,
+      created_by: user.id,
+    })
+    .select('*')
+    .single()
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath(`/vault/metrics/${formData.metricId}`)
+  revalidatePath('/vault/metrics')
+  return {
+    ...data,
+    value: Number(data.value),
+  }
+}
+
+export async function updateMetricObservation(
+  id: string,
+  workspaceId: string,
+  formData: {
+    value?: number
+    observedAt?: string
+    periodStart?: string | null
+    periodEnd?: string | null
+    notes?: string | null
+    sourceLabel?: string | null
+    sourceUrl?: string | null
+  }
+): Promise<MetricObservationItem> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  const { data: existing } = await (supabase as any)
+    .from('workspace_metric_observations')
+    .select('id, metric_id, period_start, period_end')
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .maybeSingle()
+  if (!existing) throw new Error('Observation not found or access denied')
+
+  const pStart = formData.periodStart !== undefined ? formData.periodStart : existing.period_start
+  const pEnd = formData.periodEnd !== undefined ? formData.periodEnd : existing.period_end
+  if (pStart && pEnd && pEnd < pStart) {
+    throw new Error('Observation period end date cannot be earlier than start date')
+  }
+
+  const updates: any = {
+    updated_at: new Date().toISOString(),
+  }
+
+  if (formData.value !== undefined) updates.value = formData.value
+  if (formData.observedAt !== undefined) updates.observed_at = formData.observedAt
+  if (formData.periodStart !== undefined) updates.period_start = formData.periodStart || null
+  if (formData.periodEnd !== undefined) updates.period_end = formData.periodEnd || null
+  if (formData.notes !== undefined) updates.notes = formData.notes?.trim() || null
+  if (formData.sourceLabel !== undefined) updates.source_label = formData.sourceLabel?.trim() || null
+  if (formData.sourceUrl !== undefined) updates.source_url = formData.sourceUrl?.trim() || null
+
+  const { data, error } = await (supabase as any)
+    .from('workspace_metric_observations')
+    .update(updates)
+    .eq('id', id)
+    .eq('workspace_id', workspaceId)
+    .select('*')
+    .single()
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath(`/vault/metrics/${existing.metric_id}`)
+  revalidatePath('/vault/metrics')
+  return {
+    ...data,
+    value: Number(data.value),
+  }
+}

@@ -1244,6 +1244,153 @@ export interface Database {
           updated_at?: string
         }
       }
+      workspace_metrics: {
+        Row: {
+          id: string
+          workspace_id: string
+          project_id: string | null
+          name: string
+          key: string
+          description: string | null
+          category: 'growth' | 'financial' | 'operational' | 'product' | 'marketing' | 'community' | 'other'
+          unit_type: 'count' | 'currency' | 'percentage' | 'duration' | 'score'
+          unit_symbol: string | null
+          direction: 'higher_is_better' | 'lower_is_better' | 'neutral'
+          measurement_type: 'point' | 'period'
+          cadence: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly' | 'ad_hoc' | null
+          status: 'active' | 'paused' | 'archived'
+          created_by: string | null
+          created_at: string
+          updated_at: string
+          archived_at: string | null
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          project_id?: string | null
+          name: string
+          key: string
+          description?: string | null
+          category: 'growth' | 'financial' | 'operational' | 'product' | 'marketing' | 'community' | 'other'
+          unit_type: 'count' | 'currency' | 'percentage' | 'duration' | 'score'
+          unit_symbol?: string | null
+          direction?: 'higher_is_better' | 'lower_is_better' | 'neutral'
+          measurement_type: 'point' | 'period'
+          cadence?: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly' | 'ad_hoc' | null
+          status?: 'active' | 'paused' | 'archived'
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+          archived_at?: string | null
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          project_id?: string | null
+          name?: string
+          key?: string
+          description?: string | null
+          category?: 'growth' | 'financial' | 'operational' | 'product' | 'marketing' | 'community' | 'other'
+          unit_type?: 'count' | 'currency' | 'percentage' | 'duration' | 'score'
+          unit_symbol?: string | null
+          direction?: 'higher_is_better' | 'lower_is_better' | 'neutral'
+          measurement_type?: 'point' | 'period'
+          cadence?: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly' | 'ad_hoc' | null
+          status?: 'active' | 'paused' | 'archived'
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+          archived_at?: string | null
+        }
+      }
+      workspace_metric_targets: {
+        Row: {
+          id: string
+          workspace_id: string
+          metric_id: string
+          target_value: number
+          baseline_value: number | null
+          period_start: string | null
+          period_end: string | null
+          notes: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          metric_id: string
+          target_value: number
+          baseline_value?: number | null
+          period_start?: string | null
+          period_end?: string | null
+          notes?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          metric_id?: string
+          target_value?: number
+          baseline_value?: number | null
+          period_start?: string | null
+          period_end?: string | null
+          notes?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      workspace_metric_observations: {
+        Row: {
+          id: string
+          workspace_id: string
+          metric_id: string
+          value: number
+          observed_at: string
+          period_start: string | null
+          period_end: string | null
+          notes: string | null
+          source_label: string | null
+          source_url: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          metric_id: string
+          value: number
+          observed_at?: string
+          period_start?: string | null
+          period_end?: string | null
+          notes?: string | null
+          source_label?: string | null
+          source_url?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          metric_id?: string
+          value?: number
+          observed_at?: string
+          period_start?: string | null
+          period_end?: string | null
+          notes?: string | null
+          source_label?: string | null
+          source_url?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>

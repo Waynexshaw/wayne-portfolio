@@ -10,6 +10,7 @@ import {
   CheckSquare, 
   TrendingUp, 
   FolderGit2, 
+  BarChart3,
   BookOpen,
   RotateCcw,
   Briefcase, 
@@ -28,6 +29,7 @@ const navItems = [
   { href: '/vault/follow-ups', label: 'Follow-ups', icon: CheckSquare },
   { href: '/vault/opportunities', label: 'Opportunities', icon: TrendingUp },
   { href: '/vault/projects', label: 'Projects', icon: FolderGit2 },
+  { href: '/vault/metrics', label: 'Metrics', icon: BarChart3 },
   { href: '/vault/research', label: 'Research', icon: BookOpen },
   { href: '/vault/reviews', label: 'Reviews', icon: RotateCcw },
 ]
