@@ -849,8 +849,64 @@ export async function logInteraction(formData: {
 // Follow-ups
 // ---------------------------------------------------------------------------
 
-export async function getFollowUps(workspaceId?: string) {
+export async function getFollowUps(
+  workspaceId?: string,
+  options?: {
+    q?: string
+    status?: string
+    priority?: string
+    dateState?: string
+  }
+) {
   const supabase = await createClient()
+  const q = options?.q?.trim()
+  const status = options?.status && options.status !== 'all' ? options.status : undefined
+  const priority = options?.priority && options.priority !== 'all' ? options.priority : undefined
+  const dateState = options?.dateState && options.dateState !== 'all' ? options.dateState : undefined
+
+  if (!workspaceId) return []
+
+  // Verify workspace authorization
+  const { data: ws } = await (supabase as any)
+    .from('workspaces')
+    .select('id')
+    .eq('id', workspaceId)
+    .maybeSingle()
+  if (!ws) return []
+
+  let matchedContactIds: string[] = []
+
+  if (q) {
+    const sanitizedQuery = q.replace(/[,()]/g, ' ').trim()
+    if (sanitizedQuery) {
+      const [contactRes, companyRes] = await Promise.all([
+        (supabase as any)
+          .from('contacts')
+          .select('id')
+          .ilike('full_name', `%${sanitizedQuery}%`),
+        (supabase as any)
+          .from('companies')
+          .select('id')
+          .ilike('name', `%${sanitizedQuery}%`),
+      ])
+
+      if (contactRes.data && contactRes.data.length > 0) {
+        matchedContactIds.push(...contactRes.data.map((c: any) => c.id))
+      }
+      if (companyRes.data && companyRes.data.length > 0) {
+        const compIds = companyRes.data.map((c: any) => c.id)
+        const { data: compContacts } = await (supabase as any)
+          .from('contacts')
+          .select('id')
+          .in('company_id', compIds)
+        if (compContacts && compContacts.length > 0) {
+          matchedContactIds.push(...compContacts.map((c: any) => c.id))
+        }
+      }
+      matchedContactIds = Array.from(new Set(matchedContactIds))
+    }
+  }
+
   let query = (supabase as any)
     .from('follow_ups')
     .select(`
@@ -862,12 +918,63 @@ export async function getFollowUps(workspaceId?: string) {
         role_title,
         company:companies(id, name)
       ),
+      interaction:interactions(
+        id,
+        channel,
+        direction,
+        interaction_date,
+        purpose
+      ),
       workspace:workspaces(id, name)
     `)
-    .order('due_date', { ascending: true })
+    .eq('workspace_id', workspaceId)
 
-  if (workspaceId) {
-    query = query.eq('workspace_id', workspaceId)
+  if (priority) {
+    query = query.eq('priority', priority)
+  }
+
+  if (status) {
+    if (status === 'open') {
+      query = query.eq('status', 'pending')
+    } else {
+      query = query.eq('status', status)
+    }
+  }
+
+  if (dateState) {
+    const now = new Date()
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).toISOString()
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString()
+
+    if (dateState === 'overdue') {
+      query = query.eq('status', 'pending').lt('due_date', startOfToday)
+    } else if (dateState === 'today') {
+      query = query.eq('status', 'pending').gte('due_date', startOfToday).lte('due_date', endOfToday)
+    } else if (dateState === 'upcoming') {
+      query = query.eq('status', 'pending').gt('due_date', endOfToday)
+    } else if (dateState === 'completed') {
+      query = query.eq('status', 'completed')
+    }
+  }
+
+  if (q) {
+    const sanitizedQuery = q.replace(/[,()]/g, ' ').trim()
+    if (sanitizedQuery) {
+      const orClauses = [
+        `title.ilike.%${sanitizedQuery}%`,
+        `description.ilike.%${sanitizedQuery}%`,
+      ]
+      if (matchedContactIds.length > 0) {
+        orClauses.push(`contact_id.in.(${matchedContactIds.join(',')})`)
+      }
+      query = query.or(orClauses.join(','))
+    }
+  }
+
+  if (status === 'completed' || dateState === 'completed') {
+    query = query.order('completed_at', { ascending: false, nullsFirst: false }).order('due_date', { ascending: true })
+  } else {
+    query = query.order('due_date', { ascending: true })
   }
 
   const { data, error } = await query
@@ -877,6 +984,26 @@ export async function getFollowUps(workspaceId?: string) {
 
 export async function toggleFollowUpStatus(id: string, currentStatus: string) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  // Verify follow-up exists and retrieve its workspace_id and contact_id
+  const { data: existing } = await (supabase as any)
+    .from('follow_ups')
+    .select('id, workspace_id, contact_id, status')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (!existing) throw new Error('Follow-up not found or access denied')
+
+  // Verify user has membership access to this workspace
+  const { data: ws } = await (supabase as any)
+    .from('workspaces')
+    .select('id')
+    .eq('id', existing.workspace_id)
+    .maybeSingle()
+  if (!ws) throw new Error('Workspace access denied')
+
   const newStatus = currentStatus === 'completed' ? 'pending' : 'completed'
   const completedAt = newStatus === 'completed' ? new Date().toISOString() : null
 
@@ -891,8 +1018,26 @@ export async function toggleFollowUpStatus(id: string, currentStatus: string) {
 
   if (error) throw new Error(error.message)
 
+  // Recalculate earliest next_follow_up_at for this contact in this workspace
+  const { data: nextPending } = await (supabase as any)
+    .from('follow_ups')
+    .select('due_date')
+    .eq('workspace_id', existing.workspace_id)
+    .eq('contact_id', existing.contact_id)
+    .eq('status', 'pending')
+    .order('due_date', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  await (supabase as any)
+    .from('workspace_contacts')
+    .update({ next_follow_up_at: nextPending?.due_date || null })
+    .match({ workspace_id: existing.workspace_id, contact_id: existing.contact_id })
+
   revalidatePath('/vault/follow-ups')
   revalidatePath('/vault')
+  revalidatePath('/vault/contacts')
+  revalidatePath(`/vault/contacts/${existing.contact_id}`)
   return newStatus
 }
 
@@ -1246,15 +1391,55 @@ export async function createFollowUp(formData: {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Unauthorized')
 
+  // 1. Workspace authorization
+  const { data: ws } = await (supabase as any)
+    .from('workspaces')
+    .select('id')
+    .eq('id', formData.workspaceId)
+    .maybeSingle()
+  if (!ws) throw new Error('Workspace not found or access denied')
+
+  // 2. Contact authorization (must belong to owner, not archived, linked to workspace)
+  const { data: contact } = await (supabase as any)
+    .from('contacts')
+    .select('id, workspace_contacts!inner(workspace_id)')
+    .eq('id', formData.contactId)
+    .eq('owner_id', user.id)
+    .is('archived_at', null)
+    .eq('workspace_contacts.workspace_id', formData.workspaceId)
+    .maybeSingle()
+  if (!contact) throw new Error('Contact not found or not associated with this workspace')
+
+  // 3. Interaction authorization (if provided)
+  let validatedInteractionId: string | null = null
+  if (formData.interactionId) {
+    const { data: inter } = await (supabase as any)
+      .from('interactions')
+      .select('id')
+      .eq('id', formData.interactionId)
+      .eq('workspace_id', formData.workspaceId)
+      .eq('contact_id', formData.contactId)
+      .maybeSingle()
+    if (!inter) throw new Error('Originating interaction not found or not associated with this contact and workspace')
+    validatedInteractionId = inter.id
+  }
+
+  // 4. Validate dueDate
+  const parsedDueDate = new Date(formData.dueDate)
+  if (isNaN(parsedDueDate.getTime())) {
+    throw new Error('Invalid due date provided')
+  }
+
+  // 5. Insert follow_up
   const { data, error } = await (supabase as any)
     .from('follow_ups')
     .insert({
       workspace_id: formData.workspaceId,
       contact_id: formData.contactId,
-      interaction_id: formData.interactionId || null,
-      title: formData.title,
-      description: formData.description || null,
-      due_date: formData.dueDate,
+      interaction_id: validatedInteractionId,
+      title: formData.title.trim(),
+      description: formData.description?.trim() || null,
+      due_date: parsedDueDate.toISOString(),
       status: 'pending',
       priority: formData.priority || 'medium',
       created_by: user.id
@@ -1264,13 +1449,24 @@ export async function createFollowUp(formData: {
 
   if (error) throw new Error(error.message)
 
-  // Update next_follow_up_at in workspace_contacts
+  // 6. Recalculate earliest next_follow_up_at in workspace_contacts
+  const { data: nextPending } = await (supabase as any)
+    .from('follow_ups')
+    .select('due_date')
+    .eq('workspace_id', formData.workspaceId)
+    .eq('contact_id', formData.contactId)
+    .eq('status', 'pending')
+    .order('due_date', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
   await (supabase as any)
     .from('workspace_contacts')
-    .update({ next_follow_up_at: formData.dueDate })
+    .update({ next_follow_up_at: nextPending?.due_date || parsedDueDate.toISOString() })
     .match({ workspace_id: formData.workspaceId, contact_id: formData.contactId })
 
   revalidatePath(`/vault/contacts/${formData.contactId}`)
+  revalidatePath('/vault/contacts')
   revalidatePath('/vault/follow-ups')
   revalidatePath('/vault')
   return data

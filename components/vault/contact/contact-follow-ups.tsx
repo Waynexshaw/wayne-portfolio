@@ -29,7 +29,7 @@ export function ContactFollowUps({
   followUps.forEach((item) => {
     if (item.status === 'completed') {
       completed.push(item)
-    } else {
+    } else if (item.status === 'pending') {
       const dueDate = new Date(item.due_date)
       if (dueDate < startOfToday) {
         overdue.push(item)

@@ -25,8 +25,8 @@ export function AttentionSection({
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
   const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
 
-  // Filter incomplete follow-ups
-  const activeFollowUps = followUps.filter((f) => f.status !== 'completed' && f.status !== 'cancelled')
+  // Filter active pending follow-ups (exclude completed, cancelled, rescheduled)
+  const activeFollowUps = followUps.filter((f) => f.status === 'pending')
 
   const overdueFollowUps: any[] = []
   const dueTodayFollowUps: any[] = []

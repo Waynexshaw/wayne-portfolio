@@ -16,6 +16,7 @@ interface ContactModalsProps {
   workspaceId?: string
   identities: any[]
   companies: any[]
+  interactions?: any[]
   // Modal visibility states
   isLogInteractionOpen: boolean
   setIsLogInteractionOpen: (open: boolean) => void
@@ -35,6 +36,7 @@ export function ContactModals({
   workspaceId,
   identities,
   companies,
+  interactions = [],
   isLogInteractionOpen,
   setIsLogInteractionOpen,
   isCreateFollowUpOpen,
@@ -92,6 +94,7 @@ export function ContactModals({
       await createFollowUp({
         workspaceId,
         contactId: contact.id,
+        interactionId: (form.get('interactionId') as string) || undefined,
         title: form.get('title') as string,
         description: (form.get('description') as string) || undefined,
         dueDate: form.get('dueDate') as string,
@@ -404,6 +407,29 @@ export function ContactModals({
                   </select>
                 </div>
               </div>
+
+              {interactions && interactions.length > 0 && (
+                <div className="space-y-1">
+                  <label className="text-muted-foreground font-mono uppercase text-[10px]">
+                    Originating Touchpoint (Optional)
+                  </label>
+                  <select
+                    name="interactionId"
+                    className="w-full px-3 py-2 rounded-lg bg-secondary/50 border border-border text-foreground focus:outline-none focus:border-primary text-xs"
+                  >
+                    <option value="">None (Independent Task)</option>
+                    {interactions.map((inter: any) => {
+                      const date = new Date(inter.interaction_date).toLocaleDateString()
+                      const summary = inter.purpose || inter.content?.slice(0, 40) || 'Touchpoint'
+                      return (
+                        <option key={inter.id} value={inter.id}>
+                          {date} · {inter.channel?.toUpperCase()} ({inter.direction}) — {summary}
+                        </option>
+                      )
+                    })}
+                  </select>
+                </div>
+              )}
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
                 <button

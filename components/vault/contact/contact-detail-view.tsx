@@ -89,6 +89,7 @@ export function ContactDetailView({
         workspaceId={activeWorkspace?.id}
         identities={identities}
         companies={companies}
+        interactions={interactions}
         isLogInteractionOpen={isLogInteractionOpen}
         setIsLogInteractionOpen={setIsLogInteractionOpen}
         isCreateFollowUpOpen={isCreateFollowUpOpen}
