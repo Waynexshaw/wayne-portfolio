@@ -41,9 +41,9 @@ const UNIT_TYPES: { value: MetricUnitType; label: string }[] = [
 ]
 
 const DIRECTIONS: { value: MetricDirection; label: string }[] = [
-  { value: 'higher_is_better', label: 'Higher is Better (↑)' },
-  { value: 'lower_is_better', label: 'Lower is Better (↓)' },
-  { value: 'neutral', label: 'Neutral / Informational' },
+  { value: 'higher_is_better', label: 'Higher is better' },
+  { value: 'lower_is_better', label: 'Lower is better' },
+  { value: 'neutral', label: 'Neutral' },
 ]
 
 const MEASUREMENT_TYPES: { value: MetricMeasurementType; label: string }[] = [
@@ -117,10 +117,12 @@ export function MetricCreateModal({
 
   useEffect(() => {
     if (isOpen) {
-      if (!initialProjects) {
+      if (!initialProjects || initialProjects.length === 0) {
         getWorkspaceProjects(workspaceId).then((res) => {
           setProjects(res.map((p) => ({ id: p.id, title: p.title })))
         }).catch(() => {})
+      } else {
+        setProjects(initialProjects)
       }
       setProjectId(defaultProjectId || '')
       setError(null)
@@ -186,46 +188,47 @@ export function MetricCreateModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto bg-background/80 backdrop-blur-sm animate-in fade-in duration-150">
       <div
-        className="relative w-full max-w-2xl bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden my-8"
+        className="relative w-full max-w-2xl bg-card border border-border rounded-xl shadow-2xl overflow-hidden my-8"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800/80 bg-zinc-900/40">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/20">
           <div className="flex items-center space-x-2.5">
-            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              <BarChart2 className="w-5 h-5" />
+            <div className="p-2 rounded-lg bg-muted/50 text-muted-foreground border border-border">
+              <BarChart2 className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-zinc-100">Create New Metric</h2>
-              <p className="text-xs text-zinc-400">Define an operational measurement for tracking performance</p>
+              <h2 className="text-base font-semibold text-foreground">Create New Metric</h2>
+              <p className="text-xs text-muted-foreground">Define an operational measurement for tracking performance</p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
             disabled={isPending}
-            className="p-1.5 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-lg transition-colors"
+            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Error banner */}
         {error && (
-          <div className="mx-6 mt-4 p-3 bg-red-950/40 border border-red-800/60 rounded-lg flex items-start space-x-2.5 text-red-300 text-sm">
-            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-red-400" />
+          <div className="mx-6 mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-start space-x-2.5 text-destructive text-xs">
+            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {/* Name & Key */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-zinc-300 mb-1.5">
-                Metric Name <span className="text-emerald-400">*</span>
+              <label className="block text-xs font-medium text-foreground mb-1.5">
+                Metric Name <span className="text-primary">*</span>
               </label>
               <input
                 type="text"
@@ -233,13 +236,13 @@ export function MetricCreateModal({
                 onChange={(e) => handleNameChange(e.target.value)}
                 placeholder="e.g. PEVRA Waitlist Signups"
                 required
-                className="w-full px-3 py-2 bg-zinc-900/80 border border-zinc-800 rounded-lg text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-zinc-300 mb-1.5">
-                Key Identifier <span className="text-emerald-400">*</span>
-                <span className="text-zinc-500 font-normal ml-1">(unique slug)</span>
+              <label className="block text-xs font-medium text-foreground mb-1.5">
+                Key Identifier <span className="text-primary">*</span>
+                <span className="text-muted-foreground font-normal ml-1">(unique slug)</span>
               </label>
               <input
                 type="text"
@@ -250,49 +253,49 @@ export function MetricCreateModal({
                 }}
                 placeholder="pevra_waitlist_signups"
                 required
-                className="w-full px-3 py-2 bg-zinc-900/80 border border-zinc-800 rounded-lg text-sm font-mono text-zinc-200 placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
               />
             </div>
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-xs font-medium text-zinc-300 mb-1.5">Description</label>
+            <label className="block text-xs font-medium text-foreground mb-1.5">Description</label>
             <textarea
               rows={2}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Operational intent, what this metric measures and why..."
-              className="w-full px-3 py-2 bg-zinc-900/80 border border-zinc-800 rounded-lg text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors resize-none"
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors resize-none"
             />
           </div>
 
           {/* Category & Project Scope */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-zinc-300 mb-1.5">Category *</label>
+              <label className="block text-xs font-medium text-foreground mb-1.5">Category *</label>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value as MetricCategory)}
-                className="w-full px-3 py-2 bg-zinc-900/80 border border-zinc-800 rounded-lg text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
               >
                 {CATEGORIES.map((c) => (
-                  <option key={c.value} value={c.value}>
+                  <option key={c.value} value={c.value} className="bg-card text-foreground">
                     {c.label}
                   </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-zinc-300 mb-1.5">Project Scope (Optional)</label>
+              <label className="block text-xs font-medium text-foreground mb-1.5">Project Scope (Optional)</label>
               <select
                 value={projectId}
                 onChange={(e) => setProjectId(e.target.value)}
-                className="w-full px-3 py-2 bg-zinc-900/80 border border-zinc-800 rounded-lg text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
               >
-                <option value="">-- Workspace Level (General) --</option>
+                <option value="" className="bg-card text-foreground">-- Workspace Level (General) --</option>
                 {projects.map((p) => (
-                  <option key={p.id} value={p.id}>
+                  <option key={p.id} value={p.id} className="bg-card text-foreground">
                     {p.title}
                   </option>
                 ))}
@@ -303,29 +306,29 @@ export function MetricCreateModal({
           {/* Unit Type & Unit Symbol */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-zinc-300 mb-1.5">Unit Type *</label>
+              <label className="block text-xs font-medium text-foreground mb-1.5">Unit Type *</label>
               <select
                 value={unitType}
                 onChange={(e) => handleUnitTypeChange(e.target.value as MetricUnitType)}
-                className="w-full px-3 py-2 bg-zinc-900/80 border border-zinc-800 rounded-lg text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
               >
                 {UNIT_TYPES.map((u) => (
-                  <option key={u.value} value={u.value}>
+                  <option key={u.value} value={u.value} className="bg-card text-foreground">
                     {u.label}
                   </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-zinc-300 mb-1.5">
-                Unit Symbol / Label <span className="text-zinc-500 font-normal">(e.g. $, %, signups, days)</span>
+              <label className="block text-xs font-medium text-foreground mb-1.5">
+                Unit Symbol / Label <span className="text-muted-foreground font-normal">(e.g. $, %, days)</span>
               </label>
               <input
                 type="text"
                 value={unitSymbol}
                 onChange={(e) => setUnitSymbol(e.target.value)}
                 placeholder="e.g. NGN, %, users"
-                className="w-full px-3 py-2 bg-zinc-900/80 border border-zinc-800 rounded-lg text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
               />
             </div>
           </div>
@@ -333,43 +336,43 @@ export function MetricCreateModal({
           {/* Direction, Measurement Type & Cadence */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-medium text-zinc-300 mb-1.5">Direction *</label>
+              <label className="block text-xs font-medium text-foreground mb-1.5">Direction *</label>
               <select
                 value={direction}
                 onChange={(e) => setDirection(e.target.value as MetricDirection)}
-                className="w-full px-3 py-2 bg-zinc-900/80 border border-zinc-800 rounded-lg text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
               >
                 {DIRECTIONS.map((d) => (
-                  <option key={d.value} value={d.value}>
+                  <option key={d.value} value={d.value} className="bg-card text-foreground">
                     {d.label}
                   </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-zinc-300 mb-1.5">Measurement *</label>
+              <label className="block text-xs font-medium text-foreground mb-1.5">Measurement *</label>
               <select
                 value={measurementType}
                 onChange={(e) => setMeasurementType(e.target.value as MetricMeasurementType)}
-                className="w-full px-3 py-2 bg-zinc-900/80 border border-zinc-800 rounded-lg text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
               >
                 {MEASUREMENT_TYPES.map((m) => (
-                  <option key={m.value} value={m.value}>
+                  <option key={m.value} value={m.value} className="bg-card text-foreground">
                     {m.label}
                   </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-zinc-300 mb-1.5">Cadence (Optional)</label>
+              <label className="block text-xs font-medium text-foreground mb-1.5">Cadence (Optional)</label>
               <select
                 value={cadence}
                 onChange={(e) => setCadence(e.target.value)}
-                className="w-full px-3 py-2 bg-zinc-900/80 border border-zinc-800 rounded-lg text-sm text-zinc-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
               >
-                <option value="">-- Unspecified --</option>
+                <option value="" className="bg-card text-foreground">-- Unspecified --</option>
                 {CADENCES.map((c) => (
-                  <option key={c.value} value={c.value}>
+                  <option key={c.value} value={c.value} className="bg-card text-foreground">
                     {c.label}
                   </option>
                 ))}
@@ -378,21 +381,21 @@ export function MetricCreateModal({
           </div>
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-end space-x-3 pt-4 border-t border-zinc-800/80">
+          <div className="flex items-center justify-end space-x-2.5 pt-4 border-t border-border">
             <button
               type="button"
               onClick={onClose}
               disabled={isPending}
-              className="px-4 py-2 text-sm font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 rounded-lg transition-colors"
+              className="px-3.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isPending}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium shadow-sm transition-all flex items-center space-x-2"
+              className="px-3.5 py-1.5 bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground rounded-lg text-xs font-medium shadow-sm transition-all flex items-center space-x-1.5 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
             >
-              {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               <span>Create Metric</span>
             </button>
           </div>

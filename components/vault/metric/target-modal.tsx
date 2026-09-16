@@ -152,17 +152,17 @@ export function TargetModal({
       }}
     >
       <div
-        className="relative w-full max-w-lg bg-card border border-border rounded-xl shadow-2xl p-6 my-8 space-y-5"
+        className="relative w-full max-w-lg bg-card border border-border rounded-xl shadow-2xl p-6 my-8 space-y-4"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-border pb-4">
+        <div className="flex items-center justify-between border-b border-border pb-3.5">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-lg bg-primary/10 text-primary">
+            <div className="p-2 rounded-lg bg-primary/10 text-primary border border-primary/20">
               <Target className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="font-serif text-lg font-medium text-foreground">
+              <h2 className="font-serif text-base font-medium text-foreground">
                 {isEdit ? 'Edit Metric Target' : 'Set Metric Target'}
               </h2>
               <p className="text-xs text-muted-foreground">
@@ -176,7 +176,7 @@ export function TargetModal({
             type="button"
             onClick={onClose}
             disabled={isPending}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-50"
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
             aria-label="Close dialog"
           >
             <X className="w-4 h-4" />
@@ -215,7 +215,7 @@ export function TargetModal({
                   placeholder="e.g. 1000"
                   value={targetValue}
                   onChange={(e) => setTargetValue(e.target.value)}
-                  className={`w-full px-3 py-2 text-sm rounded-lg border border-border bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors font-mono ${
+                  className={`w-full px-3 py-2 text-xs rounded-lg border border-border bg-background text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors font-mono tabular-nums ${
                     metricUnitSymbol ? 'pr-12' : ''
                   }`}
                 />
@@ -247,7 +247,7 @@ export function TargetModal({
                   placeholder="e.g. 350"
                   value={baselineValue}
                   onChange={(e) => setBaselineValue(e.target.value)}
-                  className={`w-full px-3 py-2 text-sm rounded-lg border border-border bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors font-mono ${
+                  className={`w-full px-3 py-2 text-xs rounded-lg border border-border bg-background text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors font-mono tabular-nums ${
                     metricUnitSymbol ? 'pr-12' : ''
                   }`}
                 />
@@ -274,7 +274,7 @@ export function TargetModal({
                 type="date"
                 value={periodStart}
                 onChange={(e) => setPeriodStart(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors font-mono"
+                className="w-full px-3 py-2 text-xs rounded-lg border border-border bg-background text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors font-mono"
               />
               <p className="mt-1 text-[11px] text-muted-foreground">
                 Cycle start date (optional).
@@ -291,7 +291,7 @@ export function TargetModal({
                 value={periodEnd}
                 min={periodStart || undefined}
                 onChange={(e) => setPeriodEnd(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors font-mono"
+                className="w-full px-3 py-2 text-xs rounded-lg border border-border bg-background text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors font-mono"
               />
               <p className="mt-1 text-[11px] text-muted-foreground">
                 Target deadline date (optional).
@@ -310,24 +310,24 @@ export function TargetModal({
               placeholder="Context, rationale, or milestone for this target"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors resize-none font-sans"
+              className="w-full px-3 py-2 text-xs rounded-lg border border-border bg-background text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors resize-none font-sans"
             />
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border">
             <button
               type="button"
               onClick={onClose}
               disabled={isPending}
-              className="px-4 py-2 text-xs font-medium rounded-lg border border-border text-foreground hover:bg-secondary transition-colors disabled:opacity-50"
+              className="px-3.5 py-1.5 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isPending}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 shadow-sm"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 shadow-sm focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
             >
               {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               <span>{isEdit ? 'Update Target' : 'Create Target'}</span>

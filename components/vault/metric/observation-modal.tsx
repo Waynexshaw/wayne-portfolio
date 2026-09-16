@@ -12,7 +12,6 @@ import {
   Tag,
   BarChart3,
   Edit3,
-  Info,
 } from 'lucide-react'
 import {
   createMetricObservation,
@@ -192,18 +191,18 @@ export function ObservationModal({
       aria-labelledby="modal-title"
     >
       <div
-        className="relative w-full max-w-xl bg-card border border-border rounded-xl shadow-2xl p-6 my-8 space-y-5 max-h-[90vh] overflow-y-auto"
+        className="relative w-full max-w-xl bg-card border border-border rounded-xl shadow-2xl p-6 my-8 space-y-4 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border pb-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-lg bg-primary/10 text-primary border border-primary/20">
-              {isEdit ? <Edit3 className="w-5 h-5" /> : <BarChart3 className="w-5 h-5" />}
+        <div className="flex items-center justify-between border-b border-border pb-3.5">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-lg bg-primary/10 text-primary border border-primary/20">
+              {isEdit ? <Edit3 className="w-4 h-4" /> : <BarChart3 className="w-4 h-4" />}
             </div>
             <div>
-              <h2 id="modal-title" className="font-serif text-lg font-medium text-foreground">
-                {isEdit ? 'Edit Observation' : 'Log Metric Observation'}
+              <h2 id="modal-title" className="font-serif text-base font-medium text-foreground">
+                {isEdit ? 'Edit Observation' : 'Record Observation'}
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {isEdit
@@ -218,7 +217,7 @@ export function ObservationModal({
             type="button"
             onClick={onClose}
             disabled={isPending}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-50"
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
             aria-label="Close dialog"
           >
             <X className="w-4 h-4" />
@@ -245,7 +244,7 @@ export function ObservationModal({
                   </span>
                 </label>
                 {metricUnitSymbol && (
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-secondary text-muted-foreground border border-border">
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted/60 text-muted-foreground border border-border">
                     {metricUnitSymbol}
                   </span>
                 )}
@@ -258,7 +257,7 @@ export function ObservationModal({
                   placeholder="e.g. 472"
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
-                  className={`w-full px-3 py-2 text-sm rounded-lg border border-border bg-secondary/50 text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors ${
+                  className={`w-full px-3 py-2 text-xs rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors font-mono tabular-nums ${
                     metricUnitSymbol ? 'pr-14' : ''
                   }`}
                 />
@@ -286,7 +285,7 @@ export function ObservationModal({
                 required
                 value={observedAt}
                 onChange={(e) => setObservedAt(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
+                className="w-full px-3 py-2 text-xs rounded-lg border border-border bg-background text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors font-mono tabular-nums"
               />
               <span className="text-[11px] text-muted-foreground mt-1 block">
                 Date when this observation was logged or detected.
@@ -294,9 +293,9 @@ export function ObservationModal({
             </div>
           </div>
 
-          {/* Period Section: Prominent for period metrics, clean/optional for point metrics */}
+          {/* Period Section */}
           {isPeriod ? (
-            <div className="p-3.5 rounded-xl border border-primary/30 bg-primary/5 space-y-3">
+            <div className="p-3.5 rounded-xl border border-primary/25 bg-primary/5 space-y-2.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider text-primary font-medium">
                   <CalendarRange className="w-3.5 h-3.5 text-primary" />
@@ -319,7 +318,7 @@ export function ObservationModal({
                     value={periodStart}
                     max={periodEnd || undefined}
                     onChange={(e) => setPeriodStart(e.target.value)}
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-border bg-background text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors font-mono tabular-nums"
                   />
                 </div>
                 <div>
@@ -331,13 +330,13 @@ export function ObservationModal({
                     value={periodEnd}
                     min={periodStart || undefined}
                     onChange={(e) => setPeriodEnd(e.target.value)}
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-border bg-background text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors font-mono tabular-nums"
                   />
                 </div>
               </div>
             </div>
           ) : (
-            <div className="p-3.5 rounded-xl border border-border/70 bg-secondary/30 space-y-2.5">
+            <div className="p-3.5 rounded-xl border border-border/70 bg-muted/20 space-y-2.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider text-muted-foreground">
                   <CalendarRange className="w-3.5 h-3.5 text-muted-foreground" />
@@ -360,7 +359,7 @@ export function ObservationModal({
                     value={periodStart}
                     max={periodEnd || undefined}
                     onChange={(e) => setPeriodStart(e.target.value)}
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-border bg-background text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors font-mono tabular-nums"
                   />
                 </div>
                 <div>
@@ -372,7 +371,7 @@ export function ObservationModal({
                     value={periodEnd}
                     min={periodStart || undefined}
                     onChange={(e) => setPeriodEnd(e.target.value)}
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-border bg-background text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors font-mono tabular-nums"
                   />
                 </div>
               </div>
@@ -388,10 +387,10 @@ export function ObservationModal({
               </label>
               <input
                 type="text"
-                placeholder="e.g. Google Analytics, Manual Count, X Dashboard"
+                placeholder="e.g. Google Analytics, Manual Count"
                 value={sourceLabel}
                 onChange={(e) => setSourceLabel(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-secondary/50 text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
+                className="w-full px-3 py-2 text-xs rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
               />
               <span className="text-[11px] text-muted-foreground mt-1 block">
                 Provider, tooling, or origin of the reading.
@@ -408,7 +407,7 @@ export function ObservationModal({
                 placeholder="https://..."
                 value={sourceUrl}
                 onChange={(e) => setSourceUrl(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-secondary/50 text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
+                className="w-full px-3 py-2 text-xs rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
               />
               <span className="text-[11px] text-muted-foreground mt-1 block">
                 Direct link to source report or external dashboard.
@@ -427,7 +426,7 @@ export function ObservationModal({
               placeholder="Observations, anomalies, or qualitative context"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-secondary/50 text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors resize-none"
+              className="w-full px-3 py-2 text-xs rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors resize-none font-sans"
             />
             <span className="text-[11px] text-muted-foreground mt-1 block">
               Any situational nuances, methodology shifts, or contextual commentary.
@@ -435,22 +434,22 @@ export function ObservationModal({
           </div>
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border">
             <button
               type="button"
               onClick={onClose}
               disabled={isPending}
-              className="px-4 py-2 text-xs font-medium rounded-lg border border-border text-foreground hover:bg-secondary transition-colors disabled:opacity-50"
+              className="px-3.5 py-1.5 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isPending}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 shadow-sm"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 shadow-sm focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
             >
               {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              <span>{isEdit ? 'Update Observation' : 'Log Observation'}</span>
+              <span>{isEdit ? 'Update Observation' : 'Record Observation'}</span>
             </button>
           </div>
         </form>

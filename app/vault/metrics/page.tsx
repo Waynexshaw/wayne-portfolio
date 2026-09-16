@@ -3,12 +3,11 @@ import { getVaultContext, getWorkspaceMetrics, getWorkspaceProjects } from '@/li
 import { MetricSearchFilters } from '@/components/vault/metric/metric-search-filters'
 import { MetricList } from '@/components/vault/metric/metric-list'
 import { MetricCreateButton } from './create-button'
-import { BarChart2, TrendingUp, Target, Activity } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
-  title: 'Metrics & Performance | Waynex Vault',
+  title: 'Metrics | Waynex Vault',
 }
 
 interface MetricsPageProps {
@@ -29,7 +28,7 @@ export default async function MetricsPage({ searchParams }: MetricsPageProps) {
 
   if (!activeWorkspace) {
     return (
-      <div className="p-8 text-center text-zinc-400">
+      <div className="p-8 text-center text-muted-foreground">
         Workspace not found or access denied.
       </div>
     )
@@ -64,72 +63,57 @@ export default async function MetricsPage({ searchParams }: MetricsPageProps) {
     loadError = 'Database query failure encountered while loading metrics.'
   }
 
-  // Summary counts
+  // Summary counts for restrained operational stat line
   const totalCount = metrics.length
   const activeCount = metrics.filter((m) => m.status === 'active').length
-  const withTargetsCount = metrics.filter((m) => m.current_target !== null && m.current_target !== undefined).length
-  const achievedCount = metrics.filter(
-    (m) => m.attainment_rate !== null && m.attainment_rate !== undefined && m.attainment_rate >= 100
+  const withTargetsCount = metrics.filter(
+    (m) => m.current_target !== null && m.current_target !== undefined
   ).length
+  const totalObservationsCount = metrics.reduce(
+    (acc, m) => acc + (m.observations_count || 0),
+    0
+  )
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       {/* Top Banner & Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-100 flex items-center space-x-2.5">
-            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              <BarChart2 className="w-5 h-5" />
-            </div>
-            <span>Metrics & Performance</span>
+          <h1 className="font-serif text-2xl font-normal text-foreground tracking-tight">
+            Metrics
           </h1>
-          <p className="text-sm text-zinc-400 mt-1">
-            Operational measurements, intended targets, and empirical performance tracking
+          <p className="text-xs text-muted-foreground mt-1">
+            Operational measurement context
           </p>
         </div>
 
         <MetricCreateButton
           workspaceId={activeWorkspace.id}
           workspaceName={activeWorkspace.name}
+          projects={projects}
         />
       </div>
 
-      {/* Summary KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="p-4 bg-zinc-900/40 border border-zinc-800/80 rounded-xl">
-          <div className="flex items-center justify-between text-zinc-400 text-xs font-medium mb-1">
-            <span>TOTAL METRICS</span>
-            <Activity className="w-3.5 h-3.5 text-zinc-500" />
-          </div>
-          <div className="text-2xl font-bold text-zinc-100">{totalCount}</div>
-          <div className="text-[11px] text-zinc-500 mt-0.5">{activeCount} active</div>
+      {/* Restrained Operational Stat Line */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted-foreground border-y border-border/60 py-2.5 px-0.5">
+        <div className="flex items-center gap-1.5">
+          <span className="font-semibold text-foreground tabular-nums font-sans">{totalCount}</span>
+          <span>Metrics</span>
         </div>
-
-        <div className="p-4 bg-zinc-900/40 border border-zinc-800/80 rounded-xl">
-          <div className="flex items-center justify-between text-zinc-400 text-xs font-medium mb-1">
-            <span>ACTIVE</span>
-            <div className="w-2 h-2 rounded-full bg-emerald-500" />
-          </div>
-          <div className="text-2xl font-bold text-emerald-400">{activeCount}</div>
-          <div className="text-[11px] text-zinc-500 mt-0.5">Actively tracked</div>
+        <span className="text-border select-none">•</span>
+        <div className="flex items-center gap-1.5">
+          <span className="font-semibold text-foreground tabular-nums font-sans">{activeCount}</span>
+          <span>Active</span>
         </div>
-
-        <div className="p-4 bg-zinc-900/40 border border-zinc-800/80 rounded-xl">
-          <div className="flex items-center justify-between text-zinc-400 text-xs font-medium mb-1">
-            <span>TARGETED</span>
-            <Target className="w-3.5 h-3.5 text-blue-400" />
-          </div>
-          <div className="text-2xl font-bold text-blue-400">{withTargetsCount}</div>
-          <div className="text-[11px] text-zinc-500 mt-0.5">With current targets</div>
+        <span className="text-border select-none">•</span>
+        <div className="flex items-center gap-1.5">
+          <span className="font-semibold text-foreground tabular-nums font-sans">{withTargetsCount}</span>
+          <span>Targeted</span>
         </div>
-
-        <div className="p-4 bg-zinc-900/40 border border-zinc-800/80 rounded-xl">
-          <div className="flex items-center justify-between text-zinc-400 text-xs font-medium mb-1">
-            <span>TARGET MET</span>
-            <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
-          </div>
-          <div className="text-2xl font-bold text-emerald-400">{achievedCount}</div>
-          <div className="text-[11px] text-zinc-500 mt-0.5">100%+ attainment</div>
+        <span className="text-border select-none">•</span>
+        <div className="flex items-center gap-1.5">
+          <span className="font-semibold text-foreground tabular-nums font-sans">{totalObservationsCount}</span>
+          <span>Observations</span>
         </div>
       </div>
 

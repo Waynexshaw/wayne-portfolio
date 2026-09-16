@@ -41,9 +41,9 @@ const UNIT_TYPES: { value: MetricUnitType; label: string }[] = [
 ]
 
 const DIRECTIONS: { value: MetricDirection; label: string }[] = [
-  { value: 'higher_is_better', label: 'Higher is Better (↑)' },
-  { value: 'lower_is_better', label: 'Lower is Better (↓)' },
-  { value: 'neutral', label: 'Neutral / Informational' },
+  { value: 'higher_is_better', label: 'Higher is better' },
+  { value: 'lower_is_better', label: 'Lower is better' },
+  { value: 'neutral', label: 'Neutral' },
 ]
 
 const MEASUREMENT_TYPES: { value: MetricMeasurementType; label: string }[] = [
@@ -184,8 +184,9 @@ export function MetricEditModal({
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
+            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
           >
             <X className="w-4 h-4" />
           </button>
@@ -213,7 +214,7 @@ export function MetricEditModal({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Monthly Active Users, MRR"
-                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none transition-colors text-foreground"
+                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none transition-colors text-foreground"
               />
             </div>
 
@@ -250,7 +251,7 @@ export function MetricEditModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe what this metric tracks, its calculation method, or notes..."
-              className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none transition-colors resize-none text-foreground"
+              className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none transition-colors resize-none text-foreground"
             />
           </div>
 
@@ -265,10 +266,10 @@ export function MetricEditModal({
                 required
                 value={category}
                 onChange={(e) => setCategory(e.target.value as MetricCategory)}
-                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none transition-colors text-foreground cursor-pointer"
+                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none transition-colors text-foreground cursor-pointer"
               >
                 {CATEGORIES.map((cat) => (
-                  <option key={cat.value} value={cat.value}>
+                  <option key={cat.value} value={cat.value} className="bg-card text-foreground">
                     {cat.label}
                   </option>
                 ))}
@@ -283,11 +284,11 @@ export function MetricEditModal({
               <select
                 value={projectId}
                 onChange={(e) => setProjectId(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none transition-colors text-foreground cursor-pointer"
+                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none transition-colors text-foreground cursor-pointer"
               >
-                <option value="">Workspace Level (Global)</option>
+                <option value="" className="bg-card text-foreground">Workspace Level (Global)</option>
                 {projectOptions.map((p) => (
-                  <option key={p.id} value={p.id}>
+                  <option key={p.id} value={p.id} className="bg-card text-foreground">
                     Project: {p.title}
                   </option>
                 ))}
@@ -306,10 +307,10 @@ export function MetricEditModal({
                 required
                 value={unitType}
                 onChange={(e) => setUnitType(e.target.value as MetricUnitType)}
-                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none transition-colors text-foreground cursor-pointer"
+                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none transition-colors text-foreground cursor-pointer"
               >
                 {UNIT_TYPES.map((u) => (
-                  <option key={u.value} value={u.value}>
+                  <option key={u.value} value={u.value} className="bg-card text-foreground">
                     {u.label}
                   </option>
                 ))}
@@ -326,7 +327,7 @@ export function MetricEditModal({
                 value={unitSymbol}
                 onChange={(e) => setUnitSymbol(e.target.value)}
                 placeholder="e.g. $, %, ms, users, pts"
-                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none transition-colors text-foreground"
+                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none transition-colors text-foreground"
               />
             </div>
           </div>
@@ -342,10 +343,10 @@ export function MetricEditModal({
                 required
                 value={direction}
                 onChange={(e) => setDirection(e.target.value as MetricDirection)}
-                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none transition-colors text-foreground cursor-pointer"
+                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none transition-colors text-foreground cursor-pointer"
               >
                 {DIRECTIONS.map((dir) => (
-                  <option key={dir.value} value={dir.value}>
+                  <option key={dir.value} value={dir.value} className="bg-card text-foreground">
                     {dir.label}
                   </option>
                 ))}
@@ -361,10 +362,10 @@ export function MetricEditModal({
                 required
                 value={measurementType}
                 onChange={(e) => setMeasurementType(e.target.value as MetricMeasurementType)}
-                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none transition-colors text-foreground cursor-pointer"
+                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none transition-colors text-foreground cursor-pointer"
               >
                 {MEASUREMENT_TYPES.map((m) => (
-                  <option key={m.value} value={m.value}>
+                  <option key={m.value} value={m.value} className="bg-card text-foreground">
                     {m.label}
                   </option>
                 ))}
@@ -380,11 +381,11 @@ export function MetricEditModal({
             <select
               value={cadence}
               onChange={(e) => setCadence(e.target.value)}
-              className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none transition-colors text-foreground cursor-pointer"
+              className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none transition-colors text-foreground cursor-pointer"
             >
-              <option value="">No Cadence (Ad-hoc / Manual)</option>
+              <option value="" className="bg-card text-foreground">No Cadence (Ad-hoc / Manual)</option>
               {CADENCES.map((c) => (
-                <option key={c.value} value={c.value}>
+                <option key={c.value} value={c.value} className="bg-card text-foreground">
                   {c.label}
                 </option>
               ))}
@@ -397,14 +398,14 @@ export function MetricEditModal({
               type="button"
               onClick={onClose}
               disabled={isPending}
-              className="px-3.5 py-1.5 text-xs rounded-lg border border-border hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+              className="px-3.5 py-1.5 text-xs rounded-lg border border-border hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isPending || !name.trim()}
-              className="px-4 py-1.5 text-xs rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors flex items-center gap-1.5 disabled:opacity-50 shadow-sm"
+              className="px-4 py-1.5 text-xs rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors flex items-center gap-1.5 disabled:opacity-50 shadow-sm focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
             >
               {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               Save Changes

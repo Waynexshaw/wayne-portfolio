@@ -3,8 +3,7 @@ import { ArrowLeft, RotateCcw, Database } from 'lucide-react'
 import {
   getVaultContext,
   getWorkspaceMetricDetail,
-  getMetricTargets,
-  getMetricObservations,
+  getWorkspaceProjects,
 } from '@/lib/vault/actions'
 import { MetricDetailView } from '@/components/vault/metric/metric-detail-view'
 
@@ -20,17 +19,17 @@ export default async function MetricDetailPage({ params }: MetricDetailPageProps
   const activeWorkspace = context?.activeWorkspace
 
   let metric: any = null
-  let targets: any[] = []
-  let observations: any[] = []
+  let projects: any[] = []
   let dbError: string | null = null
 
   try {
     if (activeWorkspace?.id) {
-      metric = await getWorkspaceMetricDetail(id, activeWorkspace.id)
-      if (metric) {
-        targets = await getMetricTargets(id, activeWorkspace.id)
-        observations = await getMetricObservations(id, activeWorkspace.id)
-      }
+      const [fetchedMetric, fetchedProjects] = await Promise.all([
+        getWorkspaceMetricDetail(id, activeWorkspace.id),
+        getWorkspaceProjects(activeWorkspace.id),
+      ])
+      metric = fetchedMetric
+      projects = fetchedProjects
     }
   } catch (err: any) {
     console.error('[Vault Metric Detail Error]:', err?.message || err)
@@ -48,13 +47,13 @@ export default async function MetricDetailPage({ params }: MetricDetailPageProps
             System Error
           </h2>
           <p className="text-xs text-muted-foreground">
-            A database error occurred while retrieving this metric. This may indicate a pending schema migration or connection issue.
+            A database error occurred while retrieving this metric. This may indicate a connection issue.
           </p>
         </div>
         <div className="pt-2">
           <Link
             href="/vault/metrics"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-secondary text-foreground text-xs font-medium hover:bg-secondary/80 transition-colors shadow-sm"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-secondary text-foreground text-xs font-medium hover:bg-secondary/80 transition-colors shadow-sm focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             Return to Metrics Directory
@@ -81,7 +80,7 @@ export default async function MetricDetailPage({ params }: MetricDetailPageProps
         <div className="pt-2">
           <Link
             href="/vault/metrics"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-secondary text-foreground text-xs font-medium hover:bg-secondary/80 transition-colors shadow-sm"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-secondary text-foreground text-xs font-medium hover:bg-secondary/80 transition-colors shadow-sm focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             Return to Metrics Directory
@@ -95,6 +94,7 @@ export default async function MetricDetailPage({ params }: MetricDetailPageProps
     <MetricDetailView
       metric={metric}
       workspaceId={activeWorkspace.id}
+      projects={projects}
     />
   )
 }
