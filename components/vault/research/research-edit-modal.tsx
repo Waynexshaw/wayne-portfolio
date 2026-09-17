@@ -99,9 +99,9 @@ export function ResearchEditModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border pb-4">
+        <div className="flex items-center justify-between border-b border-border/60 pb-4">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-md bg-primary/10 text-primary">
+            <div className="p-1.5 rounded-md bg-muted/60 text-foreground">
               <Edit3 className="w-4 h-4" />
             </div>
             <h2 className="font-serif text-lg font-medium text-foreground">
@@ -110,7 +110,7 @@ export function ResearchEditModal({
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
           >
             <X className="w-4 h-4" />
           </button>
@@ -122,171 +122,192 @@ export function ResearchEditModal({
           </div>
         )}
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Title */}
-          <div>
-            <label className="block text-xs font-medium text-foreground mb-1">
-              Research Title <span className="text-destructive">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 text-sm bg-secondary/30 border border-border rounded-lg text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
-            />
-          </div>
+        {/* Form organized into 3 conceptual groups */}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* GROUP 1: RECORD DEFINITION */}
+          <div className="space-y-3">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground font-semibold">
+              1. Record Definition
+            </span>
 
-          {/* Type, Status, Priority */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Title */}
             <div>
               <label className="block text-xs font-medium text-foreground mb-1">
-                Research Type
+                Research Title <span className="text-destructive">*</span>
               </label>
-              <select
-                value={researchType}
-                onChange={(e) => setResearchType(e.target.value as ResearchType)}
-                className="w-full px-3 py-2 text-xs bg-secondary/30 border border-border rounded-lg text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-              >
-                {TYPES.map((t) => (
-                  <option key={t.value} value={t.value} className="bg-background text-foreground">
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-foreground mb-1">
-                Status
-              </label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as ResearchStatus)}
-                className="w-full px-3 py-2 text-xs bg-secondary/30 border border-border rounded-lg text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-              >
-                {STATUSES.map((s) => (
-                  <option key={s.value} value={s.value} className="bg-background text-foreground">
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-foreground mb-1">
-                Priority
-              </label>
-              <select
-                value={priority}
-                onChange={(e) => setPriority(e.target.value as ResearchPriority)}
-                className="w-full px-3 py-2 text-xs bg-secondary/30 border border-border rounded-lg text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-              >
-                {PRIORITIES.map((p) => (
-                  <option key={p.value} value={p.value} className="bg-background text-foreground">
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Research Question */}
-          <div>
-            <label className="block text-xs font-medium text-foreground mb-1 flex items-center gap-1">
-              <HelpCircle className="w-3 h-3 text-primary" />
-              <span>Central Research Question</span>
-            </label>
-            <textarea
-              rows={2}
-              value={researchQuestion}
-              onChange={(e) => setResearchQuestion(e.target.value)}
-              className="w-full px-3 py-2 text-xs bg-secondary/30 border border-border rounded-lg text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors resize-none"
-            />
-          </div>
-
-          {/* Objective */}
-          <div>
-            <label className="block text-xs font-medium text-foreground mb-1 flex items-center gap-1">
-              <Target className="w-3 h-3 text-primary" />
-              <span>Strategic Objective</span>
-            </label>
-            <input
-              type="text"
-              value={objective}
-              onChange={(e) => setObjective(e.target.value)}
-              className="w-full px-3 py-2 text-xs bg-secondary/30 border border-border rounded-lg text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
-            />
-          </div>
-
-          {/* Summary */}
-          <div>
-            <label className="block text-xs font-medium text-foreground mb-1">
-              Background / Context Summary
-            </label>
-            <textarea
-              rows={3}
-              value={summary}
-              onChange={(e) => setSummary(e.target.value)}
-              className="w-full px-3 py-2 text-xs bg-secondary/30 border border-border rounded-lg text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors resize-none"
-            />
-          </div>
-
-          {/* Findings */}
-          <div>
-            <label className="block text-xs font-medium text-foreground mb-1">
-              Findings & Analysis
-            </label>
-            <textarea
-              rows={4}
-              value={findings}
-              onChange={(e) => setFindings(e.target.value)}
-              className="w-full px-3 py-2 text-xs bg-secondary/30 border border-border rounded-lg text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors resize-none"
-            />
-          </div>
-
-          {/* Conclusion & Next Action in 2-col */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-foreground mb-1">
-                Conclusion & Synthesis
-              </label>
-              <textarea
-                rows={3}
-                value={conclusion}
-                onChange={(e) => setConclusion(e.target.value)}
-                className="w-full px-3 py-2 text-xs bg-secondary/30 border border-border rounded-lg text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors resize-none"
+              <input
+                type="text"
+                required
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full px-3 py-2 text-sm bg-card border border-border rounded-lg text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
               />
             </div>
 
+            {/* Type, Status, Priority */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">
+                  Research Type
+                </label>
+                <select
+                  value={researchType}
+                  onChange={(e) => setResearchType(e.target.value as ResearchType)}
+                  className="w-full px-3 py-2 text-xs bg-card border border-border rounded-lg text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 cursor-pointer"
+                >
+                  {TYPES.map((t) => (
+                    <option key={t.value} value={t.value} className="bg-card text-foreground">
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">
+                  Status
+                </label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as ResearchStatus)}
+                  className="w-full px-3 py-2 text-xs bg-card border border-border rounded-lg text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 cursor-pointer"
+                >
+                  {STATUSES.map((s) => (
+                    <option key={s.value} value={s.value} className="bg-card text-foreground">
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">
+                  Priority
+                </label>
+                <select
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value as ResearchPriority)}
+                  className="w-full px-3 py-2 text-xs bg-card border border-border rounded-lg text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 cursor-pointer"
+                >
+                  {PRIORITIES.map((p) => (
+                    <option key={p.value} value={p.value} className="bg-card text-foreground">
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* GROUP 2: CORE INQUIRY */}
+          <div className="space-y-3 pt-3 border-t border-border/60">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground font-semibold">
+              2. Core Inquiry
+            </span>
+
+            {/* Research Question */}
+            <div>
+              <label className="block text-xs font-medium text-foreground mb-1 flex items-center gap-1">
+                <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                <span>Central Research Question</span>
+              </label>
+              <textarea
+                rows={2}
+                value={researchQuestion}
+                onChange={(e) => setResearchQuestion(e.target.value)}
+                className="w-full px-3 py-2 text-xs bg-card border border-border rounded-lg text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors resize-none"
+              />
+            </div>
+
+            {/* Objective */}
+            <div>
+              <label className="block text-xs font-medium text-foreground mb-1 flex items-center gap-1">
+                <Target className="w-3 h-3 text-muted-foreground" />
+                <span>Strategic Objective</span>
+              </label>
+              <input
+                type="text"
+                value={objective}
+                onChange={(e) => setObjective(e.target.value)}
+                className="w-full px-3 py-2 text-xs bg-card border border-border rounded-lg text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
+              />
+            </div>
+
+            {/* Background / Summary */}
             <div>
               <label className="block text-xs font-medium text-foreground mb-1">
-                Resulting Next Action
+                Background / Context Summary
+              </label>
+              <textarea
+                rows={2}
+                value={summary}
+                onChange={(e) => setSummary(e.target.value)}
+                className="w-full px-3 py-2 text-xs bg-card border border-border rounded-lg text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors resize-none"
+              />
+            </div>
+          </div>
+
+          {/* GROUP 3: SYNTHESIS */}
+          <div className="space-y-3 pt-3 border-t border-border/60">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground font-semibold">
+              3. Synthesis
+            </span>
+
+            {/* Findings */}
+            <div>
+              <label className="block text-xs font-medium text-foreground mb-1">
+                Findings & Analysis
               </label>
               <textarea
                 rows={3}
-                value={nextAction}
-                onChange={(e) => setNextAction(e.target.value)}
-                className="w-full px-3 py-2 text-xs bg-secondary/30 border border-border rounded-lg text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors resize-none"
+                value={findings}
+                onChange={(e) => setFindings(e.target.value)}
+                className="w-full px-3 py-2 text-xs bg-card border border-border rounded-lg text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors resize-none"
               />
+            </div>
+
+            {/* Conclusion & Next Action in 2-col */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">
+                  Conclusion
+                </label>
+                <textarea
+                  rows={2}
+                  value={conclusion}
+                  onChange={(e) => setConclusion(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-card border border-border rounded-lg text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">
+                  Resulting Next Action
+                </label>
+                <textarea
+                  rows={2}
+                  value={nextAction}
+                  onChange={(e) => setNextAction(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-card border border-border rounded-lg text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors resize-none"
+                />
+              </div>
             </div>
           </div>
 
           {/* Modal Actions */}
-          <div className="flex items-center justify-end gap-2 pt-4 border-t border-border">
+          <div className="flex items-center justify-end gap-2 pt-4 border-t border-border/60">
             <button
               type="button"
               disabled={isPending}
               onClick={onClose}
-              className="px-3.5 py-2 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+              className="px-3.5 py-2 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isPending}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none shadow-sm"
             >
               {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               <span>{isPending ? 'Saving...' : 'Save Changes'}</span>

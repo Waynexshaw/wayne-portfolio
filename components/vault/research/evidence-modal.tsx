@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition, useEffect } from 'react'
-import { X, Loader2, Quote, MapPin, Sparkles, FileText, BookOpen } from 'lucide-react'
+import { X, Loader2, Quote, MapPin, FileText, BookOpen } from 'lucide-react'
 import {
   createResearchEvidence,
   updateResearchEvidence,
@@ -113,9 +113,9 @@ export function EvidenceModal({
         className="relative w-full max-w-xl bg-card border border-border rounded-xl shadow-xl p-6 my-8 space-y-5"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-border pb-4">
+        <div className="flex items-center justify-between border-b border-border/60 pb-4">
           <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-primary/10 text-primary">
+            <div className="p-1.5 rounded-md bg-muted/60 text-foreground">
               <Quote className="w-4 h-4" />
             </div>
             <div>
@@ -123,13 +123,13 @@ export function EvidenceModal({
                 {isEdit ? 'Edit Evidence Record' : 'Record Research Evidence'}
               </h2>
               <p className="text-xs text-muted-foreground">
-                Ground your findings with verbatim text or data points tied to an authoritative source.
+                Ground findings with verbatim text or data points tied to a logged research source.
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
           >
             <X className="w-4 h-4" />
           </button>
@@ -142,14 +142,14 @@ export function EvidenceModal({
         )}
 
         {activeSources.length === 0 && !isEdit ? (
-          <div className="p-5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-center space-y-3">
-            <div className="w-10 h-10 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
+          <div className="p-5 rounded-xl border border-border bg-muted/30 text-center space-y-3">
+            <div className="w-10 h-10 rounded-full bg-muted/60 text-muted-foreground flex items-center justify-center mx-auto">
               <BookOpen className="w-5 h-5" />
             </div>
             <div className="space-y-1">
               <h4 className="text-sm font-medium text-foreground">No Sources Available</h4>
               <p className="text-xs text-muted-foreground">
-                Evidence must be linked to an authoritative source in this research record. Add a source first before logging evidence.
+                Evidence must be linked to a logged research source in this record. Add a source first before logging evidence.
               </p>
             </div>
             {onOpenAddSource && (
@@ -159,7 +159,7 @@ export function EvidenceModal({
                   onClose()
                   onOpenAddSource()
                 }}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
               >
                 + Add Source Now
               </button>
@@ -173,7 +173,7 @@ export function EvidenceModal({
                 <span>Parent Source <span className="text-destructive">*</span></span>
               </label>
               {isEdit ? (
-                <div className="px-3 py-2 text-xs rounded-lg border border-border bg-secondary text-foreground font-mono">
+                <div className="px-3 py-2 text-xs rounded-lg border border-border bg-muted/40 text-foreground font-mono">
                   {sources.find((s) => s.id === sourceId)?.title || sourceId}
                 </div>
               ) : (
@@ -181,7 +181,7 @@ export function EvidenceModal({
                   required
                   value={sourceId}
                   onChange={(e) => setSourceId(e.target.value)}
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors cursor-pointer"
                 >
                   {activeSources.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -194,39 +194,39 @@ export function EvidenceModal({
 
             <div>
               <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
-                <Quote className="w-3 h-3 text-primary" />
-                <span>Evidence Text (Source Data / Excerpt) <span className="text-destructive">*</span></span>
+                <Quote className="w-3 h-3 text-muted-foreground" />
+                <span>Evidence Text (Verbatim Source Material / Data) <span className="text-destructive">*</span></span>
               </label>
               <textarea
                 required
                 rows={4}
-                placeholder="Paste the verbatim excerpt, quote, data point, or observable metric from the source..."
+                placeholder="Paste the exact verbatim excerpt, data point, or observation from the source..."
                 value={evidenceText}
                 onChange={(e) => setEvidenceText(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors resize-none font-sans"
+                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors resize-none font-sans"
               />
               <span className="text-[11px] text-muted-foreground">
-                Preserve what the source actually stated or demonstrated.
+                Preserve what the source actually stated or demonstrated without editorial distortion.
               </span>
             </div>
 
             <div>
               <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-primary" />
-                <span>Claim / Takeaway Summary</span>
+                <FileText className="w-3 h-3 text-muted-foreground" />
+                <span>Claim Summary (Researcher Interpretation / Supported Claim)</span>
               </label>
               <textarea
                 rows={2}
-                placeholder="What interpretation, takeaway, or finding does this evidence support?"
+                placeholder="What interpretation, takeaway, or finding do you believe this evidence supports?"
                 value={claimSummary}
                 onChange={(e) => setClaimSummary(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors resize-none"
+                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors resize-none"
               />
             </div>
 
             <div>
               <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
-                <MapPin className="w-3 h-3" />
+                <MapPin className="w-3 h-3 text-muted-foreground" />
                 <span>Context Location</span>
               </label>
               <input
@@ -234,13 +234,13 @@ export function EvidenceModal({
                 placeholder="e.g. Page 14, paragraph 2; Timestamp 14:20; Section 3.1"
                 value={contextLocation}
                 onChange={(e) => setContextLocation(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
+                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
               />
             </div>
 
             <div>
               <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
-                <FileText className="w-3 h-3" />
+                <FileText className="w-3 h-3 text-muted-foreground" />
                 <span>Internal Notes</span>
               </label>
               <textarea
@@ -248,22 +248,22 @@ export function EvidenceModal({
                 placeholder="Caveats, verification notes, or correlation with other evidence..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors resize-none"
+                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors resize-none"
               />
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-border/60">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-xs font-medium rounded-lg border border-border text-foreground hover:bg-secondary transition-colors"
+                className="px-4 py-2 text-xs font-medium rounded-lg border border-border text-foreground hover:bg-muted/40 transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isPending}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 shadow-sm"
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 shadow-sm focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
               >
                 {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 <span>{isEdit ? 'Save Evidence' : 'Record Evidence'}</span>

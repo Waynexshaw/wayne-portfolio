@@ -11,7 +11,6 @@ import {
   Calendar,
   User,
   Building2,
-  Quote,
   Filter,
 } from 'lucide-react'
 import { archiveResearchSource, restoreResearchSource } from '@/lib/vault/actions'
@@ -23,26 +22,6 @@ interface ResearchSourcesSectionProps {
   sources: any[]
   evidenceCountBySourceId: Record<string, number>
   onAddEvidenceForSource?: (sourceId: string) => void
-}
-
-function getSourceTypeBadge(type: string) {
-  switch (type) {
-    case 'research_report':
-      return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30'
-    case 'whitepaper':
-      return 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30'
-    case 'academic_paper':
-      return 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30'
-    case 'regulatory_document':
-      return 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30'
-    case 'official_website':
-    case 'documentation':
-      return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
-    case 'dataset':
-      return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30'
-    default:
-      return 'bg-secondary text-foreground border-border'
-  }
 }
 
 export function ResearchSourcesSection({
@@ -85,36 +64,31 @@ export function ResearchSourcesSection({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-5">
-      {/* Section Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-border">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-lg bg-primary/10 text-primary">
-            <BookOpen className="w-4 h-4" />
+    <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-4">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-border/60">
+        <div>
+          <div className="flex items-center gap-2">
+            <h3 className="font-serif text-base font-medium text-foreground">
+              Source Library
+            </h3>
+            <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border/60">
+              {activeSources.length}
+            </span>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-serif text-lg font-medium text-foreground">
-                Research Sources
-              </h3>
-              <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground border border-border">
-                {activeSources.length}
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Underlying articles, reports, documentation, and records supporting this inquiry.
-            </p>
-          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Bibliographic records, documents, and references underlying this inquiry.
+          </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
           {archivedSources.length > 0 && (
             <button
               onClick={() => setShowArchived(!showArchived)}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors ${
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none ${
                 showArchived
                   ? 'bg-secondary text-foreground border-border'
-                  : 'text-muted-foreground hover:text-foreground border-transparent'
+                  : 'text-muted-foreground hover:text-foreground border-border/60'
               }`}
             >
               <Filter className="w-3 h-3" />
@@ -124,7 +98,7 @@ export function ResearchSourcesSection({
 
           <button
             onClick={() => setIsAddOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add Source</span>
@@ -138,10 +112,10 @@ export function ResearchSourcesSection({
         </div>
       )}
 
-      {/* Sources List / Empty State */}
+      {/* Sources Ledger */}
       {displayedSources.length === 0 ? (
-        <div className="py-8 text-center space-y-2 border border-dashed border-border rounded-xl">
-          <BookOpen className="w-8 h-8 text-muted-foreground/50 mx-auto" />
+        <div className="py-8 text-center space-y-2 border border-dashed border-border/80 rounded-xl">
+          <BookOpen className="w-7 h-7 text-muted-foreground/40 mx-auto" />
           <p className="text-xs text-muted-foreground">
             {showArchived
               ? 'No archived sources.'
@@ -150,7 +124,7 @@ export function ResearchSourcesSection({
           {!showArchived && (
             <button
               onClick={() => setIsAddOpen(true)}
-              className="inline-flex items-center gap-1 text-xs text-primary font-medium hover:underline pt-1"
+              className="inline-flex items-center gap-1 text-xs text-primary font-medium hover:underline pt-1 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
             >
               <Plus className="w-3 h-3" />
               <span>Add First Source</span>
@@ -158,7 +132,7 @@ export function ResearchSourcesSection({
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="divide-y divide-border/60 border border-border/60 rounded-lg overflow-hidden bg-card/40">
           {displayedSources.map((source) => {
             const count = evidenceCountBySourceId[source.id] || 0
             const publishedFormatted = source.published_at
@@ -179,73 +153,28 @@ export function ResearchSourcesSection({
             return (
               <div
                 key={source.id}
-                className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3 hover:border-primary/30 transition-colors flex flex-col justify-between"
+                className="p-3.5 sm:p-4 hover:bg-muted/20 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3"
               >
-                <div className="space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span
-                        className={`text-[11px] font-mono capitalize px-2 py-0.5 rounded border ${getSourceTypeBadge(
-                          source.source_type
-                        )}`}
-                      >
-                        {source.source_type.replace('_', ' ')}
+                {/* Source Info */}
+                <div className="space-y-1.5 flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.2 rounded bg-muted/60 text-muted-foreground border border-border/50">
+                      {source.source_type?.replace('_', ' ')}
+                    </span>
+                    {source.archived_at && (
+                      <span className="text-[10px] font-mono uppercase px-1.5 py-0.2 rounded bg-muted/40 text-muted-foreground border border-border/50">
+                        Archived
                       </span>
-                      {source.archived_at && (
-                        <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-zinc-500/10 text-zinc-500 border border-zinc-500/20">
-                          Archived
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                      {source.url && (
-                        <a
-                          href={source.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-1 rounded text-muted-foreground hover:text-primary hover:bg-secondary transition-colors"
-                          title="Open URL"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </a>
-                      )}
-                      <button
-                        onClick={() => setEditingSource(source)}
-                        className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-                        title="Edit Source"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
-                      {source.archived_at ? (
-                        <button
-                          disabled={isPending}
-                          onClick={() => handleRestore(source.id)}
-                          className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-                          title="Restore Source"
-                        >
-                          <RotateCcw className="w-3.5 h-3.5" />
-                        </button>
-                      ) : (
-                        <button
-                          disabled={isPending}
-                          onClick={() => handleArchive(source.id)}
-                          className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                          title="Archive Source"
-                        >
-                          <Archive className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
+                    )}
+                    <h4 className="font-serif text-sm font-medium text-foreground hover:text-primary transition-colors truncate">
+                      {source.title}
+                    </h4>
                   </div>
 
-                  <h4 className="font-serif text-sm font-medium text-foreground leading-snug">
-                    {source.title}
-                  </h4>
-
-                  <div className="space-y-1 text-xs text-muted-foreground">
+                  {/* Metadata Row: Publisher/Author, Dates, Notes */}
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                     {(source.publisher || source.author) && (
-                      <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex items-center gap-2">
                         {source.publisher && (
                           <span className="flex items-center gap-1">
                             <Building2 className="w-3 h-3 text-muted-foreground/70" />
@@ -261,44 +190,82 @@ export function ResearchSourcesSection({
                       </div>
                     )}
 
-                    <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono text-muted-foreground/80">
-                      {publishedFormatted && (
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          <span>Pub: {publishedFormatted}</span>
-                        </span>
-                      )}
-                      {accessedFormatted && (
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          <span>Accessed: {accessedFormatted}</span>
-                        </span>
-                      )}
-                    </div>
+                    {publishedFormatted && (
+                      <span className="flex items-center gap-1 font-mono text-[11px] text-muted-foreground/80">
+                        <Calendar className="w-3 h-3" />
+                        <span>Pub: {publishedFormatted}</span>
+                      </span>
+                    )}
+
+                    {accessedFormatted && (
+                      <span className="flex items-center gap-1 font-mono text-[11px] text-muted-foreground/80">
+                        <Calendar className="w-3 h-3" />
+                        <span>Accessed: {accessedFormatted}</span>
+                      </span>
+                    )}
+
+                    <span className="font-mono text-[11px] text-muted-foreground">
+                      {count} evidence point{count === 1 ? '' : 's'}
+                    </span>
                   </div>
 
                   {source.notes && (
-                    <p className="text-xs text-muted-foreground/90 italic pt-1 line-clamp-2 border-t border-border/50">
+                    <p className="text-xs text-muted-foreground/80 italic line-clamp-1">
                       &ldquo;{source.notes}&rdquo;
                     </p>
                   )}
                 </div>
 
-                <div className="pt-2 border-t border-border/60 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5 text-muted-foreground">
-                    <Quote className="w-3 h-3 text-primary" />
-                    <span className="font-mono text-[11px]">
-                      {count} evidence point{count === 1 ? '' : 's'}
-                    </span>
-                  </div>
+                {/* Right Side: Links & Actions */}
+                <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+                  {source.url && (
+                    <a
+                      href={source.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-primary border border-border/60 hover:border-primary/40 rounded transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
+                      title="Open source URL"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      <span className="font-mono text-[11px]">Visit</span>
+                    </a>
+                  )}
 
                   {!source.archived_at && onAddEvidenceForSource && (
                     <button
                       onClick={() => onAddEvidenceForSource(source.id)}
-                      className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                      className="px-2 py-1 text-xs text-primary hover:bg-primary/10 border border-primary/20 rounded transition-colors font-medium focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
+                      title="Attach evidence to this source"
                     >
-                      <Plus className="w-3 h-3" />
-                      <span>Attach Evidence</span>
+                      + Evidence
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => setEditingSource(source)}
+                    className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
+                    title="Edit Source"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                  </button>
+
+                  {source.archived_at ? (
+                    <button
+                      disabled={isPending}
+                      onClick={() => handleRestore(source.id)}
+                      className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
+                      title="Restore Source"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </button>
+                  ) : (
+                    <button
+                      disabled={isPending}
+                      onClick={() => handleArchive(source.id)}
+                      className="p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
+                      title="Archive Source"
+                    >
+                      <Archive className="w-3.5 h-3.5" />
                     </button>
                   )}
                 </div>

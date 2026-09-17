@@ -54,18 +54,18 @@ export default async function VaultResearchPage({
       {/* Header & Main Action */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-border">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="font-serif text-2xl font-medium text-foreground">
-              Research & Intelligence
+          <div className="flex items-center gap-2.5">
+            <h1 className="font-serif text-2xl font-medium text-foreground tracking-tight">
+              Research
             </h1>
             {!loadError && (
-              <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+              <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border/60">
                 {records.length} {hasActiveFilters ? 'Found' : 'Total'}
               </span>
             )}
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Track inquiries, hypotheses, market investigations, and resulting actions for {activeWorkspace?.name || 'this workspace'}.
+            Private research and evidence workspace for {activeWorkspace?.name || 'this workspace'}.
           </p>
         </div>
 

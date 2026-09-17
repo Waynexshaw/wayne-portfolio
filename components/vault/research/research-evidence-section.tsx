@@ -4,7 +4,6 @@ import { useState, useTransition } from 'react'
 import {
   Quote,
   Plus,
-  Sparkles,
   MapPin,
   ExternalLink,
   Edit3,
@@ -72,26 +71,21 @@ export function ResearchEvidenceSection({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-5">
-      {/* Section Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-border">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-lg bg-primary/10 text-primary">
-            <Quote className="w-4 h-4" />
+    <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-4">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-border/60">
+        <div>
+          <div className="flex items-center gap-2">
+            <h3 className="font-serif text-base font-medium text-foreground">
+              Evidence Catalog
+            </h3>
+            <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border/60">
+              {activeEvidence.length}
+            </span>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-serif text-lg font-medium text-foreground">
-                Evidence & Grounded Claims
-              </h3>
-              <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground border border-border">
-                {activeEvidence.length}
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Traceable excerpts, empirical observations, and citations backing this research.
-            </p>
-          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Empirical extractions, verbatim excerpts, and researcher claim summaries.
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -102,7 +96,7 @@ export function ResearchEvidenceSection({
               <select
                 value={filterSourceId || ''}
                 onChange={(e) => setFilterSourceId(e.target.value || null)}
-                className="px-2 py-1 text-xs rounded-lg border border-border bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                className="px-2 py-1 text-xs rounded-lg border border-border bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus-visible:ring-2 focus-visible:ring-primary/40 cursor-pointer"
               >
                 <option value="">All Sources ({sources.length})</option>
                 {sources.map((s) => (
@@ -117,10 +111,10 @@ export function ResearchEvidenceSection({
           {archivedEvidence.length > 0 && (
             <button
               onClick={() => setShowArchived(!showArchived)}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors ${
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none ${
                 showArchived
                   ? 'bg-secondary text-foreground border-border'
-                  : 'text-muted-foreground hover:text-foreground border-transparent'
+                  : 'text-muted-foreground hover:text-foreground border-border/60'
               }`}
             >
               <span>{showArchived ? 'Viewing Archived' : `Archived (${archivedEvidence.length})`}</span>
@@ -129,7 +123,7 @@ export function ResearchEvidenceSection({
 
           <button
             onClick={() => setIsAddOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add Evidence</span>
@@ -143,10 +137,10 @@ export function ResearchEvidenceSection({
         </div>
       )}
 
-      {/* Evidence Cards / Empty State */}
+      {/* Evidence Blocks / Empty State */}
       {displayedEvidence.length === 0 ? (
-        <div className="py-8 text-center space-y-2 border border-dashed border-border rounded-xl">
-          <Quote className="w-8 h-8 text-muted-foreground/50 mx-auto" />
+        <div className="py-8 text-center space-y-2 border border-dashed border-border/80 rounded-xl">
+          <Quote className="w-7 h-7 text-muted-foreground/40 mx-auto" />
           <p className="text-xs text-muted-foreground">
             {showArchived
               ? 'No archived evidence records.'
@@ -157,7 +151,7 @@ export function ResearchEvidenceSection({
           {!showArchived && sources.length > 0 && (
             <button
               onClick={() => setIsAddOpen(true)}
-              className="inline-flex items-center gap-1 text-xs text-primary font-medium hover:underline pt-1"
+              className="inline-flex items-center gap-1 text-xs text-primary font-medium hover:underline pt-1 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
             >
               <Plus className="w-3 h-3" />
               <span>Record Evidence</span>
@@ -172,45 +166,50 @@ export function ResearchEvidenceSection({
             return (
               <div
                 key={item.id}
-                className="rounded-lg border border-border bg-secondary/15 p-4 space-y-3 hover:border-primary/30 transition-colors"
+                className="rounded-lg border border-border/70 bg-card/60 p-4 space-y-3 hover:border-primary/30 transition-colors"
               >
-                {/* Header: Parent Source Chip & Action Buttons */}
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2.5">
+                {/* Top Meta: Source Linkage, Context Location, Actions */}
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2">
                   <div className="flex flex-wrap items-center gap-2 text-xs">
-                    <span className="flex items-center gap-1 font-mono text-[11px] px-2 py-0.5 rounded bg-secondary text-secondary-foreground border border-border">
-                      <BookOpen className="w-3 h-3 text-primary" />
-                      <span>{parentSource?.title || 'Unknown Source'}</span>
+                    {/* Source Linkage */}
+                    <span className="flex items-center gap-1 font-mono text-[11px] px-2 py-0.5 rounded bg-muted/60 text-foreground/90 border border-border/60">
+                      <BookOpen className="w-3 h-3 text-muted-foreground" />
+                      <span className="truncate max-w-[280px]">{parentSource?.title || 'Unknown Source'}</span>
                     </span>
-
-                    {parentSource?.source_type && (
-                      <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-secondary/80 text-muted-foreground border border-border">
-                        {parentSource.source_type}
-                      </span>
-                    )}
 
                     {parentSource?.url && (
                       <a
                         href={parentSource.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-0.5 text-[11px] text-primary hover:underline"
+                        className="inline-flex items-center gap-0.5 text-[11px] text-muted-foreground hover:text-primary transition-colors"
+                        title="Open source URL"
                       >
                         <ExternalLink className="w-3 h-3" />
-                        <span>Source Link</span>
+                        <span className="font-mono">Link</span>
                       </a>
                     )}
 
+                    {/* Quiet Location Badge */}
+                    {item.context_location && (
+                      <span className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded border border-border/40">
+                        <MapPin className="w-3 h-3 text-muted-foreground/70" />
+                        <span>{item.context_location}</span>
+                      </span>
+                    )}
+
                     {item.archived_at && (
-                      <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-zinc-500/10 text-zinc-500 border border-zinc-500/20">
+                      <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-muted/40 text-muted-foreground border border-border/40">
                         Archived
                       </span>
                     )}
                   </div>
 
+                  {/* Actions */}
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => setEditingEvidence(item)}
-                      className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                      className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
                       title="Edit Evidence"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
@@ -219,7 +218,7 @@ export function ResearchEvidenceSection({
                       <button
                         disabled={isPending}
                         onClick={() => handleRestore(item.id)}
-                        className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                        className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
                         title="Restore Evidence"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
@@ -228,7 +227,7 @@ export function ResearchEvidenceSection({
                       <button
                         disabled={isPending}
                         onClick={() => handleArchive(item.id)}
-                        className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                        className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
                         title="Archive Evidence"
                       >
                         <Archive className="w-3.5 h-3.5" />
@@ -237,12 +236,11 @@ export function ResearchEvidenceSection({
                   </div>
                 </div>
 
-                {/* Claim Summary: The Researcher's Interpretation */}
+                {/* Layer 1: CLAIM (Researcher's Interpretation) */}
                 {item.claim_summary && (
                   <div className="space-y-1">
-                    <div className="flex items-center gap-1 text-[11px] font-mono uppercase tracking-wider text-primary">
-                      <Sparkles className="w-3 h-3" />
-                      <span>Takeaway / Supported Claim</span>
+                    <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground font-semibold">
+                      Claim
                     </div>
                     <p className="text-sm font-medium text-foreground leading-relaxed">
                       {item.claim_summary}
@@ -250,30 +248,21 @@ export function ResearchEvidenceSection({
                   </div>
                 )}
 
-                {/* Evidence Text: Verbatim Source Excerpt */}
+                {/* Layer 2: EVIDENCE (Verbatim Source Excerpt / Data) */}
                 <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Quote className="w-3 h-3 text-muted-foreground" />
-                      <span>Verbatim Excerpt</span>
-                    </span>
-                    {item.context_location && (
-                      <span className="flex items-center gap-1 text-[11px] font-mono lowercase normal-case text-muted-foreground">
-                        <MapPin className="w-3 h-3 text-primary" />
-                        <span>{item.context_location}</span>
-                      </span>
-                    )}
+                  <div className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground font-semibold">
+                    Evidence
                   </div>
-                  <div className="p-3 rounded-lg bg-background/60 border border-border/80 text-xs text-foreground/90 font-serif italic leading-relaxed whitespace-pre-wrap">
-                    &ldquo;{item.evidence_text}&rdquo;
+                  <div className="border-l-2 border-border/80 pl-3.5 py-1 text-sm text-foreground/90 font-sans leading-relaxed whitespace-pre-wrap bg-muted/10 rounded-r">
+                    {item.evidence_text}
                   </div>
                 </div>
 
-                {/* Notes */}
+                {/* Internal Notes */}
                 {item.notes && (
-                  <div className="pt-1 text-xs text-muted-foreground flex items-start gap-1.5">
-                    <FileText className="w-3.5 h-3.5 shrink-0 mt-0.5 text-muted-foreground/70" />
-                    <p className="whitespace-pre-wrap">{item.notes}</p>
+                  <div className="pt-1 text-xs text-muted-foreground flex items-start gap-1.5 border-t border-border/30">
+                    <FileText className="w-3 h-3 shrink-0 mt-0.5 text-muted-foreground/60" />
+                    <p className="whitespace-pre-wrap leading-relaxed">{item.notes}</p>
                   </div>
                 )}
               </div>

@@ -31,22 +31,7 @@ interface ResearchConnectionsSectionProps {
 }
 
 function getRelationshipBadge(type: ResearchConnectionType) {
-  switch (type) {
-    case 'subject':
-      return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30'
-    case 'stakeholder':
-      return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30'
-    case 'partner':
-      return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
-    case 'competitor':
-      return 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30'
-    case 'due_diligence':
-      return 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30'
-    case 'supporting':
-      return 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/30'
-    default:
-      return 'bg-secondary text-foreground border-border'
-  }
+  return 'bg-muted/60 text-muted-foreground border-border/60 font-mono text-[10px] uppercase tracking-wider'
 }
 
 function formatRelationshipLabel(type: ResearchConnectionType) {
@@ -108,26 +93,21 @@ export function ResearchConnectionsSection({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-5">
+    <div className="rounded-xl border border-border bg-card p-6 shadow-sm space-y-4">
       {/* Section Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-border">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-lg bg-primary/10 text-primary">
-            <Link2 className="w-4 h-4" />
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-border/60">
+        <div>
+          <div className="flex items-center gap-2">
+            <h3 className="font-serif text-base font-medium text-foreground">
+              Connected Operational Entities
+            </h3>
+            <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border/60">
+              {connections.length}
+            </span>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-serif text-lg font-medium text-foreground">
-                Connected Entities
-              </h3>
-              <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground border border-border">
-                {connections.length}
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Vault contacts, companies, opportunities, and projects connected to this inquiry
-            </p>
-          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Vault projects, companies, contacts, and opportunities linked to this research.
+          </p>
         </div>
 
         {/* Header Action */}
@@ -135,7 +115,7 @@ export function ResearchConnectionsSection({
           <button
             type="button"
             onClick={() => setIsAddOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors shadow-sm"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors shadow-sm focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Connect Entity</span>
@@ -145,9 +125,9 @@ export function ResearchConnectionsSection({
 
       {/* Error Alert */}
       {actionError && (
-        <div className="flex items-start gap-2.5 p-3 text-xs rounded-lg bg-destructive/10 text-destructive border border-destructive/20">
+        <div className="flex items-start gap-2.5 p-3 text-xs rounded-lg bg-destructive/10 text-destructive border border-destructive/20 font-mono">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-          <div className="flex-1 font-mono">{actionError}</div>
+          <div className="flex-1">{actionError}</div>
         </div>
       )}
 
@@ -157,26 +137,41 @@ export function ResearchConnectionsSection({
           <button
             type="button"
             onClick={() => setFilterType('all')}
-            className={`px-2.5 py-1 text-xs rounded-md transition-colors font-medium ${
+            className={`px-2.5 py-1 text-xs rounded-md transition-colors font-medium focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none ${
               filterType === 'all'
-                ? 'bg-secondary text-foreground font-semibold border border-border shadow-xs'
+                ? 'bg-secondary text-foreground border border-border/80'
                 : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
             }`}
           >
             All ({connections.length})
           </button>
 
+          {projectsCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setFilterType('projects')}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md transition-colors font-medium focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none ${
+                filterType === 'projects'
+                  ? 'bg-secondary text-foreground border border-border/80'
+                  : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
+              }`}
+            >
+              <Briefcase className="w-3 h-3 text-muted-foreground" />
+              <span>Projects ({projectsCount})</span>
+            </button>
+          )}
+
           {companiesCount > 0 && (
             <button
               type="button"
               onClick={() => setFilterType('companies')}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md transition-colors font-medium ${
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md transition-colors font-medium focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none ${
                 filterType === 'companies'
-                  ? 'bg-secondary text-foreground font-semibold border border-border shadow-xs'
+                  ? 'bg-secondary text-foreground border border-border/80'
                   : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
               }`}
             >
-              <Building2 className="w-3 h-3 text-indigo-500" />
+              <Building2 className="w-3 h-3 text-muted-foreground" />
               <span>Companies ({companiesCount})</span>
             </button>
           )}
@@ -185,13 +180,13 @@ export function ResearchConnectionsSection({
             <button
               type="button"
               onClick={() => setFilterType('contacts')}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md transition-colors font-medium ${
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md transition-colors font-medium focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none ${
                 filterType === 'contacts'
-                  ? 'bg-secondary text-foreground font-semibold border border-border shadow-xs'
+                  ? 'bg-secondary text-foreground border border-border/80'
                   : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
               }`}
             >
-              <User className="w-3 h-3 text-sky-500" />
+              <User className="w-3 h-3 text-muted-foreground" />
               <span>Contacts ({contactsCount})</span>
             </button>
           )}
@@ -200,29 +195,14 @@ export function ResearchConnectionsSection({
             <button
               type="button"
               onClick={() => setFilterType('opportunities')}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md transition-colors font-medium ${
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md transition-colors font-medium focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none ${
                 filterType === 'opportunities'
-                  ? 'bg-secondary text-foreground font-semibold border border-border shadow-xs'
+                  ? 'bg-secondary text-foreground border border-border/80'
                   : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
               }`}
             >
-              <Target className="w-3 h-3 text-emerald-500" />
+              <Target className="w-3 h-3 text-muted-foreground" />
               <span>Opportunities ({opportunitiesCount})</span>
-            </button>
-          )}
-
-          {projectsCount > 0 && (
-            <button
-              type="button"
-              onClick={() => setFilterType('projects')}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md transition-colors font-medium ${
-                filterType === 'projects'
-                  ? 'bg-secondary text-foreground font-semibold border border-border shadow-xs'
-                  : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
-              }`}
-            >
-              <Briefcase className="w-3 h-3 text-violet-500" />
-              <span>Projects ({projectsCount})</span>
             </button>
           )}
         </div>
@@ -230,16 +210,16 @@ export function ResearchConnectionsSection({
 
       {/* Connections List or Empty State */}
       {filteredConnections.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-10 px-4 text-center rounded-lg border border-dashed border-border bg-secondary/20">
-          <div className="p-3 rounded-full bg-secondary text-muted-foreground mb-3">
-            <Link2 className="w-5 h-5" />
+        <div className="flex flex-col items-center justify-center py-8 px-4 text-center rounded-lg border border-dashed border-border/80 bg-muted/20">
+          <div className="p-2.5 rounded-full bg-muted/50 text-muted-foreground mb-2.5">
+            <Link2 className="w-4 h-4" />
           </div>
-          <h4 className="text-sm font-medium text-foreground mb-1">
+          <h4 className="text-xs font-medium text-foreground mb-1">
             {connections.length === 0
               ? 'No entities connected yet'
               : 'No entities match this filter'}
           </h4>
-          <p className="text-xs text-muted-foreground max-w-sm mb-4">
+          <p className="text-xs text-muted-foreground max-w-sm mb-3">
             {connections.length === 0
               ? 'Connect contacts, companies, opportunities, or projects to anchor this research inquiry to operational records.'
               : 'Try selecting a different filter above.'}
@@ -248,7 +228,7 @@ export function ResearchConnectionsSection({
             <button
               type="button"
               onClick={() => setIsAddOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors shadow-sm"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors shadow-sm focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Connect First Entity</span>
@@ -258,26 +238,32 @@ export function ResearchConnectionsSection({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
           {filteredConnections.map((conn) => {
-            let entityTypeIcon = <Building2 className="w-4 h-4 text-indigo-500" />
+            let entityTypeIcon = <Building2 className="w-4 h-4 text-muted-foreground" />
             let entityCategoryLabel = 'Company'
             let entityTitle = 'Unknown Entity'
             let entitySubtitle = ''
             let entityHref = '#'
 
-            if (conn.company_id && conn.company) {
-              entityTypeIcon = <Building2 className="w-4 h-4 text-indigo-500" />
+            if (conn.project_id && conn.project) {
+              entityTypeIcon = <Briefcase className="w-4 h-4 text-muted-foreground" />
+              entityCategoryLabel = 'Project'
+              entityTitle = conn.project.title
+              entitySubtitle = `${conn.project.status} • ${conn.project.priority} priority`
+              entityHref = `/vault/projects/${conn.project_id}`
+            } else if (conn.company_id && conn.company) {
+              entityTypeIcon = <Building2 className="w-4 h-4 text-muted-foreground" />
               entityCategoryLabel = 'Company'
               entityTitle = conn.company.name
               entitySubtitle = [conn.company.industry, conn.company.domain].filter(Boolean).join(' • ')
               entityHref = `/vault/companies/${conn.company_id}`
             } else if (conn.contact_id && conn.contact) {
-              entityTypeIcon = <User className="w-4 h-4 text-sky-500" />
+              entityTypeIcon = <User className="w-4 h-4 text-muted-foreground" />
               entityCategoryLabel = 'Contact'
               entityTitle = conn.contact.full_name
               entitySubtitle = conn.contact.role_title || ''
               entityHref = `/vault/contacts/${conn.contact_id}`
             } else if (conn.opportunity_id && conn.opportunity) {
-              entityTypeIcon = <Target className="w-4 h-4 text-emerald-500" />
+              entityTypeIcon = <Target className="w-4 h-4 text-muted-foreground" />
               entityCategoryLabel = 'Opportunity'
               entityTitle = conn.opportunity.title
               const val = conn.opportunity.value_estimate
@@ -285,12 +271,6 @@ export function ResearchConnectionsSection({
                 : null
               entitySubtitle = [conn.opportunity.pipeline_stage, val].filter(Boolean).join(' • ')
               entityHref = `/vault/opportunities`
-            } else if (conn.project_id && conn.project) {
-              entityTypeIcon = <Briefcase className="w-4 h-4 text-violet-500" />
-              entityCategoryLabel = 'Project'
-              entityTitle = conn.project.title
-              entitySubtitle = `${conn.project.status} • ${conn.project.priority} priority`
-              entityHref = `/vault/projects`
             }
 
             const isDisconnecting = disconnectingId === conn.id
@@ -298,78 +278,85 @@ export function ResearchConnectionsSection({
             return (
               <div
                 key={conn.id}
-                className="flex flex-col justify-between p-4 rounded-xl border border-border bg-card hover:border-border/80 transition-all shadow-xs space-y-3"
+                className="group relative flex flex-col justify-between rounded-lg border border-border/70 bg-card/60 p-4 space-y-2.5 hover:border-primary/30 transition-colors"
               >
-                {/* Entity Info & Category */}
                 <div className="space-y-2">
-                  <div className="flex items-start justify-between gap-2">
+                  {/* Card Header: Category + Neutral Relationship Badge + Disconnect */}
+                  <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className="p-1.5 rounded-md bg-secondary/80 shrink-0">
+                      <div className="p-1.5 rounded-md bg-muted/60 text-muted-foreground shrink-0">
                         {entityTypeIcon}
                       </div>
-                      <div className="min-w-0">
-                        <Link
-                          href={entityHref}
-                          className="group inline-flex items-center gap-1 text-sm font-medium text-foreground hover:text-primary transition-colors truncate"
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground/80">
+                          {entityCategoryLabel}
+                        </span>
+                        <span
+                          className={`inline-block px-1.5 py-0.2 rounded border ${getRelationshipBadge(
+                            conn.relationship_type
+                          )}`}
                         >
-                          <span className="truncate">{entityTitle}</span>
-                          <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                        </Link>
-                        {entitySubtitle && (
-                          <div className="text-[11px] text-muted-foreground truncate">
-                            {entitySubtitle}
-                          </div>
-                        )}
+                          {formatRelationshipLabel(conn.relationship_type)}
+                        </span>
                       </div>
                     </div>
 
-                    {/* Relationship Badge */}
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-mono border shrink-0 ${getRelationshipBadge(
-                        conn.relationship_type
-                      )}`}
-                    >
-                      {formatRelationshipLabel(conn.relationship_type)}
-                    </span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setEditingConnection(conn)}
+                        className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
+                        title="Edit Relationship"
+                        aria-label="Edit relationship"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isDisconnecting || isPending}
+                        onClick={() => handleDisconnect(conn.id)}
+                        className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
+                        title="Disconnect entity"
+                        aria-label="Disconnect entity"
+                      >
+                        {isDisconnecting ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-destructive" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Notes snippet if present */}
+                  {/* Entity Title Link */}
+                  <div>
+                    {entityHref !== '#' ? (
+                      <Link
+                        href={entityHref}
+                        className="font-serif text-sm font-medium text-foreground hover:text-primary transition-colors flex items-center gap-1.5 group/link truncate"
+                      >
+                        <span className="truncate">{entityTitle}</span>
+                        <ExternalLink className="w-3 h-3 text-muted-foreground group-hover/link:text-primary shrink-0 opacity-0 group-hover/link:opacity-100 transition-opacity" />
+                      </Link>
+                    ) : (
+                      <span className="font-serif text-sm font-medium text-foreground truncate block">
+                        {entityTitle}
+                      </span>
+                    )}
+                    {entitySubtitle && (
+                      <p className="text-xs text-muted-foreground truncate mt-0.5">
+                        {entitySubtitle}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Notes */}
                   {conn.notes && (
-                    <div className="text-xs text-foreground/80 bg-secondary/30 p-2.5 rounded-lg border border-border/50 whitespace-pre-wrap leading-relaxed">
-                      {conn.notes}
+                    <div className="pt-1.5 border-t border-border/40 text-xs text-muted-foreground flex items-start gap-1.5">
+                      <FileText className="w-3 h-3 shrink-0 mt-0.5 text-muted-foreground/60" />
+                      <p className="line-clamp-2 leading-relaxed">{conn.notes}</p>
                     </div>
                   )}
-                </div>
-
-                {/* Footer / Meta & Actions */}
-                <div className="flex items-center justify-between pt-2 border-t border-border/50 text-[11px] text-muted-foreground">
-                  <span className="font-mono text-[10px]">
-                    {entityCategoryLabel}
-                  </span>
-
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setEditingConnection(conn)}
-                      className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-                      title="Edit relationship or notes"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDisconnect(conn.id)}
-                      disabled={isDisconnecting || isPending}
-                      className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50"
-                      title="Disconnect entity"
-                    >
-                      {isDisconnecting ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-destructive" />
-                      ) : (
-                        <Trash2 className="w-3.5 h-3.5" />
-                      )}
-                    </button>
-                  </div>
                 </div>
               </div>
             )
@@ -377,7 +364,7 @@ export function ResearchConnectionsSection({
         </div>
       )}
 
-      {/* Create Connection Modal */}
+      {/* Connect Entity Modal */}
       <ConnectionModal
         researchRecordId={researchRecordId}
         workspaceId={workspaceId}

@@ -131,9 +131,9 @@ export function SourceModal({
         className="relative w-full max-w-xl bg-card border border-border rounded-xl shadow-xl p-6 my-8 space-y-5"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-border pb-4">
+        <div className="flex items-center justify-between border-b border-border/60 pb-4">
           <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-primary/10 text-primary">
+            <div className="p-1.5 rounded-md bg-muted/60 text-foreground">
               <BookOpen className="w-4 h-4" />
             </div>
             <div>
@@ -147,7 +147,7 @@ export function SourceModal({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
           >
             <X className="w-4 h-4" />
           </button>
@@ -161,7 +161,7 @@ export function SourceModal({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1.5">
+            <label className="block text-xs font-medium text-foreground mb-1.5">
               Source Title <span className="text-destructive">*</span>
             </label>
             <input
@@ -170,22 +170,22 @@ export function SourceModal({
               placeholder="e.g. Uniswap v4 Technical Whitepaper, Bloomberg Market Survey"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
             />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1.5">
+              <label className="block text-xs font-medium text-foreground mb-1.5">
                 Source Type
               </label>
               <select
                 value={sourceType}
                 onChange={(e) => setSourceType(e.target.value as ResearchSourceType)}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
+                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors cursor-pointer"
               >
                 {SOURCE_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>
+                  <option key={t.value} value={t.value} className="bg-card text-foreground">
                     {t.label}
                   </option>
                 ))}
@@ -193,8 +193,8 @@ export function SourceModal({
             </div>
 
             <div>
-              <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
-                <Link2 className="w-3 h-3" />
+              <label className="block text-xs font-medium text-foreground mb-1.5 flex items-center gap-1">
+                <Link2 className="w-3 h-3 text-muted-foreground" />
                 <span>URL (Optional)</span>
               </label>
               <input
@@ -202,15 +202,15 @@ export function SourceModal({
                 placeholder="https://example.com/report.pdf"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
+                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
-                <Building2 className="w-3 h-3" />
+              <label className="block text-xs font-medium text-foreground mb-1.5 flex items-center gap-1">
+                <Building2 className="w-3 h-3 text-muted-foreground" />
                 <span>Publisher / Organization</span>
               </label>
               <input
@@ -218,13 +218,13 @@ export function SourceModal({
                 placeholder="e.g. Paradigm, Federal Reserve, CoinDesk"
                 value={publisher}
                 onChange={(e) => setPublisher(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
+                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
-                <User className="w-3 h-3" />
+              <label className="block text-xs font-medium text-foreground mb-1.5 flex items-center gap-1">
+                <User className="w-3 h-3 text-muted-foreground" />
                 <span>Author(s)</span>
               </label>
               <input
@@ -232,65 +232,65 @@ export function SourceModal({
                 placeholder="e.g. Dan Robinson, Vitalik Buterin"
                 value={author}
                 onChange={(e) => setAuthor(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
+                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
-                <Calendar className="w-3 h-3" />
+              <label className="block text-xs font-medium text-foreground mb-1.5 flex items-center gap-1">
+                <Calendar className="w-3 h-3 text-muted-foreground" />
                 <span>Published Date</span>
               </label>
               <input
                 type="date"
                 value={publishedAt}
                 onChange={(e) => setPublishedAt(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
+                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
-                <Calendar className="w-3 h-3" />
+              <label className="block text-xs font-medium text-foreground mb-1.5 flex items-center gap-1">
+                <Calendar className="w-3 h-3 text-muted-foreground" />
                 <span>Accessed Date</span>
               </label>
               <input
                 type="date"
                 value={accessedAt}
                 onChange={(e) => setAccessedAt(e.target.value)}
-                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
+                className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
-              <FileText className="w-3 h-3" />
+            <label className="block text-xs font-medium text-foreground mb-1.5 flex items-center gap-1">
+              <FileText className="w-3 h-3 text-muted-foreground" />
               <span>Notes & Context</span>
             </label>
             <textarea
               rows={3}
-              placeholder="Observations on credibility, methodology, scope, or background..."
+              placeholder="Observations on methodology, scope, or background context..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-secondary/50 text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors resize-none"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card text-foreground focus:outline-none focus:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/40 transition-colors resize-none"
             />
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-border/60">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-medium rounded-lg border border-border text-foreground hover:bg-secondary transition-colors"
+              className="px-4 py-2 text-xs font-medium rounded-lg border border-border text-foreground hover:bg-muted/40 transition-colors focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isPending}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 shadow-sm"
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 shadow-sm focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
             >
               {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               <span>{isEdit ? 'Save Changes' : 'Add Source'}</span>
