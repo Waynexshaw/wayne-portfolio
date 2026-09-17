@@ -83,12 +83,12 @@ export function ReviewCreateModal({
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-border bg-card/60">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+            <div className="w-8 h-8 rounded-lg bg-muted border border-border flex items-center justify-center text-foreground">
               <RotateCcw className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="font-serif text-base font-medium text-foreground">
-                Create Operational Review
+              <h2 className="font-serif text-base font-medium text-foreground tracking-tight">
+                New Review
               </h2>
               <p className="text-xs text-muted-foreground">
                 {workspaceName ? `in ${workspaceName}` : 'Capture retrospective reflection and learnings'}
@@ -119,25 +119,25 @@ export function ReviewCreateModal({
             <input
               type="text"
               required
-              placeholder="e.g., Q3 PEVRA Payment Settlement Infrastructure Review"
+              placeholder="e.g., Q3 Payment Settlement Infrastructure Review"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none transition-colors"
+              className="w-full px-3 py-2 text-xs rounded-lg bg-card border border-border text-foreground placeholder:text-muted-foreground focus:border-foreground/40 focus:outline-none transition-colors"
             />
           </div>
 
           {/* Review Type */}
           <div>
             <label className="block text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1.5">
-              Review Category
+              Review Type
             </label>
             <select
               value={reviewType}
               onChange={(e) => setReviewType(e.target.value as ReviewType)}
-              className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none cursor-pointer"
+              className="w-full px-3 py-2 text-xs rounded-lg bg-card border border-border text-foreground focus:border-foreground/40 focus:outline-none cursor-pointer"
             >
               {REVIEW_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>
+                <option key={t.value} value={t.value} className="bg-card text-foreground">
                   {t.label}
                 </option>
               ))}
@@ -154,7 +154,7 @@ export function ReviewCreateModal({
                 type="date"
                 value={periodStart}
                 onChange={(e) => setPeriodStart(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none"
+                className="w-full px-3 py-2 text-xs rounded-lg bg-card border border-border text-foreground focus:border-foreground/40 focus:outline-none"
               />
             </div>
             <div>
@@ -165,7 +165,7 @@ export function ReviewCreateModal({
                 type="date"
                 value={periodEnd}
                 onChange={(e) => setPeriodEnd(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none"
+                className="w-full px-3 py-2 text-xs rounded-lg bg-card border border-border text-foreground focus:border-foreground/40 focus:outline-none"
               />
             </div>
           </div>
@@ -173,14 +173,14 @@ export function ReviewCreateModal({
           {/* Objective */}
           <div>
             <label className="block text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1.5">
-              Original Objective
+              Objective
             </label>
             <textarea
               rows={3}
-              placeholder="What did we set out to achieve during this initiative or period?"
+              placeholder="What was this review evaluating? Original scope and purpose."
               value={objective}
               onChange={(e) => setObjective(e.target.value)}
-              className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none resize-none"
+              className="w-full px-3 py-2 text-xs rounded-lg bg-card border border-border text-foreground placeholder:text-muted-foreground focus:border-foreground/40 focus:outline-none resize-none"
             />
           </div>
 
@@ -191,10 +191,10 @@ export function ReviewCreateModal({
             </label>
             <textarea
               rows={2}
-              placeholder="What specific outcome or metric did we anticipate at the start?"
+              placeholder="What outcome or targets were anticipated at the start?"
               value={expectedOutcome}
               onChange={(e) => setExpectedOutcome(e.target.value)}
-              className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none resize-none"
+              className="w-full px-3 py-2 text-xs rounded-lg bg-card border border-border text-foreground placeholder:text-muted-foreground focus:border-foreground/40 focus:outline-none resize-none"
             />
           </div>
 
@@ -214,7 +214,7 @@ export function ReviewCreateModal({
               className="px-4 py-1.5 text-xs rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors flex items-center gap-1.5 disabled:opacity-50 shadow-sm"
             >
               {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              Create & Open Review
+              Create Review
             </button>
           </div>
         </form>

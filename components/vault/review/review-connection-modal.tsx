@@ -221,21 +221,21 @@ export function ReviewConnectionModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in-0">
-      <div className="relative w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-xl space-y-5">
+      <div className="relative w-full max-w-lg rounded-xl border border-border bg-card shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border pb-4">
+        <div className="flex items-center justify-between p-5 border-b border-border bg-card shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-lg bg-primary/10 text-primary">
-              <Link2 className="w-5 h-5" />
+            <div className="w-8 h-8 rounded-lg bg-muted border border-border flex items-center justify-center text-foreground">
+              <Link2 className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="font-serif text-lg font-medium text-foreground">
-                {isEdit ? 'Edit Connection' : 'Add Review Context'}
+              <h2 className="font-serif text-base font-medium text-foreground">
+                {isEdit ? 'Edit Connection' : 'Add Connection'}
               </h2>
               <p className="text-xs text-muted-foreground">
                 {isEdit
-                  ? 'Update relationship role or notes for this connection'
-                  : 'Connect an entity to this review with a semantic relationship role'}
+                  ? 'Update relationship role or context notes for this connection'
+                  : 'Connect an entity to this review with an explicit semantic role'}
               </p>
             </div>
           </div>
@@ -244,28 +244,29 @@ export function ReviewConnectionModal({
             onClick={onClose}
             className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {error && (
-          <div className="flex items-start gap-2.5 p-3 text-xs rounded-lg bg-destructive/10 text-destructive border border-destructive/20">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <div className="flex-1 font-mono">{error}</div>
-          </div>
-        )}
+        {/* Scrollable Form Body */}
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto flex-1">
+          {error && (
+            <div className="flex items-start gap-2.5 p-3 text-xs rounded-lg bg-destructive/10 text-destructive border border-destructive/20 font-mono">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="flex-1">{error}</div>
+            </div>
+          )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
           {isEdit ? (
             /* Target Entity Read-only (Immutability Enforced) */
-            <div className="space-y-1.5 p-3 rounded-lg bg-secondary/50 border border-border">
+            <div className="space-y-1.5 p-3 rounded-lg bg-muted/40 border border-border">
               <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span className="font-medium">{editCategoryLabel}</span>
+                <span className="font-medium text-foreground">{editCategoryLabel}</span>
                 <span className="flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
                   <Lock className="w-3 h-3" /> Target Immutable
                 </span>
               </div>
-              <div className="text-sm font-medium text-foreground font-serif">
+              <div className="text-sm font-medium text-foreground font-serif pt-1">
                 {editEntityDisplay}
               </div>
             </div>
@@ -287,9 +288,9 @@ export function ReviewConnectionModal({
                         : 'border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground'
                     }`}
                   >
-                    <Briefcase className="w-4 h-4" />
+                    <Briefcase className="w-3.5 h-3.5" />
                     <span>Project</span>
-                    <span className="text-[10px] font-mono text-muted-foreground">
+                    <span className="text-[10px] font-mono opacity-80">
                       ({filteredProjects.length})
                     </span>
                   </button>
@@ -303,9 +304,9 @@ export function ReviewConnectionModal({
                         : 'border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground'
                     }`}
                   >
-                    <Target className="w-4 h-4" />
+                    <Target className="w-3.5 h-3.5" />
                     <span>Opp.</span>
-                    <span className="text-[10px] font-mono text-muted-foreground">
+                    <span className="text-[10px] font-mono opacity-80">
                       ({filteredOpportunities.length})
                     </span>
                   </button>
@@ -319,9 +320,9 @@ export function ReviewConnectionModal({
                         : 'border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground'
                     }`}
                   >
-                    <BookOpen className="w-4 h-4" />
+                    <BookOpen className="w-3.5 h-3.5" />
                     <span>Research</span>
-                    <span className="text-[10px] font-mono text-muted-foreground">
+                    <span className="text-[10px] font-mono opacity-80">
                       ({filteredResearch.length})
                     </span>
                   </button>
@@ -335,9 +336,9 @@ export function ReviewConnectionModal({
                         : 'border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground'
                     }`}
                   >
-                    <Building2 className="w-4 h-4" />
+                    <Building2 className="w-3.5 h-3.5" />
                     <span>Company</span>
-                    <span className="text-[10px] font-mono text-muted-foreground">
+                    <span className="text-[10px] font-mono opacity-80">
                       ({filteredCompanies.length})
                     </span>
                   </button>
@@ -351,9 +352,9 @@ export function ReviewConnectionModal({
                         : 'border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground'
                     }`}
                   >
-                    <User className="w-4 h-4" />
+                    <User className="w-3.5 h-3.5" />
                     <span>Contact</span>
-                    <span className="text-[10px] font-mono text-muted-foreground">
+                    <span className="text-[10px] font-mono opacity-80">
                       ({filteredContacts.length})
                     </span>
                   </button>
@@ -367,8 +368,8 @@ export function ReviewConnectionModal({
                   <span className="text-destructive">*</span>
                 </label>
                 {isLoadingEntities ? (
-                  <div className="flex items-center justify-center p-4 rounded-lg border border-border bg-secondary/30 text-xs text-muted-foreground gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                  <div className="flex items-center justify-center p-4 rounded-lg border border-border bg-muted/40 text-xs text-muted-foreground gap-2">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
                     <span>Loading workspace entities...</span>
                   </div>
                 ) : (
@@ -376,7 +377,7 @@ export function ReviewConnectionModal({
                     value={selectedEntityId}
                     onChange={(e) => setSelectedEntityId(e.target.value)}
                     required
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-border bg-background text-foreground focus:ring-1 focus:ring-primary focus:outline-none"
                   >
                     <option value="">-- Choose a {category} --</option>
                     {category === 'project' &&
@@ -416,27 +417,27 @@ export function ReviewConnectionModal({
                 {!isLoadingEntities && (
                   <>
                     {category === 'project' && filteredProjects.length === 0 && (
-                      <p className="text-[11px] text-amber-500 font-mono">
+                      <p className="text-[11px] text-muted-foreground italic font-mono pt-1">
                         No unconnected projects available in this workspace.
                       </p>
                     )}
                     {category === 'opportunity' && filteredOpportunities.length === 0 && (
-                      <p className="text-[11px] text-amber-500 font-mono">
+                      <p className="text-[11px] text-muted-foreground italic font-mono pt-1">
                         No unconnected opportunities available in this workspace.
                       </p>
                     )}
                     {category === 'research' && filteredResearch.length === 0 && (
-                      <p className="text-[11px] text-amber-500 font-mono">
+                      <p className="text-[11px] text-muted-foreground italic font-mono pt-1">
                         No unconnected research records available in this workspace.
                       </p>
                     )}
                     {category === 'company' && filteredCompanies.length === 0 && (
-                      <p className="text-[11px] text-amber-500 font-mono">
+                      <p className="text-[11px] text-muted-foreground italic font-mono pt-1">
                         No unconnected companies available in this workspace.
                       </p>
                     )}
                     {category === 'contact' && filteredContacts.length === 0 && (
-                      <p className="text-[11px] text-amber-500 font-mono">
+                      <p className="text-[11px] text-muted-foreground italic font-mono pt-1">
                         No unconnected contacts available in this workspace.
                       </p>
                     )}
@@ -454,7 +455,7 @@ export function ReviewConnectionModal({
             <select
               value={relationshipType}
               onChange={(e) => setRelationshipType(e.target.value as ReviewConnectionRelationshipType)}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full px-3 py-2 text-xs rounded-lg border border-border bg-background text-foreground focus:ring-1 focus:ring-primary focus:outline-none"
             >
               {compatibleRelTypes.map((rt) => (
                 <option key={rt} value={rt}>
@@ -474,24 +475,24 @@ export function ReviewConnectionModal({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Why is this entity connected? What role did it play in this review?"
-              className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground/60 resize-none"
+              className="w-full px-3 py-2 text-xs rounded-lg border border-border bg-background text-foreground focus:ring-1 focus:ring-primary focus:outline-none placeholder:text-muted-foreground/60 resize-none"
             />
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border">
             <button
               type="button"
               onClick={onClose}
               disabled={isPending}
-              className="px-4 py-2 text-xs font-medium rounded-lg border border-border hover:bg-secondary text-foreground transition-colors disabled:opacity-50"
+              className="px-3.5 py-1.5 text-xs rounded-lg border border-border hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isPending || (!isEdit && !selectedEntityId)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50"
             >
               {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               {isEdit ? 'Save Changes' : 'Connect Entity'}

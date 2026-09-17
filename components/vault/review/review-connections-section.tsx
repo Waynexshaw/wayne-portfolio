@@ -37,47 +37,31 @@ const SEMANTIC_GROUPS: {
   key: ReviewConnectionRelationshipType
   label: string
   icon: React.ReactNode
-  color: string
 }[] = [
   {
     key: 'subject',
     label: 'Evaluated Subjects',
-    icon: <Target className="w-3.5 h-3.5" />,
-    color: 'text-amber-600 dark:text-amber-400',
+    icon: <Target className="w-3.5 h-3.5 text-muted-foreground" />,
   },
   {
     key: 'informed_by',
     label: 'Research Inputs',
-    icon: <BookOpen className="w-3.5 h-3.5" />,
-    color: 'text-blue-600 dark:text-blue-400',
+    icon: <BookOpen className="w-3.5 h-3.5 text-muted-foreground" />,
   },
   {
     key: 'stakeholder',
     label: 'Key Stakeholders',
-    icon: <Users className="w-3.5 h-3.5" />,
-    color: 'text-indigo-600 dark:text-indigo-400',
+    icon: <Users className="w-3.5 h-3.5 text-muted-foreground" />,
   },
   {
     key: 'resulted_in',
     label: 'Generated Outcomes',
-    icon: <ArrowRightCircle className="w-3.5 h-3.5" />,
-    color: 'text-emerald-600 dark:text-emerald-400',
+    icon: <ArrowRightCircle className="w-3.5 h-3.5 text-muted-foreground" />,
   },
 ]
 
-function getRelationshipBadge(type: ReviewConnectionRelationshipType) {
-  switch (type) {
-    case 'subject':
-      return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30'
-    case 'informed_by':
-      return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30'
-    case 'stakeholder':
-      return 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30'
-    case 'resulted_in':
-      return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
-    default:
-      return 'bg-secondary text-foreground border-border'
-  }
+function getRelationshipBadge(_type: ReviewConnectionRelationshipType) {
+  return 'bg-muted/60 text-muted-foreground border border-border/60 font-mono text-[10px] uppercase tracking-wider'
 }
 
 function formatRelationshipLabel(type: ReviewConnectionRelationshipType) {
@@ -96,12 +80,12 @@ function formatRelationshipLabel(type: ReviewConnectionRelationshipType) {
 }
 
 function getEntityIcon(conn: ReviewConnectionItem) {
-  if (conn.project_id) return <Briefcase className="w-4 h-4 text-violet-500" />
-  if (conn.opportunity_id) return <Target className="w-4 h-4 text-emerald-500" />
-  if (conn.research_record_id) return <BookOpen className="w-4 h-4 text-blue-500" />
-  if (conn.company_id) return <Building2 className="w-4 h-4 text-indigo-500" />
-  if (conn.contact_id) return <User className="w-4 h-4 text-sky-500" />
-  return <Link2 className="w-4 h-4" />
+  if (conn.project_id) return <Briefcase className="w-4 h-4 text-muted-foreground shrink-0" />
+  if (conn.opportunity_id) return <Target className="w-4 h-4 text-muted-foreground shrink-0" />
+  if (conn.research_record_id) return <BookOpen className="w-4 h-4 text-muted-foreground shrink-0" />
+  if (conn.company_id) return <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
+  if (conn.contact_id) return <User className="w-4 h-4 text-muted-foreground shrink-0" />
+  return <Link2 className="w-4 h-4 text-muted-foreground shrink-0" />
 }
 
 function getEntityDetails(conn: ReviewConnectionItem) {
@@ -110,7 +94,7 @@ function getEntityDetails(conn: ReviewConnectionItem) {
       title: conn.project.title,
       subtitle: `${conn.project.status} • ${conn.project.priority} priority`,
       categoryLabel: 'Project',
-      href: '/vault/projects',
+      href: `/vault/projects/${conn.project_id}`,
     }
   }
   if (conn.opportunity_id && conn.opportunity) {
@@ -194,13 +178,13 @@ export function ReviewConnectionsSection({
       {/* Section Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-border">
         <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-lg bg-primary/10 text-primary">
+          <div className="p-2 rounded-lg bg-muted border border-border text-foreground">
             <Link2 className="w-4 h-4" />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h3 className="font-serif text-lg font-medium text-foreground">
-                Review Context
+                Connected Entities
               </h3>
               <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground border border-border">
                 {connections.length}
@@ -220,7 +204,7 @@ export function ReviewConnectionsSection({
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors shadow-sm"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>Add Context</span>
+            <span>Add Connection</span>
           </button>
         </div>
       </div>
@@ -240,10 +224,10 @@ export function ReviewConnectionsSection({
             <Link2 className="w-5 h-5" />
           </div>
           <h4 className="text-sm font-medium text-foreground mb-1">
-            No review context yet
+            No connected entities yet
           </h4>
           <p className="text-xs text-muted-foreground max-w-sm mb-4">
-            Connect projects, research records, contacts, companies, or opportunities to provide context for this review.
+            Connect projects, research records, contacts, companies, or opportunities to provide operational context for this review.
           </p>
           <button
             type="button"
@@ -251,7 +235,7 @@ export function ReviewConnectionsSection({
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors shadow-sm"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>Add First Context</span>
+            <span>Add Connection</span>
           </button>
         </div>
       ) : (
@@ -260,11 +244,11 @@ export function ReviewConnectionsSection({
             <div key={group.key} className="space-y-2.5">
               {/* Group Header */}
               <div className="flex items-center gap-2 px-1">
-                <span className={group.color}>{group.icon}</span>
+                <span>{group.icon}</span>
                 <h4 className="text-xs font-mono text-muted-foreground uppercase tracking-wider">
                   {group.label}
                 </h4>
-                <span className="text-[10px] font-mono text-muted-foreground bg-secondary/50 px-1.5 py-0.5 rounded-md border border-border">
+                <span className="text-[10px] font-mono text-muted-foreground bg-secondary/50 px-1.5 py-0.5 rounded-md border border-border/60">
                   {group.items.length}
                 </span>
               </div>
@@ -290,7 +274,7 @@ export function ReviewConnectionsSection({
                             <div className="min-w-0">
                               <Link
                                 href={details.href}
-                                className="group inline-flex items-center gap-1 text-sm font-medium text-foreground hover:text-primary transition-colors truncate"
+                                className="group inline-flex items-center gap-1 text-sm font-medium text-foreground hover:text-foreground/80 transition-colors truncate"
                               >
                                 <span className="truncate">{details.title}</span>
                                 <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />

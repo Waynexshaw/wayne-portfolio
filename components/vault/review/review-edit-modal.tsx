@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { X, Loader2, Edit3, Calendar } from 'lucide-react'
+import { X, Loader2, Edit3 } from 'lucide-react'
 import { updateReview, ReviewItem, ReviewType, ReviewStatus } from '@/lib/vault/actions'
 
 interface ReviewEditModalProps {
@@ -93,240 +93,269 @@ export function ReviewEditModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
-      <div className="w-full max-w-2xl bg-card border border-border rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in-0">
+      <div className="w-full max-w-2xl bg-card border border-border rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-border bg-card/60 shrink-0">
+        <div className="flex items-center justify-between p-5 border-b border-border bg-card shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+            <div className="w-8 h-8 rounded-lg bg-muted border border-border flex items-center justify-center text-foreground">
               <Edit3 className="w-4 h-4" />
             </div>
             <div>
               <h2 className="font-serif text-base font-medium text-foreground">
-                Edit Operational Review
+                Edit Review
               </h2>
               <p className="text-xs text-muted-foreground">
-                Update retrospective details, diagnosis, and action items
+                Update review definition, outcomes, diagnosis, and synthesis
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
+            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Scrollable Form Body */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-5 overflow-y-auto flex-1">
+        <form onSubmit={handleSubmit} className="p-5 space-y-6 overflow-y-auto flex-1">
           {error && (
-            <div className="p-3 rounded-lg border border-destructive/30 bg-destructive/10 text-destructive text-xs">
+            <div className="p-3 rounded-lg border border-destructive/30 bg-destructive/10 text-destructive text-xs font-mono">
               {error}
             </div>
           )}
 
-          {/* Title */}
-          <div>
-            <label className="block text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1.5">
-              Review Title <span className="text-destructive">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none"
-            />
-          </div>
-
-          {/* Type and Status */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1.5">
-                Category
-              </label>
-              <select
-                value={reviewType}
-                onChange={(e) => setReviewType(e.target.value as ReviewType)}
-                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none"
-              >
-                {REVIEW_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
+          {/* GROUP 1: REVIEW DEFINITION */}
+          <div className="space-y-3.5">
+            <div className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground font-semibold border-b border-border/60 pb-1.5">
+              1. Review Definition
             </div>
 
+            {/* Title */}
             <div>
-              <label className="block text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1.5">
-                Status
-              </label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as ReviewStatus)}
-                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none"
-              >
-                {STATUSES.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Period Range */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1.5">
-                Period Start
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                Review Title <span className="text-destructive">*</span>
               </label>
               <input
-                type="date"
-                value={periodStart}
-                onChange={(e) => setPeriodStart(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none"
+                type="text"
+                required
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g., Q3 Growth Initiative Retrospective"
+                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:ring-1 focus:ring-primary focus:outline-none text-foreground placeholder:text-muted-foreground/60"
               />
             </div>
+
+            {/* Type and Status */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                  Review Type
+                </label>
+                <select
+                  value={reviewType}
+                  onChange={(e) => setReviewType(e.target.value as ReviewType)}
+                  className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:ring-1 focus:ring-primary focus:outline-none text-foreground"
+                >
+                  {REVIEW_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                  Status
+                </label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as ReviewStatus)}
+                  className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:ring-1 focus:ring-primary focus:outline-none text-foreground"
+                >
+                  {STATUSES.map((s) => (
+                    <option key={s.value} value={s.value}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Period Range */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                  Period Start
+                </label>
+                <input
+                  type="date"
+                  value={periodStart}
+                  onChange={(e) => setPeriodStart(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:ring-1 focus:ring-primary focus:outline-none text-foreground"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                  Period End
+                </label>
+                <input
+                  type="date"
+                  value={periodEnd}
+                  onChange={(e) => setPeriodEnd(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:ring-1 focus:ring-primary focus:outline-none text-foreground"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* GROUP 2: INTENT & REALITY */}
+          <div className="space-y-3.5 pt-2">
+            <div className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground font-semibold border-b border-border/60 pb-1.5">
+              2. Intent & Reality
+            </div>
+
+            {/* Objective */}
             <div>
-              <label className="block text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1.5">
-                Period End
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                Original Objective
               </label>
-              <input
-                type="date"
-                value={periodEnd}
-                onChange={(e) => setPeriodEnd(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none"
+              <textarea
+                rows={2}
+                value={objective}
+                onChange={(e) => setObjective(e.target.value)}
+                placeholder="What did we set out to accomplish?"
+                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:ring-1 focus:ring-primary focus:outline-none resize-none text-foreground placeholder:text-muted-foreground/60"
               />
+            </div>
+
+            {/* Expected vs Actual Outcome */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                  Expected Outcome
+                </label>
+                <textarea
+                  rows={3}
+                  value={expectedOutcome}
+                  onChange={(e) => setExpectedOutcome(e.target.value)}
+                  placeholder="What was expected to happen?"
+                  className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:ring-1 focus:ring-primary focus:outline-none resize-none text-foreground placeholder:text-muted-foreground/60"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                  Actual Outcome
+                </label>
+                <textarea
+                  rows={3}
+                  value={actualOutcome}
+                  onChange={(e) => setActualOutcome(e.target.value)}
+                  placeholder="What actually materialized?"
+                  className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:ring-1 focus:ring-primary focus:outline-none resize-none text-foreground placeholder:text-muted-foreground/60"
+                />
+              </div>
             </div>
           </div>
 
-          {/* Objective */}
-          <div>
-            <label className="block text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1.5">
-              Original Objective
-            </label>
-            <textarea
-              rows={2}
-              value={objective}
-              onChange={(e) => setObjective(e.target.value)}
-              placeholder="What did we set out to do?"
-              className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none resize-none"
-            />
-          </div>
+          {/* GROUP 3: ANALYSIS */}
+          <div className="space-y-3.5 pt-2">
+            <div className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground font-semibold border-b border-border/60 pb-1.5">
+              3. Analysis
+            </div>
 
-          {/* Expected vs Actual Outcome */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* What Worked vs What Didn't Work */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                  What Worked
+                </label>
+                <textarea
+                  rows={3}
+                  value={whatWorked}
+                  onChange={(e) => setWhatWorked(e.target.value)}
+                  placeholder="Positive levers, strong execution points"
+                  className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:ring-1 focus:ring-primary focus:outline-none resize-none text-foreground placeholder:text-muted-foreground/60"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                  What Didn&apos;t Work
+                </label>
+                <textarea
+                  rows={3}
+                  value={whatDidNotWork}
+                  onChange={(e) => setWhatDidNotWork(e.target.value)}
+                  placeholder="Friction points, blockers, underperformance"
+                  className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:ring-1 focus:ring-primary focus:outline-none resize-none text-foreground placeholder:text-muted-foreground/60"
+                />
+              </div>
+            </div>
+
+            {/* Why */}
             <div>
-              <label className="block text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1.5">
-                Expected Outcome
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                Why
               </label>
               <textarea
                 rows={3}
-                value={expectedOutcome}
-                onChange={(e) => setExpectedOutcome(e.target.value)}
-                placeholder="What was supposed to happen?"
-                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none resize-none"
+                value={why}
+                onChange={(e) => setWhy(e.target.value)}
+                placeholder="Why did things turn out this way? Causal factors and context"
+                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:ring-1 focus:ring-primary focus:outline-none resize-none text-foreground placeholder:text-muted-foreground/60"
               />
             </div>
+          </div>
+
+          {/* GROUP 4: SYNTHESIS */}
+          <div className="space-y-3.5 pt-2">
+            <div className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground font-semibold border-b border-border/60 pb-1.5">
+              4. Synthesis
+            </div>
+
+            {/* Lessons */}
             <div>
-              <label className="block text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1.5">
-                Actual Outcome
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                Key Lessons
               </label>
               <textarea
                 rows={3}
-                value={actualOutcome}
-                onChange={(e) => setActualOutcome(e.target.value)}
-                placeholder="What actually materialized?"
-                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none resize-none"
+                value={lessons}
+                onChange={(e) => setLessons(e.target.value)}
+                placeholder="What was learned from this review? Key lessons and insights"
+                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:ring-1 focus:ring-primary focus:outline-none resize-none text-foreground placeholder:text-muted-foreground/60"
               />
             </div>
-          </div>
 
-          {/* What Worked vs What Didn't Work */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Next Changes */}
             <div>
-              <label className="block text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1.5">
-                What Worked
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                Next Changes
               </label>
               <textarea
                 rows={3}
-                value={whatWorked}
-                onChange={(e) => setWhatWorked(e.target.value)}
-                placeholder="Positive levers, strong execution points"
-                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none resize-none"
+                value={nextChanges}
+                onChange={(e) => setNextChanges(e.target.value)}
+                placeholder="What will be changed going forward? Adjustments to systems, processes, or priorities"
+                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:ring-1 focus:ring-primary focus:outline-none resize-none text-foreground placeholder:text-muted-foreground/60"
               />
             </div>
+
+            {/* Summary */}
             <div>
-              <label className="block text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1.5">
-                What Did Not Work
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                Summary
               </label>
               <textarea
                 rows={3}
-                value={whatDidNotWork}
-                onChange={(e) => setWhatDidNotWork(e.target.value)}
-                placeholder="Friction points, blockers, misses"
-                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none resize-none"
+                value={summary}
+                onChange={(e) => setSummary(e.target.value)}
+                placeholder="High-level retrospective summary"
+                className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:ring-1 focus:ring-primary focus:outline-none resize-none text-foreground placeholder:text-muted-foreground/60"
               />
             </div>
-          </div>
-
-          {/* Why (Diagnosis) */}
-          <div>
-            <label className="block text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1.5">
-              Root Cause Diagnosis (Why?)
-            </label>
-            <textarea
-              rows={3}
-              value={why}
-              onChange={(e) => setWhy(e.target.value)}
-              placeholder="Why did things turn out this way? Underlying factors and mechanisms"
-              className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none resize-none"
-            />
-          </div>
-
-          {/* Lessons Learned */}
-          <div>
-            <label className="block text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1.5">
-              Lessons Learned
-            </label>
-            <textarea
-              rows={3}
-              value={lessons}
-              onChange={(e) => setLessons(e.target.value)}
-              placeholder="Generalized principles, cognitive takeaways, team knowledge"
-              className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none resize-none"
-            />
-          </div>
-
-          {/* Next Changes */}
-          <div>
-            <label className="block text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1.5">
-              Next Changes
-            </label>
-            <textarea
-              rows={3}
-              value={nextChanges}
-              onChange={(e) => setNextChanges(e.target.value)}
-              placeholder="Concrete adjustments to systems, cadences, processes, or priorities"
-              className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none resize-none"
-            />
-          </div>
-
-          {/* Executive Summary */}
-          <div>
-            <label className="block text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1.5">
-              Executive Summary
-            </label>
-            <textarea
-              rows={3}
-              value={summary}
-              onChange={(e) => setSummary(e.target.value)}
-              placeholder="High-level synopsis of the retrospective"
-              className="w-full px-3 py-2 text-xs rounded-lg bg-background border border-border focus:border-primary focus:outline-none resize-none"
-            />
           </div>
 
           {/* Footer */}
@@ -335,7 +364,7 @@ export function ReviewEditModal({
               type="button"
               onClick={onClose}
               disabled={isPending}
-              className="px-3.5 py-1.5 text-xs rounded-lg border border-border hover:bg-secondary/80 text-muted-foreground hover:text-foreground transition-colors"
+              className="px-3.5 py-1.5 text-xs rounded-lg border border-border hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
             >
               Cancel
             </button>

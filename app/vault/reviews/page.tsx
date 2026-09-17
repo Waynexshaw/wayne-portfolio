@@ -50,18 +50,11 @@ export default async function VaultReviewsPage({
       {/* Header & Main Action */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-border">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="font-serif text-2xl font-medium text-foreground">
-              Operational Reviews
-            </h1>
-            {!loadError && (
-              <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
-                {records.length} {hasActiveFilters ? 'Found' : 'Total'}
-              </span>
-            )}
-          </div>
+          <h1 className="font-serif text-2xl font-medium text-foreground tracking-tight">
+            Reviews
+          </h1>
           <p className="text-xs text-muted-foreground mt-1">
-            Structured retrospectives, root-cause diagnosis, and actionable learning loops for {activeWorkspace?.name || 'this workspace'}.
+            Retrospectives, post-mortems, and iterative learning loops for {activeWorkspace?.name || 'this workspace'}.
           </p>
         </div>
 
