@@ -27,6 +27,7 @@ import {
   ChevronDown,
   Sparkles,
   ClipboardList,
+  Award,
 } from 'lucide-react'
 import {
   WorkspaceProjectDetail,
@@ -51,6 +52,7 @@ interface ProjectDetailViewProps {
   relatedReviews: RelatedReviewItem[]
   workbenchStats?: WorkbenchStats
   operationsStats?: { activeTasks: number; upcomingMeetings: number; decisionsCount: number }
+  evidenceCounts?: { approved: number; draft: number; total: number }
   workspaceId: string
   workspaceName?: string
   identities?: { id: string; name: string; handle?: string | null }[]
@@ -128,6 +130,7 @@ export function ProjectDetailView({
   relatedReviews,
   workbenchStats,
   operationsStats,
+  evidenceCounts,
   workspaceId,
   workspaceName,
   identities = [],
@@ -620,7 +623,83 @@ export function ProjectDetailView({
         </div>
       </div>
 
-      {/* 6. Performance: Project Metrics */}
+      {/* 6. Evidence & Professional Claims */}
+      <div className="p-5 rounded-2xl bg-card border border-border space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/80">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+              <Award className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="font-serif text-lg font-medium text-foreground">
+                  Evidence & Professional Claims
+                </h2>
+                <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                  {evidenceCounts?.total ?? 0} Recorded
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Professional achievements, contributions, and portfolio-ready claims for this project
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {!isArchived && (
+              <Link
+                href={`/vault/evidence?projectId=${project.id}`}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition-colors shadow-sm"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Claim</span>
+              </Link>
+            )}
+            <Link
+              href={`/vault/evidence?projectId=${project.id}`}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground border border-border text-xs font-medium transition-colors shadow-sm self-start sm:self-auto shrink-0"
+            >
+              <span>View Claims</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        </div>
+
+        {/* Evidence Stats Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Link
+            href={`/vault/evidence?status=approved&projectId=${project.id}`}
+            className="p-3 rounded-xl bg-secondary/40 border border-border/70 hover:border-emerald-500/40 transition-colors group"
+          >
+            <div className="text-[11px] font-mono text-emerald-500">APPROVED CLAIMS</div>
+            <div className="text-lg font-semibold text-foreground mt-0.5 group-hover:text-emerald-500 transition-colors">
+              {evidenceCounts?.approved ?? 0}
+            </div>
+          </Link>
+
+          <Link
+            href={`/vault/evidence?status=draft&projectId=${project.id}`}
+            className="p-3 rounded-xl bg-secondary/40 border border-border/70 hover:border-amber-500/40 transition-colors group"
+          >
+            <div className="text-[11px] font-mono text-amber-500">DRAFT CLAIMS</div>
+            <div className="text-lg font-semibold text-foreground mt-0.5 group-hover:text-amber-500 transition-colors">
+              {evidenceCounts?.draft ?? 0}
+            </div>
+          </Link>
+
+          <Link
+            href={`/vault/evidence?projectId=${project.id}`}
+            className="p-3 rounded-xl bg-secondary/40 border border-border/70 hover:border-primary/40 transition-colors group"
+          >
+            <div className="text-[11px] font-mono text-muted-foreground">TOTAL CLAIMS</div>
+            <div className="text-lg font-semibold text-foreground mt-0.5 group-hover:text-primary transition-colors">
+              {evidenceCounts?.total ?? 0}
+            </div>
+          </Link>
+        </div>
+      </div>
+
+      {/* 7. Performance: Project Metrics */}
       <div className="space-y-4">
         <div className="flex items-center justify-between pb-2 border-b border-border">
           <div className="flex items-center gap-2">

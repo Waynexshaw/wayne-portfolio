@@ -29,6 +29,7 @@
 | **Companies** | Phase 1 + Refinement V1 | `48630cb` | Released / Complete |
 | **Opportunities** | Phase 1 + Refinement V1 | `48630cb` | Released / Complete |
 | **Operating Records** | V1 Consolidated Batch (Tasks, Meetings, Decisions) | Migration 014 | Released / Complete |
+| **Evidence & Portfolio Bridge** | V1 Consolidated Batch (Evidence, Sources, Snapshot Bridges) | Migration 015 | Released / Complete |
 | **Command Center** | Phase 1 Attention & Summary + Operations Integration | `app/vault/page.tsx` | Functioning |
 
 ---
@@ -79,7 +80,25 @@
 
 ---
 
-## 6. Planned / Immediate Security Work
+## 6. Released Batch: Evidence & Portfolio Bridge V1
+
+* **Status:** `RELEASED / COMPLETE`
+* **Implementation Highlights:**
+  1. **Workspace Evidence:** Publication-ready professional claim formulation (`contribution`, `result`, `deliverable`, `decision`) with dual-state approval workflow (`draft` | `approved`) and database timestamp consistency checks.
+  2. **Supporting Provenance Sources:** Normalized polymorphic junction linking claims to Reviews, Metric Observations, Decisions, Workbench Documents, or Workbench Files. Enforces strict single-target check constraint and workspace tenant isolation.
+  3. **Decoupled Snapshot Bridges:** Point-in-time snapshot bridges to public projects or case studies. Zero mutations to public CMS narrative fields, drift detection (`Live Claim Changed`), and explicit refresh controls.
+  4. **Archive Single Source of Truth:** Pure `archived_at TIMESTAMPTZ` lifecycle across all evidence tables. Zero `is_archived` columns.
+  5. **Security & Strict Privacy:** Zero anonymous/public SELECT access. Member-only read/write access. No leakage of private signed URLs or file paths.
+  6. **UI & Integrations:**
+     - Evidence Hub: `/vault/evidence` with status tabs, project filtering, search, and key metrics strip.
+     - Detail View: `/vault/evidence/[id]` structured with Claim formulation, Supporting sources, Portfolio bridges with drift indicators, Internal notes, and Audit metadata.
+     - Sidebar: Single `Evidence` entry (`Award` icon).
+     - Project Detail: Compact Evidence & Professional Claims Summary Card with Approved/Draft counts and deep links.
+* **Database Migration:** Migration `015_wv_evidence_portfolio_bridge.sql` deployed and verified (3 tables, composite FKs, immutability triggers, RLS policies, 30 constraints, performance indexes). Zero unreleased migration 016.
+
+---
+
+## 7. Planned / Immediate Security Work
 
 * **Vault Owner Access Lock:**
   * **Status:** `DEFERRED — FINAL SECURITY HARDENING`
@@ -88,7 +107,7 @@
 
 ---
 
-## 7. Planned / Deferred Roadmap
+## 8. Planned / Deferred Roadmap
 
 * **Spreadsheet Formulas (V1.1+):**
   * Expression parsing and formula computation engine (e.g. SUM, AVERAGE, basic arithmetic).
@@ -96,9 +115,13 @@
   * Decision lineage and superseding chains
   * Recurring meeting series templates
   * Sub-task hierarchies or task checklists
-* **Public Portfolio Integration:**
-  * Selective evidence bridge (publishing approved internal case studies to public portfolio)
+* **Evidence & Portfolio Bridge V1.1+ Roadmap (Deferred):**
+  * Research provenance integration
+  * Experience bridge
+  * Automatic CMS synchronization
+  * Automatic Evidence generation
+  * Private-file-to-public-media promotion
 * **Intelligence (Strictly Deferred):**
   * AI-assisted research & synthesis
   * Automated drafting (always with human in the loop)
-  * Smart calendar integrations
+  * Automation & smart calendar integrations

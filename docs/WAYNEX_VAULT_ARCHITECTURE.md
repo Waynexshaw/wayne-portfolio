@@ -315,3 +315,62 @@ Operating Records V1 provides an integrated execution layer for Waynex Vault, br
 * **Command Center Integration (`/vault`)**:
   * Overdue tasks and tasks due today are surfaced in the primary attention queue with crimson (`#DC143C`) and amber warnings.
   * Upcoming meetings within the next 7 days are surfaced in the attention grid with direct deep links to `/vault/operations/meetings/[id]`.
+
+---
+
+## 15. Evidence & Portfolio Bridge V1 Architecture
+
+### Purpose & Operating Concept
+Evidence & Portfolio Bridge V1 introduces a structured provenance and portfolio bridge layer for Waynex Vault:
+1. **Workspace Evidence (`workspace_evidence`):** Curated, publication-ready professional achievement claims, measurable results, deliverable summaries, and strategic decision highlights. Evidence items support a dual-state approval workflow (`draft` | `approved`) requiring deliberate review before public presentation.
+2. **Provenance Sources (`workspace_evidence_sources`):** A normalized junction layer linking an evidence claim to its supporting workspace sources within Waynex Vault:
+   - Sprint / Quarterly / Strategy Reviews (`reviews`)
+   - Performance Metric Observations (`workspace_metric_observations`)
+   - Historical Architecture Decisions (`decisions`)
+   - Workbench Documents (`project_documents`)
+   - Workbench Private Files (`project_files`)
+   Every source connection enforces strict workspace isolation and an exact-one-target database CHECK constraint.
+3. **Portfolio Evidence Bridges (`portfolio_evidence_bridges`):** A decoupled snapshot publication bridge connecting approved Vault evidence claims to public portfolio entities (`projects` or `case_studies`).
+
+### Schema Architecture & Integrity (Migration 015)
+* **`public.workspace_evidence`**:
+  * Scoped strictly to `(workspace_id)` with composite unique constraint `uq_workspace_evidence_id_workspace UNIQUE (id, workspace_id)`.
+  * Composite foreign key `(project_id, workspace_id)` referencing `public.workspace_projects(id, workspace_id) ON DELETE SET NULL`.
+  * Dual-state approval workflow: `approval_status TEXT NOT NULL DEFAULT 'draft' CHECK (approval_status IN ('draft', 'approved'))`.
+  * Timestamp consistency constraint `chk_evidence_approval_timestamp`: enforces that if `approval_status = 'approved'`, `approved_at` must NOT be NULL.
+  * Immutability trigger `trg_prevent_evidence_tampering` prevents modifying `workspace_id`.
+  * Single source of truth archive state: `archived_at IS NULL` = active, `archived_at IS NOT NULL` = archived. Zero `is_archived` columns.
+* **`public.workspace_evidence_sources`**:
+  * Normalized polymorphic junction table with composite foreign keys to parent evidence and target source entities.
+  * Exactly-one-target constraint `chk_evidence_source_target_exactly_one`: validates that exactly one of `review_id`, `metric_observation_id`, `decision_id`, `document_id`, or `file_id` is non-null.
+  * Unique indexes `(evidence_id, target_id)` prevent redundant attachments of the same source to a claim.
+  * Immutability trigger `trg_prevent_evidence_source_tampering` locks `workspace_id` and `evidence_id`.
+* **`public.portfolio_evidence_bridges`**:
+  * Point-in-time snapshot architecture: captures `snapshot_title`, `snapshot_claim`, `snapshot_summary`, `snapshot_result`, and `snapshotted_at`.
+  * Exactly-one-target constraint `chk_bridge_target_exactly_one`: validates that exactly one of `public_project_id` or `public_case_study_id` is non-null.
+  * Partial unique indexes `uq_bridge_active_project` and `uq_bridge_active_case_study` prevent duplicate active bridges for the same evidence claim and public target.
+  * Soft-detachment lifecycle: setting `detached_at = NOW()` detaches the bridge while permanently preserving audit history and provenance.
+  * Immutability trigger `trg_prevent_portfolio_bridge_tampering` locks `workspace_id` and `evidence_id`.
+* **Row Level Security (RLS)**:
+  * Zero anonymous/public SELECT access on all three tables (`workspace_evidence`, `workspace_evidence_sources`, `portfolio_evidence_bridges`). All tables are strictly private to authenticated workspace members.
+  * `SELECT`, `INSERT`, `UPDATE`: `wv_internal.is_workspace_member(workspace_id)`.
+  * `DELETE`: `wv_internal.is_workspace_admin(workspace_id)` for evidence and bridges; members for junction sources.
+
+### Decoupled Snapshot Bridge Architecture
+* **100% Non-Mutating CMS Contract:** Bridging evidence to public projects or case studies NEVER alters or overwrites narrative columns in `projects` or `case_studies`. The public CMS retains full authorial independence.
+* **Draft & Archive Gate:** Only approved, non-archived evidence can be bridged to the portfolio. If an evidence claim is returned to draft or archived, the bridge reflects an `unapproved` or `archived` sync status.
+* **Drift Detection & Explicit Refresh:** When an approved evidence claim is modified in Vault, the bridge detects that the live claim differs from the snapshot and flags the bridge as `Live Claim Changed`. The user can review the change and trigger an explicit `Refresh Snapshot` action.
+* **Private Vault File Isolation:** Private file storage paths and short-lived signed URLs from `vault_files` are never persisted into public bridge snapshots.
+
+### UI & Workspace Integrations
+* **Evidence Directory (`/vault/evidence`)**:
+  * Filterable view with tabs (`Active Claims`, `Approved`, `Draft`, `Archived`), project dropdown, evidence type filter, and search.
+  * Key performance metrics strip: Total Claims, Approved, In Draft, Bridged, and Archived.
+  * Claim cards displaying publication claim formulation, impact metrics, supporting source counts, and portfolio bridge counts.
+* **Evidence Detail Page (`/vault/evidence/[id]`)**:
+  * Ordered hierarchy: Professional Claim Formulation, Supporting Sources & Provenance, Portfolio Usage & Snapshot Bridges, Internal Vault Notes (private), and Metadata & Audit Trail.
+  * Actions for approval toggle, editing claim, attaching/removing sources, creating/refreshing/detaching portfolio bridges.
+* **Sidebar Navigation**:
+  * Exactly ONE primary sidebar entry: `Evidence` (`/vault/evidence`, icon `Award`).
+* **Project Detail Integration (`/vault/projects/[id]`)**:
+  * Compact Evidence & Professional Claims Summary Card displaying Approved Claims, Draft Claims, and Total Claims with quick action buttons to Add Claim and View Claims (`/vault/evidence?projectId=[id]`).

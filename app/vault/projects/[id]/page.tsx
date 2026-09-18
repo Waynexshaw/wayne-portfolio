@@ -8,6 +8,7 @@ import {
 } from '@/lib/vault/actions'
 import { getProjectWorkbenchStats } from '@/lib/vault/workbench-actions'
 import { getProjectOperationsCountsAction } from '@/lib/vault/operations-actions'
+import { getProjectEvidenceCountsAction } from '@/lib/vault/evidence-actions'
 import { ProjectDetailView } from '@/components/vault/project/project-detail-view'
 
 export const dynamic = 'force-dynamic'
@@ -32,7 +33,7 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
   }
 
   // 2. Fetch related data in parallel (only after project ownership is established)
-  const [metrics, relatedResearch, relatedReviews, workbenchStats, operationsStats] = await Promise.all([
+  const [metrics, relatedResearch, relatedReviews, workbenchStats, operationsStats, evidenceCounts] = await Promise.all([
     getWorkspaceMetrics(activeWorkspace.id, { projectId: id, status: 'all' }),
     getRelatedResearchForEntity('project', id, activeWorkspace.id),
     getRelatedReviewsForEntity(activeWorkspace.id, 'project', id),
@@ -41,6 +42,11 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
       activeTasks: 0,
       upcomingMeetings: 0,
       decisionsCount: 0,
+    })),
+    getProjectEvidenceCountsAction(activeWorkspace.id, id).catch(() => ({
+      approved: 0,
+      draft: 0,
+      total: 0,
     })),
   ])
 
@@ -52,6 +58,7 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
       relatedReviews={relatedReviews}
       workbenchStats={workbenchStats}
       operationsStats={operationsStats}
+      evidenceCounts={evidenceCounts}
       workspaceId={activeWorkspace.id}
       workspaceName={activeWorkspace.name}
       identities={context?.identities || []}
