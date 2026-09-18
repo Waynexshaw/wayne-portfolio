@@ -19,7 +19,7 @@
 | **Brand System V1** | Full Visual Standardization | `941cfe6` | Complete |
 | **Mobile Navigation** | Responsive Drawers & Header | `6623c58` | Complete |
 | **Projects** | Phase 1 Workspace Projects | `004_wv_workspace_projects` | Complete |
-| **Project Workbench** | V1 Consolidated Batch (Folders, Docs, Sheets, Files) | Migration 013 | Released / Complete |
+| **Project Workbench** | V1 Consolidated Batch + Spreadsheet V1.1 | Migration 013 | Released / Complete |
 | **Metrics** | Phase 1 + Refinement V1 | `8976424` | Complete |
 | **Research** | Phase 1 + Evidence + Refinement V1 | `efb0620` | Complete |
 | **Reviews** | Phase 1 + Connections + Refinement V1 | `c9717c9` | Complete |
@@ -53,11 +53,21 @@
 * **Implementation Highlights:**
   1. **Folders:** Hierarchical organizational navigation containers with cycle-prevention trigger and unique name constraints.
   2. **Documents:** Native TipTap rich-text editor with AST JSON, word count, plain-text search extraction, and 1.5s debounced autosave.
-  3. **Spreadsheets:** Native 2D grid editor (A..Z / 1..50), cell navigation, column resizing, and RFC 4180 CSV import/export. Formula evaluation strictly deferred to V1.1+ (formulas stored as literal strings).
+  3. **Spreadsheets (Upgraded to V1.1):**
+     - Native 2D grid tabular modeling upgraded to `version: 2` document structure with full backward compatibility for `version: 1` sheets (`normalizeSpreadsheetData`).
+     - Clamped dimensions: Default 50 rows × 20 cols, Maximum 200 rows × 26 cols (A..Z), Minimum 1 row × 1 col.
+     - Multi-cell range selection: drag selection, Shift+click, Shift+arrow keys, entire column click, entire row click, select all (`#`).
+     - Cell Merging with Strict Data-Safety Rule: Anchor cell holds value (`colSpan`/`rowSpan`); covered non-anchor cells skipped in DOM rendering. If ANY non-anchor cell in selected range contains data, merge is strictly rejected with `"Some selected cells contain data. Clear them before merging."`
+     - Row & Column Manipulation: Insert Above/Below/Left/Right, Delete, Move Up/Down/Left/Right with merge-integrity checks (prevents splitting multi-row/col merges).
+     - Persistent Resizing: Interactive column width and row height drag-resizing with double-click reset to defaults (100px width, 28px height).
+     - Standard Clipboard: Native TSV copy/cut/paste across single/multi-cell selections. Commas within strings (e.g. `"Hello, Wayne"`) are preserved within a single cell and never split into separate columns. Covered merged cells export empty strings.
+     - In-Memory Undo/Redo: 50-step client-side stack with Ctrl+Z / Ctrl+Y keyboard shortcuts.
+     - Text Alignment: Cell-level left, center, right formatting with type-aware defaults.
+     - RFC 4180 CSV Interoperability: Export skips covered non-anchor cells; Import requires explicit confirmation before removing existing merged-cell structure, clears merges on confirmed import to prevent data misalignment, and clamps to 200x26.
   4. **Private Files & Storage:** Supabase `vault_files` private bucket with 25MB limits, SVG blocking for XSS safety, admin-only DELETE policy, and 300s signed URLs for downloads/previews.
   5. **Project Integration:** Workbench directory view accessible from Project Detail with aggregate workbench statistics.
-* **Formula Support:** `V1.1+ DEFERRED`
-* **Database Migration:** Migration `013_wv_project_workbench.sql` deployed and verified.
+* **Formula Support:** `DEFERRED — FORMULAS V1.2+` (Formulas starting with `=` remain literal strings. Reference rewriting requirements documented).
+* **Database Migration:** Zero new migrations (Migration 016 strictly absent; upgraded document format stored in existing `project_spreadsheets.data` JSONB column).
 
 ---
 

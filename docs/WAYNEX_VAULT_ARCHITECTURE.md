@@ -231,28 +231,54 @@ Project Workbench V1 transforms Waynex Vault projects from high-level metadata t
   * Plain text extraction indexed in `plain_text` for search.
   * Word count and optimistic versioning.
 * **`public.project_spreadsheets`**: Native 2D grid tabular modeling.
-  * Sparse cell matrix indexed by coordinate (`A1`, `B2`, etc.) in `data` JSONB.
-  * Explicit column metadata tracking custom widths.
-  * Schema versioning for forward compatibility.
-* **`public.project_files`**: Metadata records for binary project assets.
-  * Tracks display name, original file name, mime type, file size (`size_bytes`), storage path, and extension.
-  * SVG files blocked on upload to eliminate stored XSS and active SVG content execution vectors.
-* **Archive State — Single Source of Truth**:
-  * All Workbench tables use `archived_at TIMESTAMPTZ` exclusively (`archived_at IS NULL` = active, `archived_at IS NOT NULL` = archived).
-  * Redundant boolean flags are avoided; archive state cannot contradict itself.
-* **Private Storage Bucket (`vault_files`)**:
-  * 25MB file size limit (`26214400` bytes).
-  * Storage path convention: `workspaces/<workspace_id>/projects/<project_id>/<file_id>/<filename>`.
-  * Row Level Security: `SELECT`, `INSERT`, `UPDATE` require verified workspace membership via `wv_internal.is_workspace_member()`.
-  * Physical `DELETE` requires workspace admin authorization via `wv_internal.is_workspace_admin()`.
-  * Soft-archiving files updates metadata without deleting Storage objects; binary assets remain safely preserved.
-  * Direct client uploads bypass serverless payload limits.
-  * Downloads and in-browser previews authenticated via short-lived signed URLs (300-second expiration).
+  * Stored in `data JSONB`.
+  * **Document Version 2 Format:**
+    * `version: 2`: Document version specifier.
+    * `sheets`: Array of sheets (primary `sheet-1` in V1.1).
+    * `rowCount`: Current row count (minimum 1, default 50, maximum 200).
+    * `columnCount`: Current column count (minimum 1, default 20, maximum 26 / A..Z).
+    * `columnWidths`: Mapping of column letters to widths in pixels (`Record<string, number>`, default 100px).
+    * `rowHeights`: Mapping of row numbers to heights in pixels (`Record<string, number>`, default 28px).
+    * `merges`: Array of merged cell ranges (`CellMergeRange[]`), each defining `id`, `startCol`, `startRow`, `endCol`, `endRow`.
+    * `cells`: Sparse coordinate matrix (`Record<string, SpreadsheetCell>`) holding `raw`, `type` (`number` | `text`), and optional `align` (`left` | `center` | `right`).
+  * **Backward Compatibility Guarantee (`normalizeSpreadsheetData`):**
+    * Existing `version: 1` spreadsheets automatically normalize at runtime to `version: 2`.
+    * Missing `rowHeights` defaults to `{}`.
+    * Missing `merges` defaults to `[]`.
+    * Row count clamped to `1..200`; column count clamped to `1..26`.
+    * Zero data loss or corruption for legacy documents.
+  * **Critical Merge Data-Safety Rule:**
+    * If ANY non-anchor cell in a proposed merge range contains non-empty data, the merge operation is strictly aborted.
+    * Rejection error message: `"Some selected cells contain data. Clear them before merging."`
+    * The anchor cell (top-left) renders with `colSpan` and `rowSpan`. Covered non-anchor cells are omitted from the DOM table to avoid layout shifting.
+  * **Row and Column Structural Operations:**
+    * Rows and columns can be inserted, deleted, and moved.
+    * Moving a row or column that would bisect a multi-row or multi-column merge is strictly prevented with a user warning.
+    * Row and column insertions are blocked when maximum dimensions (200 rows, 26 columns) are reached.
+  * **Standard TSV Clipboard Interoperability:**
+    * Copy/Cut formats tabular selections as Tab-Separated Values (`\t` and `\r\n`).
+    * Covered merged non-anchor cells export empty strings.
+    * Paste parses `\t` and newline boundaries strictly; commas (e.g., in names like `"Wayne, Shaw"` or figures like `"100,000"`) are preserved within a single cell and never split.
+    * Single-cell paste into a multi-cell selection fills the range.
+    * Over-limit paste is clipped safely at 200 rows × 26 columns with an in-app notification banner.
+  * **CSV Interoperability & Merge Confirmation Safety:**
+    * Full RFC 4180 CSV import and export with quote escaping support.
+    * Export: covered non-anchor cells export empty strings.
+    * Import: if current sheet contains merged ranges, CSV import requires explicit user confirmation before proceeding ("This sheet contains merged cells. CSV import cannot preserve merged cell structure. Continuing will remove the existing merges. Import anyway?").
+    * If cancelled: import is aborted; zero cells, dimensions, or merges are modified.
+    * If confirmed: CSV is imported, merges are removed to prevent data misalignment, and dimensions are clamped within 200 rows × 26 columns.
+  * **Client-Side Undo / Redo:**
+    * In-memory 50-step transaction history stack.
+    * Fully accessible via toolbar controls and standard keyboard shortcuts (`Ctrl+Z`, `Ctrl+Y` / `Ctrl+Shift+Z`).
 
-### Formula Policy: Deliberately Deferred to V1.1+
-* **V1 Principle:** Grid stability, safe numeric data handling, TSV/CSV interoperability, and fast persistence take priority over computational complexity.
-* **Storage Semantics:** Any cell string starting with `=` (such as `=SUM(A1:A10)`) is treated strictly as literal text. Zero formula parsing or evaluation engines are loaded in V1.
-* **Interoperability:** Full RFC 4180 CSV import and export with quote escaping support.
+### Formula Policy: Deliberately Deferred to V1.2+
+* **V1.1 Principle:** Interaction feel, range selections, merge safety, row/col resizing, and TSV clipboard take priority over computational complexity.
+* **Storage Semantics:** Any cell string starting with `=` (such as `=SUM(A1:A10)`) is treated strictly as literal text.
+* **Future Formula Engine Requirements (V1.2+):**
+  * Adding rows/columns requires rewriting relative cell coordinates inside formulas (e.g. inserting row 3 shifts `=A4` to `=A5`).
+  * Deleting referenced rows/columns requires formula `#REF!` invalidation.
+  * Circular dependency detection graph.
+  * Tokenizer and calculation DAG.
 
 ### UI, Typography & UX Integration
 * **Workbench Entry:** Project detail views (`/vault/projects/[id]`) display direct access to the Workbench via a dedicated header button and an aggregate Artifacts Overview card alongside Metrics, Research, and Reviews.

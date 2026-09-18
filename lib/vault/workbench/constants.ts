@@ -58,8 +58,15 @@ export const DEFAULT_EMPTY_DOCUMENT = {
   ],
 }
 
+export const SPREADSHEET_MIN_ROWS = 1
+export const SPREADSHEET_MAX_ROWS = 200
+export const SPREADSHEET_MIN_COLS = 1
+export const SPREADSHEET_MAX_COLS = 26
+export const DEFAULT_COL_WIDTH = 100
+export const DEFAULT_ROW_HEIGHT = 28
+
 export const DEFAULT_EMPTY_SPREADSHEET: SpreadsheetData = {
-  version: 1,
+  version: 2,
   activeSheetId: 'sheet-1',
   sheets: [
     {
@@ -68,6 +75,8 @@ export const DEFAULT_EMPTY_SPREADSHEET: SpreadsheetData = {
       rowCount: 50,
       columnCount: 20,
       columnWidths: {},
+      rowHeights: {},
+      merges: [],
       cells: {},
     },
   ],

@@ -1,4 +1,6 @@
 import { SpreadsheetSheet, SpreadsheetCell } from './types'
+import { SPREADSHEET_MAX_ROWS, SPREADSHEET_MAX_COLS } from './constants'
+import { getCoveredCellsSet } from './spreadsheet-transforms'
 
 export function parseCSV(text: string): string[][] {
   const rows: string[][] = []
@@ -89,25 +91,31 @@ export function importCSVToSheet(
   existingSheet?: SpreadsheetSheet
 ): SpreadsheetSheet {
   const rows = parseCSV(csvText)
-  const maxRows = Math.min(Math.max(rows.length, existingSheet?.rowCount || 50), 1000)
-  let maxCols = existingSheet?.columnCount || 20
+  // Clamp rows: minimum 50, maximum SPREADSHEET_MAX_ROWS (200)
+  const maxRows = Math.min(Math.max(rows.length, existingSheet?.rowCount || 50), SPREADSHEET_MAX_ROWS)
+  // Clamp cols: minimum 20, maximum SPREADSHEET_MAX_COLS (26)
+  let maxCols = Math.min(Math.max(existingSheet?.columnCount || 20, 20), SPREADSHEET_MAX_COLS)
 
   for (const row of rows) {
     if (row.length > maxCols) {
-      maxCols = Math.min(row.length, 50)
+      maxCols = Math.min(row.length, SPREADSHEET_MAX_COLS)
     }
   }
 
   const cells: Record<string, SpreadsheetCell> = existingSheet ? { ...existingSheet.cells } : {}
 
-  for (let r = 0; r < rows.length && r < 1000; r++) {
+  for (let r = 0; r < rows.length && r < SPREADSHEET_MAX_ROWS; r++) {
     const row = rows[r]
-    for (let c = 0; c < row.length && c < 50; c++) {
+    for (let c = 0; c < row.length && c < SPREADSHEET_MAX_COLS; c++) {
       const val = row[c].trim()
-      if (val === '') continue
-
       const colLetter = colIndexToLetter(c)
       const coord = colLetter + (r + 1)
+
+      if (val === '') {
+        delete cells[coord]
+        continue
+      }
+
       const isNum = !isNaN(Number(val)) && val !== '' && !/^0[0-9]+/.test(val)
       if (isNum) {
         cells[coord] = {
@@ -129,6 +137,8 @@ export function importCSVToSheet(
     rowCount: maxRows,
     columnCount: maxCols,
     columnWidths: existingSheet?.columnWidths || {},
+    rowHeights: existingSheet?.rowHeights || {},
+    merges: [], // Merges cleared on full CSV import to prevent data misalignment
     cells,
   }
 }
@@ -147,11 +157,19 @@ export function exportSheetToCSV(sheet: SpreadsheetSheet): string {
     }
   }
 
+  const covered = getCoveredCellsSet(sheet.merges || [])
   const lines: string[] = []
+
   for (let r = 0; r <= maxR; r++) {
     const rowValues: string[] = []
     for (let c = 0; c <= maxC; c++) {
       const coord = colIndexToLetter(c) + (r + 1)
+      // Covered non-anchor cells export empty string
+      if (covered.has(coord)) {
+        rowValues.push('')
+        continue
+      }
+
       const cell = sheet.cells[coord]
       const rawVal = cell?.raw !== undefined && cell?.raw !== null ? String(cell.raw) : ''
       if (rawVal.includes('"') || rawVal.includes(',') || rawVal.includes('\n') || rawVal.includes('\r')) {
