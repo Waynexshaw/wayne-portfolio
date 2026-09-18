@@ -46,12 +46,12 @@ export function ContactFollowUps({
       {/* Header */}
       <div className="flex items-center justify-between pb-3 border-b border-border">
         <div className="flex items-center gap-2">
-          <CheckSquare className="w-4 h-4 text-amber-400" />
+          <CheckSquare className="w-4 h-4 text-muted-foreground" />
           <h3 className="font-serif text-lg font-medium text-foreground">
-            Follow-ups & Commitments
+            Follow-ups
           </h3>
           <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
-            {followUps.length} Total
+            {followUps.length}
           </span>
         </div>
 
@@ -59,7 +59,7 @@ export function ContactFollowUps({
           onClick={onOpenCreateFollowUp}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/80 hover:bg-secondary text-secondary-foreground border border-border text-xs font-medium transition-colors"
         >
-          <Plus className="w-3.5 h-3.5 text-amber-400" />
+          <Plus className="w-3.5 h-3.5 text-muted-foreground" />
           Create Follow-up
         </button>
       </div>
@@ -73,7 +73,7 @@ export function ContactFollowUps({
             onClick={onOpenCreateFollowUp}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/80 hover:bg-secondary text-foreground text-xs font-medium border border-border transition-colors mt-2"
           >
-            <Plus className="w-3.5 h-3.5 text-amber-400" />
+            <Plus className="w-3.5 h-3.5 text-muted-foreground" />
             Create Follow-up
           </button>
         </div>

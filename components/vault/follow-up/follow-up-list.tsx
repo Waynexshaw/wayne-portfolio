@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { FollowUpToggleButton } from './follow-up-toggle-button'
 import { FollowUpCreateButton } from './follow-up-create-button'
+import { VaultPriorityBadge } from '@/components/vault/vault-badge'
 
 interface FollowUpListProps {
   followUps: any[]
@@ -124,17 +125,7 @@ export function FollowUpList({
         <div className="space-y-2 min-w-0 flex-1">
           {/* Top meta row: Priority, Date state badge, Contact, Company */}
           <div className="flex items-center gap-2 flex-wrap">
-            <span
-              className={`text-[10px] uppercase font-mono px-2 py-0.5 rounded font-semibold ${
-                item.priority === 'urgent'
-                  ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                  : item.priority === 'high'
-                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                    : 'bg-secondary text-muted-foreground border border-border/60'
-              }`}
-            >
-              {item.priority}
-            </span>
+            <VaultPriorityBadge priority={item.priority} />
 
             {isOverdue && (
               <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold flex items-center gap-1">
@@ -180,7 +171,7 @@ export function FollowUpList({
               href={`/vault/contacts/${item.contact?.id || item.contact_id}`}
               className="flex items-center gap-1.5 text-foreground/90 hover:text-primary transition-colors font-sans text-xs group"
             >
-              <User className="w-3.5 h-3.5 text-primary" />
+              <User className="w-3.5 h-3.5 text-muted-foreground" />
               <span className="font-medium group-hover:underline">
                 {item.contact?.full_name || 'Contact'}
               </span>
@@ -192,14 +183,17 @@ export function FollowUpList({
             </Link>
 
             {item.contact?.company?.name && (
-              <div className="flex items-center gap-1 text-muted-foreground font-sans text-xs">
-                <Building2 className="w-3.5 h-3.5" />
+              <Link
+                href={`/vault/companies/${item.contact.company.id || item.contact.company_id}`}
+                className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors font-sans text-xs"
+              >
+                <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
                 <span>{item.contact.company.name}</span>
-              </div>
+              </Link>
             )}
 
             <div className="flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-amber-400" />
+              <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
               <span className={isOverdue ? 'text-rose-400 font-bold' : isToday ? 'text-amber-400 font-semibold' : ''}>
                 Due: {dueDate.toLocaleString(undefined, {
                   month: 'short',
@@ -220,7 +214,7 @@ export function FollowUpList({
             {/* Originating interaction snippet */}
             {item.interaction && (
               <div className="flex items-center gap-1 text-[11px] text-muted-foreground font-mono">
-                <MessageSquareShare className="w-3 h-3 text-primary" />
+                <MessageSquareShare className="w-3 h-3 text-muted-foreground" />
                 <span>
                   Via {item.interaction.channel?.toUpperCase()} ({new Date(item.interaction.interaction_date).toLocaleDateString()})
                 </span>
@@ -280,7 +274,7 @@ export function FollowUpList({
         <div className="space-y-3">
           <div className="flex items-center justify-between pb-1 border-b border-border">
             <div className="flex items-center gap-2 text-muted-foreground text-xs font-mono uppercase tracking-wider">
-              <Calendar className="w-4 h-4 text-primary" />
+              <Calendar className="w-4 h-4 text-muted-foreground" />
               Upcoming Follow-ups ({upcoming.length})
             </div>
           </div>

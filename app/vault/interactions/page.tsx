@@ -51,16 +51,11 @@ export default async function VaultInteractionsPage({
       {/* Header & Main Action */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-border">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="font-serif text-2xl font-medium text-foreground">
-              Interactions & Touchpoints
-            </h1>
-            <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
-              {interactions.length} {hasActiveFilters ? 'Found' : 'Total'}
-            </span>
-          </div>
+          <h1 className="font-serif text-2xl font-medium text-foreground">
+            Interactions
+          </h1>
           <p className="text-xs text-muted-foreground mt-1">
-            Complete professional conversational memory across 𝕏, Telegram, LinkedIn, email, and meetings.
+            Conversational history, touchpoints, and communication log.
           </p>
         </div>
 

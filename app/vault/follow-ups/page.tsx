@@ -50,16 +50,11 @@ export default async function VaultFollowUpsPage({
       {/* Header & Main Action */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-border">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="font-serif text-2xl font-medium text-foreground">
-              Follow-ups & Commitments
-            </h1>
-            <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
-              {followUps.length} {hasActiveFilters ? 'Found' : 'Total'}
-            </span>
-          </div>
+          <h1 className="font-serif text-2xl font-medium text-foreground">
+            Follow-ups
+          </h1>
           <p className="text-xs text-muted-foreground mt-1">
-            Track and complete scheduled commitments, deliverables, and relationship reminders.
+            Action items, commitments, and relationship reminders.
           </p>
         </div>
 

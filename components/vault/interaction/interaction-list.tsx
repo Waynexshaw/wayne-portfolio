@@ -93,8 +93,8 @@ export function InteractionList({
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center shrink-0 text-primary">
-                      {isOutbound && <ArrowUpRight className="w-4 h-4 text-emerald-400" />}
-                      {isInbound && <ArrowDownLeft className="w-4 h-4 text-electric" />}
+                      {isOutbound && <ArrowUpRight className="w-4 h-4 text-primary" />}
+                      {isInbound && <ArrowDownLeft className="w-4 h-4 text-muted-foreground" />}
                       {!isOutbound && !isInbound && <FileText className="w-4 h-4 text-muted-foreground" />}
                     </div>
 
@@ -109,10 +109,14 @@ export function InteractionList({
                         </Link>
 
                         {interaction.contact?.company?.name && (
-                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Link
+                            href={`/vault/companies/${interaction.contact.company.id || interaction.contact.company_id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                          >
                             <Building2 className="w-3 h-3 text-muted-foreground" />
                             {interaction.contact.company.name}
-                          </span>
+                          </Link>
                         )}
                       </div>
 
@@ -164,7 +168,7 @@ export function InteractionList({
                 {/* Response Callout */}
                 {interaction.response && (
                   <div className="p-2.5 rounded-lg bg-secondary/50 border border-border/80 text-xs text-muted-foreground space-y-0.5">
-                    <span className="text-emerald-400 text-[10px] uppercase font-mono tracking-wider block font-semibold">
+                    <span className="text-muted-foreground text-[10px] uppercase font-mono tracking-wider block font-semibold">
                       Their Response:
                     </span>
                     <p className="line-clamp-2 text-foreground/90">{interaction.response}</p>

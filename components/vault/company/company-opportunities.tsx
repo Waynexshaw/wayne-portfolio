@@ -30,9 +30,9 @@ export function CompanyOpportunities({
       {/* Header */}
       <div className="flex items-center justify-between pb-3 border-b border-border">
         <div className="flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-emerald-400" />
+          <TrendingUp className="w-4 h-4 text-muted-foreground" />
           <h3 className="font-serif text-lg font-medium text-foreground">
-            Opportunities & Mandates
+            Opportunities
           </h3>
           <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
             {opportunities.length}
@@ -41,7 +41,7 @@ export function CompanyOpportunities({
 
         <div className="flex items-center gap-3">
           {totalValue > 0 && (
-            <span className="text-xs font-mono text-emerald-400 font-medium hidden sm:inline">
+            <span className="text-xs font-mono text-foreground font-medium hidden sm:inline">
               ${totalValue.toLocaleString()} Pipeline Value
             </span>
           )}
@@ -49,7 +49,7 @@ export function CompanyOpportunities({
             onClick={onOpenCreateOpportunity}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/80 hover:bg-secondary text-secondary-foreground border border-border text-xs font-medium transition-colors shadow-sm"
           >
-            <Plus className="w-3.5 h-3.5 text-emerald-400" />
+            <Plus className="w-3.5 h-3.5 text-muted-foreground" />
             Create Opportunity
           </button>
         </div>
@@ -106,12 +106,15 @@ export function CompanyOpportunities({
 
                 {/* Connected Contact Lead */}
                 {opp.contact && (
-                  <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                    <Users className="w-3 h-3 text-primary shrink-0" />
+                  <Link
+                    href={`/vault/contacts/${opp.contact.id || opp.contact_id}`}
+                    className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <Users className="w-3 h-3 text-muted-foreground shrink-0" />
                     <span className="truncate">
                       Lead: <strong className="text-foreground">{opp.contact.full_name}</strong>
                     </span>
-                  </div>
+                  </Link>
                 )}
 
                 {/* Next Action Callout */}
@@ -137,7 +140,7 @@ export function CompanyOpportunities({
                     : 'No target close date'}
                 </span>
                 {opp.value_estimate && (
-                  <span className="text-emerald-400 font-semibold">
+                  <span className="text-foreground font-semibold">
                     ${Number(opp.value_estimate).toLocaleString()} {opp.currency || 'USD'}
                   </span>
                 )}

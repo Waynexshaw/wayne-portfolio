@@ -25,7 +25,7 @@ export function ContactTimeline({
       {/* Header */}
       <div className="flex items-center justify-between pb-3 border-b border-border">
         <div className="flex items-center gap-2">
-          <MessageSquareShare className="w-4 h-4 text-primary" />
+          <MessageSquareShare className="w-4 h-4 text-muted-foreground" />
           <h3 className="font-serif text-lg font-medium text-foreground">
             Relationship Timeline
           </h3>
@@ -71,7 +71,7 @@ export function ContactTimeline({
                 {/* Node icon */}
                 <div className="w-6 h-6 rounded-full bg-card border-2 border-primary flex items-center justify-center shrink-0 z-10">
                   {isOutbound && <ArrowUpRight className="w-3 h-3 text-primary" />}
-                  {isInbound && <ArrowDownLeft className="w-3 h-3 text-emerald-400" />}
+                  {isInbound && <ArrowDownLeft className="w-3 h-3 text-muted-foreground" />}
                   {!isOutbound && !isInbound && <FileText className="w-3 h-3 text-muted-foreground" />}
                 </div>
 
@@ -127,7 +127,7 @@ export function ContactTimeline({
                   {/* Response / Outcome Box */}
                   {item.response && (
                     <div className="p-2.5 rounded-lg bg-card border border-border text-xs space-y-1">
-                      <div className="flex items-center gap-1.5 text-emerald-400 text-[10px] font-mono uppercase font-semibold">
+                      <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] font-mono uppercase font-semibold">
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         Outcome / Response
                       </div>

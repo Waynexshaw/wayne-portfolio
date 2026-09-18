@@ -88,7 +88,7 @@ export function CompanyHeader({
           className="flex items-center gap-1 hover:text-foreground transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          Companies Directory
+          Companies
         </Link>
         <span>/</span>
         <span className="text-foreground truncate">{company.name}</span>
@@ -171,7 +171,7 @@ export function CompanyHeader({
                     rel="noreferrer"
                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-secondary/60 hover:bg-secondary text-foreground text-xs font-mono transition-colors border border-border"
                   >
-                    <Globe className="w-3 h-3 text-primary" />
+                    <Globe className="w-3 h-3 text-muted-foreground" />
                     <span>Website</span>
                     <ExternalLink className="w-2.5 h-2.5 opacity-60" />
                   </a>
@@ -218,7 +218,7 @@ export function CompanyHeader({
               onClick={onOpenCreateOpportunity}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary text-foreground text-xs font-medium hover:bg-secondary/80 border border-border transition-colors shadow-sm"
             >
-              <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+              <TrendingUp className="w-3.5 h-3.5 text-muted-foreground" />
               Create Opportunity
             </button>
 
@@ -226,7 +226,7 @@ export function CompanyHeader({
               onClick={onOpenEditRelationship}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/80 text-foreground text-xs font-medium hover:bg-secondary border border-border transition-colors"
             >
-              <Layers className="w-3.5 h-3.5 text-primary" />
+              <Layers className="w-3.5 h-3.5 text-muted-foreground" />
               Edit Relationship
             </button>
 

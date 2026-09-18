@@ -20,6 +20,7 @@ import {
 import { useState } from 'react'
 import { archiveContact } from '@/lib/vault/actions'
 import { useRouter } from 'next/navigation'
+import { VaultPriorityBadge } from '@/components/vault/vault-badge'
 
 interface ContactHeaderProps {
   contact: any
@@ -93,7 +94,7 @@ export function ContactHeader({
           className="flex items-center gap-1 hover:text-foreground transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          Contacts Directory
+          Contacts
         </Link>
         <span>/</span>
         <span className="text-foreground truncate">{contact.full_name}</span>
@@ -129,15 +130,7 @@ export function ContactHeader({
                 )}
 
                 {workspaceRelationship?.priority && (
-                  <span className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded font-medium ${
-                    workspaceRelationship.priority === 'urgent'
-                      ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                      : workspaceRelationship.priority === 'high'
-                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                        : 'bg-secondary text-muted-foreground'
-                  }`}>
-                    {workspaceRelationship.priority} Priority
-                  </span>
+                  <VaultPriorityBadge priority={workspaceRelationship.priority} />
                 )}
               </div>
 
@@ -149,10 +142,13 @@ export function ContactHeader({
 
               <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground pt-1">
                 {contact.company && (
-                  <div className="flex items-center gap-1.5 text-foreground/80 font-medium">
-                    <Building2 className="w-3.5 h-3.5 text-primary" />
+                  <Link
+                    href={`/vault/companies/${contact.company.id || contact.company_id}`}
+                    className="flex items-center gap-1.5 text-foreground/80 font-medium hover:text-primary transition-colors"
+                  >
+                    <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
                     <span>{contact.company.name}</span>
-                  </div>
+                  </Link>
                 )}
 
                 {contact.location && (
@@ -201,9 +197,7 @@ export function ContactHeader({
               </div>
               <div className="w-full bg-secondary rounded-full h-1.5 overflow-hidden mt-1">
                 <div 
-                  className={`h-full rounded-full ${
-                    score >= 7 ? 'bg-emerald-400' : score >= 4 ? 'bg-primary' : 'bg-muted-foreground'
-                  }`}
+                  className="h-full rounded-full bg-primary"
                   style={{ width: `${(score / 10) * 100}%` }}
                 />
               </div>
@@ -212,7 +206,7 @@ export function ContactHeader({
             {/* Operating Identity Context */}
             {operatingIdentity && (
               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/30 border border-border/80 text-xs">
-                <Shield className="w-3.5 h-3.5 text-primary" />
+                <Shield className="w-3.5 h-3.5 text-muted-foreground" />
                 <span className="text-muted-foreground text-[10px] font-mono uppercase">Operating as</span>
                 <span className="font-medium text-foreground">{operatingIdentity.name}</span>
                 {operatingIdentity.handle && (
@@ -239,14 +233,14 @@ export function ContactHeader({
               onClick={onOpenCreateFollowUp}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/80 hover:bg-secondary text-secondary-foreground border border-border font-medium transition-colors"
             >
-              <CheckSquare className="w-3.5 h-3.5 text-amber-400" />
+              <CheckSquare className="w-3.5 h-3.5 text-muted-foreground" />
               Create Follow-up
             </button>
             <button
               onClick={onOpenCreateOpportunity}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/80 hover:bg-secondary text-secondary-foreground border border-border font-medium transition-colors"
             >
-              <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+              <TrendingUp className="w-3.5 h-3.5 text-muted-foreground" />
               Create Opportunity
             </button>
           </div>
@@ -256,7 +250,7 @@ export function ContactHeader({
               onClick={onOpenEditRelationship}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors border border-border/60"
             >
-              <Layers className="w-3.5 h-3.5 text-primary" />
+              <Layers className="w-3.5 h-3.5 text-muted-foreground" />
               Edit Relationship
             </button>
             <button

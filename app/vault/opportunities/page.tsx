@@ -36,22 +36,17 @@ export default async function VaultOpportunitiesPage({
     <div className="space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-border">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="font-serif text-2xl font-medium text-foreground">
-              Mandates & Deal Pipeline
-            </h1>
-            <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
-              {opportunities.length} {hasActiveFilters ? 'Found' : 'Total'}
-            </span>
-          </div>
+          <h1 className="font-serif text-2xl font-medium text-foreground">
+            Opportunities
+          </h1>
           <p className="text-xs text-muted-foreground mt-1">
-            Tracking advisory retainers, growth partnerships, investments, and protocol mandates.
+            Commercial initiatives, partnerships, advisory mandates, and investments.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="px-4 py-2 rounded-xl bg-card border border-border flex items-center gap-3">
-            <DollarSign className="w-5 h-5 text-emerald-400" />
+            <DollarSign className="w-5 h-5 text-muted-foreground" />
             <div>
               <div className="text-[10px] font-mono uppercase text-muted-foreground">Estimated Pipeline Value</div>
               <div className="text-lg font-bold font-serif text-foreground">${totalValue.toLocaleString()}</div>
@@ -118,7 +113,7 @@ export default async function VaultOpportunitiesPage({
                 <h3 className="text-base font-medium text-foreground">{opp.title}</h3>
 
                 {opp.value_estimate && (
-                  <div className="text-xl font-bold font-serif text-emerald-400">
+                  <div className="text-xl font-bold font-serif text-foreground">
                     ${Number(opp.value_estimate).toLocaleString()} <span className="text-xs text-muted-foreground font-sans font-normal">{opp.currency}</span>
                   </div>
                 )}
@@ -126,12 +121,12 @@ export default async function VaultOpportunitiesPage({
                 {/* Probability gauge */}
                 <div>
                   <div className="flex justify-between text-[11px] text-muted-foreground mb-1">
-                    <span>Win Probability</span>
+                    <span>Pipeline Probability</span>
                     <span className="font-mono">{opp.probability}%</span>
                   </div>
                   <div className="w-full bg-secondary rounded-full h-1.5 overflow-hidden">
                     <div 
-                      className="bg-emerald-400 h-full rounded-full"
+                      className="bg-primary h-full rounded-full"
                       style={{ width: `${opp.probability}%` }}
                     />
                   </div>
@@ -146,16 +141,22 @@ export default async function VaultOpportunitiesPage({
 
               <div className="pt-3 border-t border-border space-y-1.5 text-xs text-muted-foreground">
                 {opp.contact && (
-                  <div className="flex items-center gap-1.5">
-                    <User className="w-3.5 h-3.5 text-primary" />
+                  <Link
+                    href={`/vault/contacts/${opp.contact.id || opp.contact_id}`}
+                    className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+                  >
+                    <User className="w-3.5 h-3.5 text-muted-foreground" />
                     <span>{opp.contact.full_name}</span>
-                  </div>
+                  </Link>
                 )}
                 {opp.company && (
-                  <div className="flex items-center gap-1.5">
-                    <Building2 className="w-3.5 h-3.5 text-electric" />
+                  <Link
+                    href={`/vault/companies/${opp.company.id || opp.company_id}`}
+                    className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+                  >
+                    <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
                     <span>{opp.company.name}</span>
-                  </div>
+                  </Link>
                 )}
                 {opp.next_action && (
                   <div className="text-[11px] text-foreground pt-1 flex items-center gap-1">

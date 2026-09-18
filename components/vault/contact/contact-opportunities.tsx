@@ -28,9 +28,9 @@ export function ContactOpportunities({
       {/* Header */}
       <div className="flex items-center justify-between pb-3 border-b border-border">
         <div className="flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-emerald-400" />
+          <TrendingUp className="w-4 h-4 text-muted-foreground" />
           <h3 className="font-serif text-lg font-medium text-foreground">
-            Opportunities & Mandates
+            Opportunities
           </h3>
           <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
             {opportunities.length}
@@ -39,7 +39,7 @@ export function ContactOpportunities({
 
         <div className="flex items-center gap-3">
           {totalValue > 0 && (
-            <span className="text-xs font-mono text-emerald-400 font-medium hidden sm:inline">
+            <span className="text-xs font-mono text-foreground font-medium hidden sm:inline">
               ${totalValue.toLocaleString()} Value
             </span>
           )}
@@ -47,7 +47,7 @@ export function ContactOpportunities({
             onClick={onOpenCreateOpportunity}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/80 hover:bg-secondary text-secondary-foreground border border-border text-xs font-medium transition-colors"
           >
-            <Plus className="w-3.5 h-3.5 text-emerald-400" />
+            <Plus className="w-3.5 h-3.5 text-muted-foreground" />
             Create Opportunity
           </button>
         </div>
@@ -62,7 +62,7 @@ export function ContactOpportunities({
             onClick={onOpenCreateOpportunity}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/80 hover:bg-secondary text-foreground text-xs font-medium border border-border transition-colors mt-2"
           >
-            <Plus className="w-3.5 h-3.5 text-emerald-400" />
+            <Plus className="w-3.5 h-3.5 text-muted-foreground" />
             Create Opportunity
           </button>
         </div>
@@ -121,7 +121,7 @@ export function ContactOpportunities({
                     : 'No close date'}
                 </span>
                 {opp.value_estimate && (
-                  <span className="text-emerald-400 font-semibold">
+                  <span className="text-foreground font-semibold">
                     ${Number(opp.value_estimate).toLocaleString()} {opp.currency || 'USD'}
                   </span>
                 )}

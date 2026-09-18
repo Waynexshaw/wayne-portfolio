@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { 
   Building2, 
   Globe, 
@@ -137,10 +138,10 @@ export function ContactRelationshipCard({
             </div>
 
             <div className="p-3 rounded-lg bg-secondary/20 border border-border/60 flex items-center gap-2.5">
-              <Calendar className="w-4 h-4 text-amber-400 shrink-0" />
+              <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
               <div>
                 <span className="text-[10px] text-muted-foreground uppercase block">Next Follow-up</span>
-                <span className={workspaceRelationship?.next_follow_up_at ? 'text-amber-400 font-semibold' : 'text-foreground'}>
+                <span className={workspaceRelationship?.next_follow_up_at ? 'text-foreground font-semibold' : 'text-foreground'}>
                   {workspaceRelationship?.next_follow_up_at 
                     ? new Date(workspaceRelationship.next_follow_up_at).toLocaleDateString() 
                     : 'None scheduled'}
@@ -205,16 +206,21 @@ export function ContactRelationshipCard({
         {/* Company Card */}
         <div className="rounded-xl border border-border bg-card p-4 space-y-3">
           <div className="flex items-center gap-2 pb-2 border-b border-border text-muted-foreground text-xs font-mono uppercase">
-            <Building2 className="w-4 h-4 text-primary" />
+            <Building2 className="w-4 h-4 text-muted-foreground" />
             Company & Entity
           </div>
 
           {company ? (
             <div className="space-y-2.5 text-xs">
               <div>
-                <h4 className="font-serif text-sm font-semibold text-foreground">
-                  {company.name}
-                </h4>
+                <Link
+                  href={`/vault/companies/${company.id}`}
+                  className="hover:underline hover:text-primary transition-colors inline-block"
+                >
+                  <h4 className="font-serif text-sm font-semibold text-foreground hover:text-primary">
+                    {company.name}
+                  </h4>
+                </Link>
                 {company.industry && (
                   <p className="text-[11px] font-mono text-muted-foreground capitalize">
                     {company.industry}
@@ -236,7 +242,7 @@ export function ContactRelationshipCard({
                     rel="noreferrer"
                     className="flex items-center gap-1.5 text-primary hover:underline"
                   >
-                    <Globe className="w-3.5 h-3.5" />
+                    <Globe className="w-3.5 h-3.5 text-muted-foreground" />
                     <span>{company.website.replace(/^https?:\/\//, '')}</span>
                     <ExternalLink className="w-2.5 h-2.5" />
                   </a>
@@ -277,7 +283,7 @@ export function ContactRelationshipCard({
         {/* Social Profiles */}
         <div className="rounded-xl border border-border bg-card p-4 space-y-3">
           <div className="flex items-center gap-2 pb-2 border-b border-border text-muted-foreground text-xs font-mono uppercase">
-            <Share2 className="w-4 h-4 text-emerald-400" />
+            <Share2 className="w-4 h-4 text-muted-foreground" />
             Social & Communication Handles
           </div>
 

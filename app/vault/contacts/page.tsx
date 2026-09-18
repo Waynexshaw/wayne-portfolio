@@ -3,6 +3,7 @@ import { getVaultContext, getContacts, getCompanies } from '@/lib/vault/actions'
 import { Users, Plus, Building2, Mail, Phone, ExternalLink, Shield, ArrowRight } from 'lucide-react'
 import { ContactCreateButton } from './create-button'
 import { ContactSearchFilters } from '@/components/vault/contact/contact-search-filters'
+import { VaultPriorityBadge } from '@/components/vault/vault-badge'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,16 +35,11 @@ export default async function VaultContactsPage({
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-border">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="font-serif text-2xl font-medium text-foreground">
-              Contacts Directory
-            </h1>
-            <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
-              {contacts.length} {hasActiveFilters ? 'Found' : 'Total'}
-            </span>
-          </div>
+          <h1 className="font-serif text-2xl font-medium text-foreground">
+            Contacts
+          </h1>
           <p className="text-xs text-muted-foreground mt-1">
-            Global relationship record across all workspaces. Single source of truth.
+            People, professional relationships, and institutional network.
           </p>
         </div>
 
@@ -117,17 +113,22 @@ export default async function VaultContactsPage({
                   </div>
 
                   {contact.company && (
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Building2 className="w-3.5 h-3.5 text-electric" />
+                    <Link
+                      href={`/vault/companies/${contact.company.id || contact.company_id}`}
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
                       <span>{contact.company.name}</span>
-                    </div>
+                    </Link>
                   )}
 
                   {/* Relationship Score Meter (1 to 10 scale) */}
                   <div className="pt-2">
                     <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1">
                       <span>Relationship Score:</span>
-                      <strong className="font-mono text-foreground">{score} / 10</strong>
+                      <span className="font-mono text-foreground">
+                        <strong>{score}</strong> / 10 <span className="text-muted-foreground text-[10px]">({score <= 3 ? 'Cold' : score <= 6 ? 'Familiar' : score <= 8 ? 'Strong' : 'Close'})</span>
+                      </span>
                     </div>
                     <div className="w-full bg-secondary rounded-full h-1.5 overflow-hidden">
                       <div 
@@ -169,9 +170,7 @@ export default async function VaultContactsPage({
 
                   <div className="flex items-center gap-3">
                     {wsRel?.priority && (
-                      <span className="text-[10px] uppercase font-mono text-muted-foreground">
-                        {wsRel.priority}
-                      </span>
+                      <VaultPriorityBadge priority={wsRel.priority} />
                     )}
                     <Link
                       href={`/vault/contacts/${contact.id}`}

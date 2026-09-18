@@ -28,16 +28,11 @@ export default async function VaultCompaniesPage({
     <div className="space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-border">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="font-serif text-2xl font-medium text-foreground">
-              Organizations & Ecosystem
-            </h1>
-            <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
-              {companies.length} {hasActiveFilters ? 'Found' : 'Total'}
-            </span>
-          </div>
+          <h1 className="font-serif text-2xl font-medium text-foreground">
+            Companies
+          </h1>
           <p className="text-xs text-muted-foreground mt-1">
-            Global directory of protocols, partner entities, VCs, and companies.
+            Organizations, institutions, partner entities, and portfolio companies.
           </p>
         </div>
 
@@ -109,7 +104,7 @@ export default async function VaultCompaniesPage({
 
                   {company.domain && (
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
-                      <Globe className="w-3.5 h-3.5 text-electric" />
+                      <Globe className="w-3.5 h-3.5 text-muted-foreground" />
                       <span>{company.domain}</span>
                     </div>
                   )}

@@ -11,6 +11,7 @@ import {
   Sparkles,
   ExternalLink
 } from 'lucide-react'
+import { VaultPriorityBadge } from '@/components/vault/vault-badge'
 
 interface CompanyContactsProps {
   contacts: any[]
@@ -33,9 +34,9 @@ export function CompanyContacts({
       {/* Header */}
       <div className="flex items-center justify-between pb-3 border-b border-border">
         <div className="flex items-center gap-2">
-          <Users className="w-4 h-4 text-primary" />
+          <Users className="w-4 h-4 text-muted-foreground" />
           <h3 className="font-serif text-lg font-medium text-foreground">
-            People & Connected Contacts
+            People & Contacts
           </h3>
           <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
             {contacts.length}
@@ -46,7 +47,7 @@ export function CompanyContacts({
           onClick={onOpenAddContact}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/80 hover:bg-secondary text-secondary-foreground border border-border text-xs font-medium transition-colors shadow-sm"
         >
-          <Plus className="w-3.5 h-3.5 text-primary" />
+          <Plus className="w-3.5 h-3.5 text-muted-foreground" />
           Add Contact
         </button>
       </div>
@@ -114,15 +115,7 @@ export function CompanyContacts({
 
                     {/* Priority Badge */}
                     {wsRel?.priority && (
-                      <span className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded font-medium shrink-0 ${
-                        wsRel.priority === 'urgent'
-                          ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                          : wsRel.priority === 'high'
-                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                            : 'bg-secondary text-muted-foreground border border-border'
-                      }`}>
-                        {wsRel.priority}
-                      </span>
+                      <VaultPriorityBadge priority={wsRel.priority} />
                     )}
                   </div>
 
@@ -140,14 +133,14 @@ export function CompanyContacts({
                   {/* Operating Identity Context */}
                   {wsRel?.identity?.name && (
                     <div className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground">
-                      <Shield className="w-3 h-3 text-primary" />
+                      <Shield className="w-3 h-3 text-muted-foreground" />
                       <span>Handled via: {wsRel.identity.name}</span>
                     </div>
                   )}
 
                   {/* Follow-up / Last touchpoint callout */}
                   {wsRel?.next_follow_up_at && (
-                    <div className="p-1.5 rounded bg-card border border-border/80 text-[11px] font-mono flex items-center gap-1 text-amber-400">
+                    <div className="p-1.5 rounded bg-card border border-border/80 text-[11px] font-mono flex items-center gap-1 text-muted-foreground">
                       <Calendar className="w-3 h-3 shrink-0" />
                       <span>Next: {new Date(wsRel.next_follow_up_at).toLocaleDateString()}</span>
                     </div>
