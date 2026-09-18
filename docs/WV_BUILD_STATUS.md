@@ -28,7 +28,8 @@
 | **Contacts** | Phase 1 + Refinement V1 | `48630cb` | Released / Complete |
 | **Companies** | Phase 1 + Refinement V1 | `48630cb` | Released / Complete |
 | **Opportunities** | Phase 1 + Refinement V1 | `48630cb` | Released / Complete |
-| **Command Center** | Phase 1 Attention & Summary | `app/vault/page.tsx` | Functioning |
+| **Operating Records** | V1 Consolidated Batch (Tasks, Meetings, Decisions) | Migration 014 | Released / Complete |
+| **Command Center** | Phase 1 Attention & Summary + Operations Integration | `app/vault/page.tsx` | Functioning |
 
 ---
 
@@ -59,7 +60,26 @@
 
 ---
 
-## 5. Planned / Immediate Security Work
+## 5. Released Batch: Operating Records V1
+
+* **Status:** `RELEASED / COMPLETE`
+* **Implementation Highlights:**
+  1. **Meetings:** Time-stamped structured records with start/end time validation, location/channel, agenda, notes, outcomes, linked projects, and workspace-isolated company links via composite foreign key `(workspace_id, company_id)`. Clear scheduling bounds semantics without clock tracking.
+  2. **Meeting Participants:** Strict single-identity rule enforced by database check constraint `chk_participant_identity` (either CRM contact or guest, never both, never neither). Meeting participant removal preserved via `removeMeetingParticipantAction`.
+  3. **Decisions:** Historical decision ledger with title, decision statement, context, reasoning, alternatives considered, and consequences. In V1, decisions are historical records without mutable status or revision lineage.
+  4. **Tasks:** Single-owner operational task management with canonical priorities (`low`, `medium`, `high`, `urgent`), statuses (`todo`, `in_progress`, `blocked`, `completed`, `cancelled`), and trigger-synchronized completion timestamps.
+  5. **Archive Single Source of Truth:** Canonical `archived_at TIMESTAMPTZ` across all tables. Hard delete controls and server actions removed from V1 UI in favor of safe Archive/Restore lifecycle.
+  6. **Unified Operations Hub:** Located at `/vault/operations` with seamless view switching (`?view=tasks|meetings|decisions`), project filtering, priority/status filtering, and real-time operational attention counters.
+  7. **Detail Routes:** Dedicated deep-link detail routes for Meetings (`/vault/operations/meetings/[id]`) and Decisions (`/vault/operations/decisions/[id]`).
+  8. **Cross-Module Integrations:**
+     - Sidebar: Exactly ONE primary `Operations` entry (`ClipboardList` icon).
+     - Project Detail: Header quick action button and compact Operations Summary card linking to project-filtered operations.
+     - Command Center: Overdue tasks (crimson), due-today tasks (amber), and upcoming 7-day meetings surfaced directly in the attention queue.
+* **Database Migration:** Migration `014_wv_operating_records.sql` deployed and verified (all 4 tables, composite FKs including `fk_meetings_company`, immutability triggers, completion sync trigger, RLS policies, indexes). Zero `is_archived` columns. Zero unreleased migration 015.
+
+---
+
+## 6. Planned / Immediate Security Work
 
 * **Vault Owner Access Lock:**
   * **Status:** `DEFERRED — FINAL SECURITY HARDENING`
@@ -68,14 +88,14 @@
 
 ---
 
-## 6. Planned / Deferred Roadmap
+## 7. Planned / Deferred Roadmap
 
 * **Spreadsheet Formulas (V1.1+):**
   * Expression parsing and formula computation engine (e.g. SUM, AVERAGE, basic arithmetic).
-* **Governance & Operations:**
-  * Meetings records
-  * Decision log
-  * Task management
+* **Operating Records V1.1+ Enhancements:**
+  * Decision lineage and superseding chains
+  * Recurring meeting series templates
+  * Sub-task hierarchies or task checklists
 * **Public Portfolio Integration:**
   * Selective evidence bridge (publishing approved internal case studies to public portfolio)
 * **Intelligence (Strictly Deferred):**

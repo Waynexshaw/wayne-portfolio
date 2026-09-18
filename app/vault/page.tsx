@@ -7,6 +7,7 @@ import {
   getOpportunities,
   getWorkspaceProjects
 } from '@/lib/vault/actions'
+import { getCommandCenterOperationsAttentionAction } from '@/lib/vault/operations-actions'
 import { CommandCenterHeader } from '@/components/vault/command-center-header'
 import { AttentionSection } from '@/components/vault/attention-section'
 import { RelationshipOverview } from '@/components/vault/relationship-overview'
@@ -21,13 +22,20 @@ export default async function VaultCommandCenterPage() {
   const activeWorkspaceId = context?.activeWorkspace?.id
 
   // Fetch all workspace-scoped data in parallel through authenticated Supabase client
-  const [contacts, companies, interactions, followUps, opportunities, projects] = await Promise.all([
+  const [contacts, companies, interactions, followUps, opportunities, projects, operationsAttention] = await Promise.all([
     getContacts(activeWorkspaceId).catch(() => []),
     getCompanies(activeWorkspaceId).catch(() => []),
     getInteractions(activeWorkspaceId).catch(() => []),
     getFollowUps(activeWorkspaceId).catch(() => []),
     getOpportunities(activeWorkspaceId).catch(() => []),
     getWorkspaceProjects(activeWorkspaceId).catch(() => []),
+    activeWorkspaceId
+      ? getCommandCenterOperationsAttentionAction(activeWorkspaceId).catch(() => ({
+          overdueTasks: [],
+          dueTodayTasks: [],
+          upcomingMeetings: [],
+        }))
+      : Promise.resolve({ overdueTasks: [], dueTodayTasks: [], upcomingMeetings: [] }),
   ])
 
   return (
@@ -38,10 +46,11 @@ export default async function VaultCommandCenterPage() {
         activeIdentity={context?.activeIdentity || null}
       />
 
-      {/* 2. Priority Attention Queue (Overdue, Due Today, Upcoming, Opportunities needing action) */}
+      {/* 2. Priority Attention Queue (Overdue, Due Today, Upcoming, Opportunities, Operations) */}
       <AttentionSection 
         followUps={followUps}
         opportunities={opportunities}
+        operationsAttention={operationsAttention}
       />
 
       {/* 3. Compact Opportunity Pipeline Overview */}

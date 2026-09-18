@@ -8,18 +8,26 @@ import {
   Building2, 
   ArrowRight,
   Sparkles,
-  CheckCircle2
+  CheckCircle2,
+  Video,
+  ClipboardList
 } from 'lucide-react'
 import { FollowUpToggleButton } from '@/app/vault/follow-ups/toggle-button'
 
 interface AttentionSectionProps {
   followUps: any[]
   opportunities: any[]
+  operationsAttention?: {
+    overdueTasks: any[]
+    dueTodayTasks: any[]
+    upcomingMeetings: any[]
+  }
 }
 
 export function AttentionSection({
   followUps,
-  opportunities
+  opportunities,
+  operationsAttention,
 }: AttentionSectionProps) {
   const now = new Date()
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
@@ -49,11 +57,20 @@ export function AttentionSection({
     return isActiveStage && (Boolean(opp.next_action) || Boolean(opp.expected_close_date))
   }).slice(0, 5)
 
+  const overdueTasks = operationsAttention?.overdueTasks || []
+  const dueTodayTasks = operationsAttention?.dueTodayTasks || []
+  const upcomingMeetings = operationsAttention?.upcomingMeetings || []
+
+  const totalOverdue = overdueFollowUps.length + overdueTasks.length
+
   const hasAnyAttentionItems = 
     overdueFollowUps.length > 0 || 
     dueTodayFollowUps.length > 0 || 
     upcomingFollowUps.length > 0 || 
-    attentionOpportunities.length > 0
+    attentionOpportunities.length > 0 ||
+    overdueTasks.length > 0 ||
+    dueTodayTasks.length > 0 ||
+    upcomingMeetings.length > 0
 
   return (
     <section className="space-y-4">
@@ -65,8 +82,8 @@ export function AttentionSection({
           </h2>
         </div>
         <span className="text-xs font-mono text-muted-foreground">
-          {overdueFollowUps.length > 0 ? (
-            <span className="text-rose-400 font-semibold">{overdueFollowUps.length} Overdue</span>
+          {totalOverdue > 0 ? (
+            <span className="text-rose-400 font-semibold">{totalOverdue} Overdue</span>
           ) : (
             <span className="text-emerald-400 flex items-center gap-1">
               <CheckCircle2 className="w-3.5 h-3.5" /> No overdue items
@@ -85,8 +102,108 @@ export function AttentionSection({
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          {/* Column 1: Follow-Ups (Overdue, Due Today, Upcoming) */}
+          {/* Column 1: Follow-Ups and Operating Tasks */}
           <div className="space-y-4">
+            {/* Overdue Tasks */}
+            {overdueTasks.length > 0 && (
+              <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-4 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-rose-500/20">
+                  <div className="flex items-center gap-2 text-rose-400 text-xs font-mono uppercase tracking-wider font-semibold">
+                    <AlertCircle className="w-4 h-4" />
+                    Overdue Tasks ({overdueTasks.length})
+                  </div>
+                  <Link
+                    href="/vault/operations?view=tasks"
+                    className="text-[11px] font-mono text-rose-400 hover:text-rose-300 flex items-center gap-1"
+                  >
+                    View all <ArrowRight className="w-3 h-3" />
+                  </Link>
+                </div>
+
+                <div className="space-y-2">
+                  {overdueTasks.slice(0, 4).map((item) => (
+                    <div
+                      key={item.id}
+                      className="p-3 rounded-lg bg-card/80 border border-rose-500/20 flex items-start justify-between gap-3 text-xs"
+                    >
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-foreground truncate">
+                            {item.title}
+                          </span>
+                          <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 font-semibold">
+                            {item.priority}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                          <span className="text-rose-400 font-mono text-[11px]">Due {item.due_date}</span>
+                          {item.project && (
+                            <span className="text-[11px]">• {item.project.title}</span>
+                          )}
+                        </div>
+                      </div>
+                      <Link
+                        href="/vault/operations?view=tasks"
+                        className="text-xs font-medium text-primary hover:underline shrink-0"
+                      >
+                        Open
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Tasks Due Today */}
+            {dueTodayTasks.length > 0 && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-amber-500/20">
+                  <div className="flex items-center gap-2 text-amber-500 text-xs font-mono uppercase tracking-wider font-semibold">
+                    <Clock className="w-4 h-4" />
+                    Tasks Due Today ({dueTodayTasks.length})
+                  </div>
+                  <Link
+                    href="/vault/operations?view=tasks"
+                    className="text-[11px] font-mono text-amber-500 hover:text-amber-400 flex items-center gap-1"
+                  >
+                    View all <ArrowRight className="w-3 h-3" />
+                  </Link>
+                </div>
+
+                <div className="space-y-2">
+                  {dueTodayTasks.slice(0, 4).map((item) => (
+                    <div
+                      key={item.id}
+                      className="p-3 rounded-lg bg-card/80 border border-amber-500/20 flex items-start justify-between gap-3 text-xs"
+                    >
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-foreground truncate">
+                            {item.title}
+                          </span>
+                          <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-500 font-semibold">
+                            {item.priority}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                          <span className="text-amber-500 font-mono text-[11px]">Due Today</span>
+                          {item.project && (
+                            <span className="text-[11px]">• {item.project.title}</span>
+                          )}
+                        </div>
+                      </div>
+                      <Link
+                        href="/vault/operations?view=tasks"
+                        className="text-xs font-medium text-primary hover:underline shrink-0"
+                      >
+                        Open
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Overdue Items */}
             {overdueFollowUps.length > 0 && (
               <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-4 space-y-3">
@@ -281,8 +398,50 @@ export function AttentionSection({
             </div>
           </div>
 
-          {/* Column 2: Opportunities Requiring Attention */}
-          <div className="rounded-xl border border-border bg-card p-4 space-y-3 flex flex-col justify-between">
+          {/* Column 2: Opportunities & Scheduled Meetings */}
+          <div className="space-y-4">
+            {/* Upcoming Meetings Card */}
+            {upcomingMeetings.length > 0 && (
+              <div className="rounded-xl border border-primary/20 bg-card p-4 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-border">
+                  <div className="flex items-center gap-2 text-primary text-xs font-mono uppercase tracking-wider font-semibold">
+                    <Video className="w-4 h-4" />
+                    Upcoming Meetings ({upcomingMeetings.length})
+                  </div>
+                  <Link
+                    href="/vault/operations?view=meetings"
+                    className="text-[11px] font-mono text-primary hover:underline flex items-center gap-1"
+                  >
+                    View all <ArrowRight className="w-3 h-3" />
+                  </Link>
+                </div>
+
+                <div className="space-y-2">
+                  {upcomingMeetings.slice(0, 3).map((m) => (
+                    <Link
+                      key={m.id}
+                      href={`/vault/operations/meetings/${m.id}`}
+                      className="p-2.5 rounded-lg border border-border/80 bg-secondary/30 hover:border-primary/40 transition-colors flex items-center justify-between gap-3 text-xs group block"
+                    >
+                      <div className="min-w-0">
+                        <span className="font-medium text-foreground group-hover:text-primary transition-colors truncate block">
+                          {m.title}
+                        </span>
+                        <div className="flex items-center gap-2 text-[11px] font-mono text-muted-foreground mt-0.5">
+                          <span>{new Date(m.scheduled_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                          <span>{new Date(m.scheduled_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
+                          {m.location_or_channel && <span>• {m.location_or_channel}</span>}
+                        </div>
+                      </div>
+                      <ArrowRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Opportunities Requiring Attention */}
+            <div className="rounded-xl border border-border bg-card p-4 space-y-3 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between pb-2 border-b border-border mb-3">
                 <div className="flex items-center gap-2 text-muted-foreground text-xs font-mono uppercase tracking-wider">
@@ -383,7 +542,8 @@ export function AttentionSection({
             </div>
           </div>
         </div>
-      )}
+      </div>
+    )}
     </section>
   )
 }

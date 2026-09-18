@@ -260,3 +260,58 @@ Project Workbench V1 transforms Waynex Vault projects from high-level metadata t
 * **Typography:** Conforms strictly to established WV Tailwind typography (`font-serif`, `font-sans`, `font-mono`) without introducing external font packages or Workbench-specific font definitions.
 * **Dedicated Full-Surface Editors:** Document and spreadsheet editors operate on focused full-surface views (`/vault/projects/[id]/documents/[docId]` and `/vault/projects/[id]/spreadsheets/[sheetId]`) with breadcrumbs back to the project workbench.
 * **Autosave & Draft Safety:** Debounced autosave (1.5s) paired with client-side `sessionStorage` fallback recovery.
+
+---
+
+## 14. Operating Records V1 Architecture
+
+### Purpose & Operating Concept
+Operating Records V1 provides an integrated execution layer for Waynex Vault, bridging strategy and operational delivery through four canonical entities:
+1. **Meetings:** Time-stamped structured records of internal syncs, external discussions, and client/partner alignments.
+2. **Meeting Participants:** Exactly one identity source per participant—either an existing global CRM contact (`contact_id`) or an external guest (`guest_name` with optional `guest_email`), enforced by a strict database CHECK constraint.
+3. **Decisions:** An immutable historical ledger recording key architectural, organizational, or strategic decisions with context, rationale, alternatives considered, and consequences. In V1, decisions are historical records without mutable status or revision lineage (lineage deferred to V1.1+).
+4. **Tasks:** Operational action items linked optionally to projects, meetings, or decisions. Tasks maintain a single-owner operational model (no assignee fields in V1), canonical priorities (`low`, `medium`, `high`, `urgent`), canonical statuses (`todo`, `in_progress`, `blocked`, `completed`, `cancelled`), and database-enforced completion timestamp synchronization.
+
+### Schema Architecture & Integrity (Migration 014)
+* **`public.meetings`**:
+  * Scoped strictly to `(workspace_id)`.
+  * Composite foreign keys `(project_id, workspace_id)` referencing `public.workspace_projects(id, workspace_id)` ON DELETE SET NULL.
+  * Composite foreign key `(workspace_id, company_id)` referencing `public.workspace_companies(workspace_id, company_id) ON DELETE SET NULL (company_id)`, strictly enforcing workspace multi-tenant isolation for meeting company associations.
+  * Time semantics & bounds: `scheduled_at` (scheduled start time) and `ended_at` (scheduled end time) define planned scheduling bounds, not clock tracking or telemetry. Time validation constraint `chk_meeting_ended_at` ensures `ended_at IS NULL OR ended_at >= scheduled_at`.
+  * Immutability trigger `trg_prevent_meetings_tampering` prevents modifying `workspace_id`.
+* **`public.meeting_participants`**:
+  * Hard database check constraint `chk_participant_identity`: `((contact_id IS NOT NULL AND guest_name IS NULL AND guest_email IS NULL) OR (contact_id IS NULL AND guest_name IS NOT NULL AND btrim(guest_name) <> ''))`. Supports internal CRM contacts or external guests (with optional email), while rejecting invalid/conflicting identity combinations.
+  * Composite foreign key `(meeting_id, workspace_id)` referencing `public.meetings(id, workspace_id)` ON DELETE CASCADE.
+  * Partial unique index prevents adding the same CRM contact more than once to a single meeting.
+  * Immutability trigger `trg_prevent_meeting_participants_tampering` locks `workspace_id` and `meeting_id`.
+* **`public.decisions`**:
+  * Historical record with `decided_at DATE NOT NULL DEFAULT CURRENT_DATE`.
+  * Composite foreign keys `(project_id, workspace_id)` referencing `workspace_projects` and `(meeting_id, workspace_id)` referencing `meetings`.
+  * Immutability trigger `trg_prevent_decisions_tampering` locks `workspace_id`.
+* **`public.tasks`**:
+  * Composite foreign keys `(project_id, workspace_id)`, `(meeting_id, workspace_id)`, `(decision_id, workspace_id)`.
+  * Trigger `trg_task_completion_timestamp` automatically sets `completed_at = NOW()` when status transitions to `completed`, and clears `completed_at = NULL` when status transitions away from `completed`.
+  * Immutability trigger `trg_prevent_tasks_tampering` locks `workspace_id`.
+* **Archive Single Source of Truth & Lifecycle Policy**:
+  * All four tables strictly use `archived_at TIMESTAMPTZ` (`archived_at IS NULL` = active, `archived_at IS NOT NULL` = archived). Zero `is_archived` boolean columns exist.
+  * Application Lifecycle: The V1 UI operates exclusively on an Archive/Restore lifecycle. User-facing permanent delete controls and corresponding server actions (`deleteTaskAction`, `deleteMeetingAction`, `deleteDecisionAction`) have been omitted from V1 application code to prevent accidental permanent data loss. Participant unlinking is retained via `removeMeetingParticipantAction`.
+* **Row Level Security (RLS)**:
+  * `SELECT`, `INSERT`, `UPDATE`: `wv_internal.is_workspace_member(workspace_id)`.
+  * `DELETE`: `wv_internal.is_workspace_admin(workspace_id)` retained at database level for defense-in-depth boundary control.
+
+### Unified Operations Hub & Cross-Module Integrations
+* **Hub Route (`/vault/operations`)**:
+  * Houses three view modes: `?view=tasks` (default), `?view=meetings`, and `?view=decisions`.
+  * Single search/filter toolbar with project scoping, status/priority filtering, and archive toggle.
+  * Real-time operational attention pills: Active Tasks, Overdue count, Due Today count, Next 7-Day Meetings, and Decisions.
+* **Deep-Link Detail Routes**:
+  * Dedicated meeting record page: `/vault/operations/meetings/[id]` featuring agenda, notes, outcomes, participants list, and direct buttons to add tasks or record decisions from the meeting.
+  * Dedicated decision record page: `/vault/operations/decisions/[id]` highlighting decision statement, context, reasoning, alternatives, consequences, and linked follow-up execution tasks.
+* **Sidebar Navigation**:
+  * Exactly ONE primary sidebar entry: `Operations` (`/vault/operations`, icon `ClipboardList`).
+* **Project Detail Integration (`/vault/projects/[id]`)**:
+  * Header quick action button: `Operations` alongside `Workbench`.
+  * Compact Operations Summary Card displaying Active Tasks, Upcoming Meetings, and Decisions Recorded with deep links to `/vault/operations?projectId=[id]`.
+* **Command Center Integration (`/vault`)**:
+  * Overdue tasks and tasks due today are surfaced in the primary attention queue with crimson (`#DC143C`) and amber warnings.
+  * Upcoming meetings within the next 7 days are surfaced in the attention grid with direct deep links to `/vault/operations/meetings/[id]`.

@@ -18,6 +18,7 @@ import {
   ExternalLink,
   Shield,
   Layers,
+  ClipboardList,
   X
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -97,6 +98,7 @@ const navItems = [
   { href: '/vault/follow-ups', label: 'Follow-ups', icon: CheckSquare },
   { href: '/vault/opportunities', label: 'Opportunities', icon: TrendingUp },
   { href: '/vault/projects', label: 'Projects', icon: FolderGit2 },
+  { href: '/vault/operations', label: 'Operations', icon: ClipboardList },
   { href: '/vault/metrics', label: 'Metrics', icon: BarChart3 },
   { href: '/vault/research', label: 'Research', icon: BookOpen },
   { href: '/vault/reviews', label: 'Reviews', icon: RotateCcw },

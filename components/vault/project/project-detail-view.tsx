@@ -26,6 +26,7 @@ import {
   ExternalLink,
   ChevronDown,
   Sparkles,
+  ClipboardList,
 } from 'lucide-react'
 import {
   WorkspaceProjectDetail,
@@ -49,6 +50,7 @@ interface ProjectDetailViewProps {
   relatedResearch: any[]
   relatedReviews: RelatedReviewItem[]
   workbenchStats?: WorkbenchStats
+  operationsStats?: { activeTasks: number; upcomingMeetings: number; decisionsCount: number }
   workspaceId: string
   workspaceName?: string
   identities?: { id: string; name: string; handle?: string | null }[]
@@ -125,6 +127,7 @@ export function ProjectDetailView({
   relatedResearch,
   relatedReviews,
   workbenchStats,
+  operationsStats,
   workspaceId,
   workspaceName,
   identities = [],
@@ -370,6 +373,15 @@ export function ProjectDetailView({
                 <span>Workbench</span>
               </Link>
 
+              {/* Open Operations */}
+              <Link
+                href={`/vault/operations?projectId=${project.id}`}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs font-medium transition-colors shadow-sm"
+              >
+                <ClipboardList className="w-3.5 h-3.5 text-primary" />
+                <span>Operations</span>
+              </Link>
+
               {/* Edit Project */}
               <button
                 onClick={() => setIsEditOpen(true)}
@@ -547,6 +559,62 @@ export function ProjectDetailView({
             <div className="text-[11px] font-mono text-muted-foreground">FOLDERS</div>
             <div className="text-lg font-semibold text-foreground mt-0.5 group-hover:text-primary transition-colors">
               {workbenchStats?.foldersCount ?? 0}
+            </div>
+          </Link>
+        </div>
+      </div>
+
+      {/* Operations Summary Card */}
+      <div className="p-6 rounded-2xl bg-card border border-border space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border">
+          <div className="flex items-center gap-2">
+            <ClipboardList className="w-4 h-4 text-primary" />
+            <h2 className="font-serif text-base font-medium text-foreground">
+              Project Operations
+            </h2>
+            <span className="text-xs font-mono text-muted-foreground">
+              Tasks, Meetings & Decisions
+            </span>
+          </div>
+
+          <Link
+            href={`/vault/operations?projectId=${project.id}`}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground border border-border text-xs font-medium transition-colors shadow-sm self-start sm:self-auto shrink-0"
+          >
+            <span>View Operations</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        {/* Operations Stats Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Link
+            href={`/vault/operations?view=tasks&projectId=${project.id}`}
+            className="p-3 rounded-xl bg-secondary/40 border border-border/70 hover:border-primary/40 transition-colors group"
+          >
+            <div className="text-[11px] font-mono text-muted-foreground">ACTIVE TASKS</div>
+            <div className="text-lg font-semibold text-foreground mt-0.5 group-hover:text-primary transition-colors">
+              {operationsStats?.activeTasks ?? 0}
+            </div>
+          </Link>
+
+          <Link
+            href={`/vault/operations?view=meetings&projectId=${project.id}`}
+            className="p-3 rounded-xl bg-secondary/40 border border-border/70 hover:border-primary/40 transition-colors group"
+          >
+            <div className="text-[11px] font-mono text-muted-foreground">UPCOMING MEETINGS</div>
+            <div className="text-lg font-semibold text-foreground mt-0.5 group-hover:text-primary transition-colors">
+              {operationsStats?.upcomingMeetings ?? 0}
+            </div>
+          </Link>
+
+          <Link
+            href={`/vault/operations?view=decisions&projectId=${project.id}`}
+            className="p-3 rounded-xl bg-secondary/40 border border-border/70 hover:border-primary/40 transition-colors group"
+          >
+            <div className="text-[11px] font-mono text-muted-foreground">DECISIONS RECORDED</div>
+            <div className="text-lg font-semibold text-foreground mt-0.5 group-hover:text-primary transition-colors">
+              {operationsStats?.decisionsCount ?? 0}
             </div>
           </Link>
         </div>
