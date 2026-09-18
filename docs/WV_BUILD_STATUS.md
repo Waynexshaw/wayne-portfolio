@@ -5,8 +5,8 @@
 * **Repository:** `Waynexshaw/wayne-portfolio`
 * **Production URL:** Production Vercel deployment with Supabase Auth
 * **Vault Mounting:** `/vault`
-* **Current Latest Release Commit:** `c9717c9 feat(vault): refine reviews workspace`
-* **Released Database Migrations:** Exactly migrations `001` through `012` (012 is latest: `012_wv_metrics_performance.sql`)
+* **Current Latest Release Commit:** `48630cb feat(vault): refine relationship workspace`
+* **Released Database Migrations:** Exactly migrations `001` through `013` (013 is latest: `013_wv_project_workbench.sql`)
 
 ---
 
@@ -19,14 +19,15 @@
 | **Brand System V1** | Full Visual Standardization | `941cfe6` | Complete |
 | **Mobile Navigation** | Responsive Drawers & Header | `6623c58` | Complete |
 | **Projects** | Phase 1 Workspace Projects | `004_wv_workspace_projects` | Complete |
+| **Project Workbench** | V1 Consolidated Batch (Folders, Docs, Sheets, Files) | Migration 013 | Released / Complete |
 | **Metrics** | Phase 1 + Refinement V1 | `8976424` | Complete |
 | **Research** | Phase 1 + Evidence + Refinement V1 | `efb0620` | Complete |
 | **Reviews** | Phase 1 + Connections + Refinement V1 | `c9717c9` | Complete |
-| **Interactions** | Phase 1 + Refinement V1 | Current Release | Released / Complete |
-| **Follow-ups** | Phase 1 + Refinement V1 | Current Release | Released / Complete |
-| **Contacts** | Phase 1 + Refinement V1 | Current Release | Released / Complete |
-| **Companies** | Phase 1 + Refinement V1 | Current Release | Released / Complete |
-| **Opportunities** | Phase 1 + Refinement V1 | Current Release | Released / Complete |
+| **Interactions** | Phase 1 + Refinement V1 | `48630cb` | Released / Complete |
+| **Follow-ups** | Phase 1 + Refinement V1 | `48630cb` | Released / Complete |
+| **Contacts** | Phase 1 + Refinement V1 | `48630cb` | Released / Complete |
+| **Companies** | Phase 1 + Refinement V1 | `48630cb` | Released / Complete |
+| **Opportunities** | Phase 1 + Refinement V1 | `48630cb` | Released / Complete |
 | **Command Center** | Phase 1 Attention & Summary | `app/vault/page.tsx` | Functioning |
 
 ---
@@ -44,7 +45,21 @@
 
 ---
 
-## 4. Planned / Immediate Security Work
+## 4. Released Batch: Project Workbench V1
+
+* **Status:** `RELEASED / COMPLETE`
+* **Implementation Highlights:**
+  1. **Folders:** Hierarchical organizational navigation containers with cycle-prevention trigger and unique name constraints.
+  2. **Documents:** Native TipTap rich-text editor with AST JSON, word count, plain-text search extraction, and 1.5s debounced autosave.
+  3. **Spreadsheets:** Native 2D grid editor (A..Z / 1..50), cell navigation, column resizing, and RFC 4180 CSV import/export. Formula evaluation strictly deferred to V1.1+ (formulas stored as literal strings).
+  4. **Private Files & Storage:** Supabase `vault_files` private bucket with 25MB limits, SVG blocking for XSS safety, admin-only DELETE policy, and 300s signed URLs for downloads/previews.
+  5. **Project Integration:** Workbench directory view accessible from Project Detail with aggregate workbench statistics.
+* **Formula Support:** `V1.1+ DEFERRED`
+* **Database Migration:** Migration `013_wv_project_workbench.sql` deployed and verified.
+
+---
+
+## 5. Planned / Immediate Security Work
 
 * **Vault Owner Access Lock:**
   * **Status:** `DEFERRED — FINAL SECURITY HARDENING`
@@ -53,13 +68,10 @@
 
 ---
 
-## 5. Planned / Deferred Roadmap
+## 6. Planned / Deferred Roadmap
 
-* **Project Workbench:**
-  * Documents
-  * Spreadsheets
-  * File uploads & storage
-  * Integrated Project Research & Metrics views
+* **Spreadsheet Formulas (V1.1+):**
+  * Expression parsing and formula computation engine (e.g. SUM, AVERAGE, basic arithmetic).
 * **Governance & Operations:**
   * Meetings records
   * Decision log

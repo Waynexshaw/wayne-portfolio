@@ -166,7 +166,7 @@ Warm white and rich black construct the calm environment. Purple identifies Wayn
 
 ## 11. Database Migration Discipline
 
-* Current released migrations: **001 through 012**.
+* Current released migrations: **001 through 013** (`013_wv_project_workbench.sql`).
 * Migrations are immutable once deployed to production.
 * Sequential naming convention must strictly be preserved.
 * **No migrations may be created without explicit authorization.**
@@ -213,3 +213,50 @@ Future security implementation work must inspect and enforce across:
 * Row Level Security (RLS) / owner enforcement
 * Auth callbacks where applicable
 *(Note: Not implemented in this batch; recorded here as authoritative architecture requirements).*
+
+---
+
+## 13. Project Workbench V1 Architecture
+
+### Purpose & Operating Concept
+Project Workbench V1 transforms Waynex Vault projects from high-level metadata tracking containers into active, private working environments. Each project houses a private Workbench for organizing deliverables, drafting strategy documents, modeling operational figures, and storing source project files. Folders serve as organizational navigation containers, while native work is captured in three canonical artifact types: Documents, Spreadsheets, and Files.
+
+### Canonical Schema & Storage Architecture (Migration 013)
+* **`public.project_folders`**: Multi-level hierarchical organizational navigation containers scoped strictly to `(workspace_id, project_id)`.
+  * Unique names enforced via partial unique indexes for root-level and subfolder-level items (`archived_at IS NULL`).
+  * Recursive cycle prevention enforced via PostgreSQL trigger (`trg_check_project_folder_hierarchy`).
+  * Self-parenting and cross-project hierarchy moves are strictly prohibited at database level.
+* **`public.project_documents`**: Native rich-text documents.
+  * TipTap JSON AST stored in `content`.
+  * Plain text extraction indexed in `plain_text` for search.
+  * Word count and optimistic versioning.
+* **`public.project_spreadsheets`**: Native 2D grid tabular modeling.
+  * Sparse cell matrix indexed by coordinate (`A1`, `B2`, etc.) in `data` JSONB.
+  * Explicit column metadata tracking custom widths.
+  * Schema versioning for forward compatibility.
+* **`public.project_files`**: Metadata records for binary project assets.
+  * Tracks display name, original file name, mime type, file size (`size_bytes`), storage path, and extension.
+  * SVG files blocked on upload to eliminate stored XSS and active SVG content execution vectors.
+* **Archive State — Single Source of Truth**:
+  * All Workbench tables use `archived_at TIMESTAMPTZ` exclusively (`archived_at IS NULL` = active, `archived_at IS NOT NULL` = archived).
+  * Redundant boolean flags are avoided; archive state cannot contradict itself.
+* **Private Storage Bucket (`vault_files`)**:
+  * 25MB file size limit (`26214400` bytes).
+  * Storage path convention: `workspaces/<workspace_id>/projects/<project_id>/<file_id>/<filename>`.
+  * Row Level Security: `SELECT`, `INSERT`, `UPDATE` require verified workspace membership via `wv_internal.is_workspace_member()`.
+  * Physical `DELETE` requires workspace admin authorization via `wv_internal.is_workspace_admin()`.
+  * Soft-archiving files updates metadata without deleting Storage objects; binary assets remain safely preserved.
+  * Direct client uploads bypass serverless payload limits.
+  * Downloads and in-browser previews authenticated via short-lived signed URLs (300-second expiration).
+
+### Formula Policy: Deliberately Deferred to V1.1+
+* **V1 Principle:** Grid stability, safe numeric data handling, TSV/CSV interoperability, and fast persistence take priority over computational complexity.
+* **Storage Semantics:** Any cell string starting with `=` (such as `=SUM(A1:A10)`) is treated strictly as literal text. Zero formula parsing or evaluation engines are loaded in V1.
+* **Interoperability:** Full RFC 4180 CSV import and export with quote escaping support.
+
+### UI, Typography & UX Integration
+* **Workbench Entry:** Project detail views (`/vault/projects/[id]`) display direct access to the Workbench via a dedicated header button and an aggregate Artifacts Overview card alongside Metrics, Research, and Reviews.
+* **Directory Navigation:** Folders remain structural navigation containers in the directory view, while artifact filtering isolates work by canonical type: `All`, `Documents`, `Spreadsheets`, `Files`.
+* **Typography:** Conforms strictly to established WV Tailwind typography (`font-serif`, `font-sans`, `font-mono`) without introducing external font packages or Workbench-specific font definitions.
+* **Dedicated Full-Surface Editors:** Document and spreadsheet editors operate on focused full-surface views (`/vault/projects/[id]/documents/[docId]` and `/vault/projects/[id]/spreadsheets/[sheetId]`) with breadcrumbs back to the project workbench.
+* **Autosave & Draft Safety:** Debounced autosave (1.5s) paired with client-side `sessionStorage` fallback recovery.

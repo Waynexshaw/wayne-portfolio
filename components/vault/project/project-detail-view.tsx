@@ -38,6 +38,7 @@ import {
   updateProjectLifecycle,
   ProjectLifecycleAction,
 } from '@/lib/vault/actions'
+import { WorkbenchStats } from '@/lib/vault/workbench/types'
 import { ProjectEditModal } from './project-edit-modal'
 import { MetricCreateModal } from '../metric/metric-create-modal'
 import { getStatusBadgeClasses, getPriorityBadgeClasses } from '@/components/vault/vault-badge'
@@ -47,6 +48,7 @@ interface ProjectDetailViewProps {
   metrics: WorkspaceMetricItem[]
   relatedResearch: any[]
   relatedReviews: RelatedReviewItem[]
+  workbenchStats?: WorkbenchStats
   workspaceId: string
   workspaceName?: string
   identities?: { id: string; name: string; handle?: string | null }[]
@@ -122,6 +124,7 @@ export function ProjectDetailView({
   metrics,
   relatedResearch,
   relatedReviews,
+  workbenchStats,
   workspaceId,
   workspaceName,
   identities = [],
@@ -358,6 +361,15 @@ export function ProjectDetailView({
                 Archive
               </button>
 
+              {/* Open Workbench */}
+              <Link
+                href={`/vault/projects/${project.id}/workbench`}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors shadow-sm"
+              >
+                <FolderGit2 className="w-3.5 h-3.5" />
+                <span>Workbench</span>
+              </Link>
+
               {/* Edit Project */}
               <button
                 onClick={() => setIsEditOpen(true)}
@@ -372,7 +384,7 @@ export function ProjectDetailView({
               <button
                 onClick={() => setIsAddMetricOpen(true)}
                 disabled={isPending}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs font-medium transition-colors shadow-sm disabled:opacity-50"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Add Metric
@@ -464,6 +476,79 @@ export function ProjectDetailView({
               {formatDate(project.updated_at)}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* 5.5. Working Environment: Project Workbench */}
+      <div className="p-6 rounded-2xl bg-card border border-border space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <FolderGit2 className="w-4 h-4 text-primary" />
+              <h2 className="font-serif text-xl font-medium text-foreground">
+                Project Workbench
+              </h2>
+              {workbenchStats && (
+                <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                  {workbenchStats.totalCount} Artifacts
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Working environment for native documents, structured spreadsheets, and project files.
+            </p>
+          </div>
+
+          <Link
+            href={`/vault/projects/${project.id}/workbench`}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors shadow-sm self-start sm:self-auto shrink-0"
+          >
+            <span>Open Workbench</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Link
+            href={`/vault/projects/${project.id}/workbench`}
+            className="p-3 rounded-xl bg-secondary/40 border border-border/70 hover:border-primary/40 transition-colors group"
+          >
+            <div className="text-[11px] font-mono text-muted-foreground">DOCUMENTS</div>
+            <div className="text-lg font-semibold text-foreground mt-0.5 group-hover:text-primary transition-colors">
+              {workbenchStats?.documentsCount ?? 0}
+            </div>
+          </Link>
+
+          <Link
+            href={`/vault/projects/${project.id}/workbench`}
+            className="p-3 rounded-xl bg-secondary/40 border border-border/70 hover:border-primary/40 transition-colors group"
+          >
+            <div className="text-[11px] font-mono text-muted-foreground">SPREADSHEETS</div>
+            <div className="text-lg font-semibold text-foreground mt-0.5 group-hover:text-primary transition-colors">
+              {workbenchStats?.spreadsheetsCount ?? 0}
+            </div>
+          </Link>
+
+          <Link
+            href={`/vault/projects/${project.id}/workbench`}
+            className="p-3 rounded-xl bg-secondary/40 border border-border/70 hover:border-primary/40 transition-colors group"
+          >
+            <div className="text-[11px] font-mono text-muted-foreground">FILES</div>
+            <div className="text-lg font-semibold text-foreground mt-0.5 group-hover:text-primary transition-colors">
+              {workbenchStats?.filesCount ?? 0}
+            </div>
+          </Link>
+
+          <Link
+            href={`/vault/projects/${project.id}/workbench`}
+            className="p-3 rounded-xl bg-secondary/40 border border-border/70 hover:border-primary/40 transition-colors group"
+          >
+            <div className="text-[11px] font-mono text-muted-foreground">FOLDERS</div>
+            <div className="text-lg font-semibold text-foreground mt-0.5 group-hover:text-primary transition-colors">
+              {workbenchStats?.foldersCount ?? 0}
+            </div>
+          </Link>
         </div>
       </div>
 

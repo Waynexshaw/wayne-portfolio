@@ -6,6 +6,7 @@ import {
   getRelatedResearchForEntity,
   getRelatedReviewsForEntity,
 } from '@/lib/vault/actions'
+import { getProjectWorkbenchStats } from '@/lib/vault/workbench-actions'
 import { ProjectDetailView } from '@/components/vault/project/project-detail-view'
 
 export const dynamic = 'force-dynamic'
@@ -30,10 +31,11 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
   }
 
   // 2. Fetch related data in parallel (only after project ownership is established)
-  const [metrics, relatedResearch, relatedReviews] = await Promise.all([
+  const [metrics, relatedResearch, relatedReviews, workbenchStats] = await Promise.all([
     getWorkspaceMetrics(activeWorkspace.id, { projectId: id, status: 'all' }),
     getRelatedResearchForEntity('project', id, activeWorkspace.id),
     getRelatedReviewsForEntity(activeWorkspace.id, 'project', id),
+    getProjectWorkbenchStats(id, activeWorkspace.id),
   ])
 
   return (
@@ -42,6 +44,7 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
       metrics={metrics}
       relatedResearch={relatedResearch}
       relatedReviews={relatedReviews}
+      workbenchStats={workbenchStats}
       workspaceId={activeWorkspace.id}
       workspaceName={activeWorkspace.name}
       identities={context?.identities || []}
