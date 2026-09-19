@@ -85,6 +85,7 @@ export default async function VaultCompaniesPage({
                     <div>
                       <Link
                         href={`/vault/companies/${company.id}`}
+                        prefetch={false}
                         className="hover:text-primary transition-colors inline-block"
                       >
                         <h3 className="text-base font-medium text-foreground hover:text-primary transition-colors">
@@ -134,9 +135,10 @@ export default async function VaultCompaniesPage({
                     )}
                     <Link
                       href={`/vault/companies/${company.id}`}
+                      prefetch={false}
                       className="font-mono text-[11px] text-primary hover:underline"
                     >
-                      View Record →
+                      View Company →
                     </Link>
                   </div>
                 </div>

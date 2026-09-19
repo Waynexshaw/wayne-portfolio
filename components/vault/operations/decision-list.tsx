@@ -85,6 +85,7 @@ export function DecisionList({
               <div className="flex flex-wrap items-center gap-2">
                 <Link
                   href={`/vault/operations/decisions/${item.id}`}
+                  prefetch={false}
                   className="text-base font-semibold text-foreground hover:text-primary transition-colors inline-flex items-center gap-1.5"
                 >
                   <span>{item.title}</span>
@@ -152,6 +153,7 @@ export function DecisionList({
               {item.project && (
                 <Link
                   href={`/vault/projects/${item.project.id}`}
+                  prefetch={false}
                   className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-secondary hover:bg-secondary/80 text-foreground transition-colors"
                 >
                   <FolderGit2 className="w-3 h-3 text-primary" />
@@ -162,6 +164,7 @@ export function DecisionList({
               {item.meeting && (
                 <Link
                   href={`/vault/operations/meetings/${item.meeting_id}`}
+                  prefetch={false}
                   className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-secondary hover:bg-secondary/80 text-foreground transition-colors"
                 >
                   <Video className="w-3 h-3 text-primary" />
@@ -172,9 +175,10 @@ export function DecisionList({
               <div className="ml-auto">
                 <Link
                   href={`/vault/operations/decisions/${item.id}`}
+                  prefetch={false}
                   className="text-xs font-medium text-primary hover:underline inline-flex items-center gap-1"
                 >
-                  <span>View Full Rationale</span>
+                  <span>View Decision</span>
                   <ChevronRight className="w-3.5 h-3.5" />
                 </Link>
               </div>

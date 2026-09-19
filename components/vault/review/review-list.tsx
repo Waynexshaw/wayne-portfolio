@@ -95,6 +95,7 @@ export function ReviewList({
           <Link
             key={review.id}
             href={`/vault/reviews/${review.id}`}
+            prefetch={false}
             className="group relative flex flex-col justify-between p-5 rounded-xl border border-border bg-card/50 hover:bg-card/90 hover:border-foreground/25 transition-all duration-150"
           >
             <div className="space-y-3">

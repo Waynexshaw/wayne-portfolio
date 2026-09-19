@@ -400,3 +400,52 @@ Evidence & Portfolio Bridge V1 introduces a structured provenance and portfolio 
   * Exactly ONE primary sidebar entry: `Evidence` (`/vault/evidence`, icon `Award`).
 * **Project Detail Integration (`/vault/projects/[id]`)**:
   * Compact Evidence & Professional Claims Summary Card displaying Approved Claims, Draft Claims, and Total Claims with quick action buttons to Add Claim and View Claims (`/vault/evidence?projectId=[id]`).
+
+---
+
+## 13. Live UX, Performance & Interaction Architecture
+
+Following live product testing and UX diagnostics, Waynex Vault implements five architectural performance and interaction patterns:
+
+### 1. Request-Level Context Deduplication (`React.cache()`)
+* **Location:** `lib/vault/context.ts`
+* **Mechanism:** Next.js Server Components share React's request cache during a single page render. `getVaultContextCached()` wraps the context resolution in React's `cache()` function.
+* **Benefits:**
+  * Eliminates duplicate `auth.getUser()` network calls between root Vault layout (`app/vault/layout.tsx`) and nested page server components.
+  * Parallelizes independent queries (`workspaces`, `identities`, `user_profiles`, and cookie retrieval) with `Promise.all`.
+  * Downstream page calls share the exact same context promise, dramatically reducing database round-trips and TTFB.
+
+### 2. High-Cardinality Link Prefetch Policy (`prefetch={false}`)
+* **Policy:** All high-cardinality, dynamic item links across Waynex Vault directories MUST explicitly declare `prefetch={false}`:
+  * Projects directory cards (`app/vault/projects/page.tsx`)
+  * Workbench folder links, document links, spreadsheet links (`components/vault/workbench/workbench-directory-view.tsx`)
+  * Project overview sub-links (`components/vault/project/project-detail-view.tsx`)
+  * Relationship directories: Contact cards (`app/vault/contacts/page.tsx`) and Company cards (`app/vault/companies/page.tsx`)
+  * Retrospectives & Knowledge: Review cards (`components/vault/review/review-list.tsx`) and Research cards (`components/vault/research/research-list.tsx`)
+  * Performance: Metric cards (`components/vault/metric/metric-list.tsx`)
+  * Operations: Meeting links and Decision links (`components/vault/operations/meeting-list.tsx`, `components/vault/operations/decision-list.tsx`)
+  * Evidence & Portfolio Bridge: Claim links (`components/vault/evidence/evidence-list.tsx`)
+* **Preserved Prefetching:** Static primary sidebar navigation (`components/vault/sidebar.tsx`) preserves standard automatic prefetching for instantaneous primary navigation.
+
+### 3. Pointer-Based Rectangular Selection & Hit-Testing (`SpreadsheetGrid`)
+* **Location:** `components/vault/workbench/spreadsheet-grid.tsx`
+* **Mechanism:**
+  * Uses pointer event lifecycle (`onPointerDown` on cells/headers, global `window.onPointerMove`, `window.onPointerUp` via `dragStateRef`).
+  * Fast element hit-testing via `document.elementFromPoint(clientX, clientY)` with cell data attributes (`data-col`, `data-row`, `data-end-col`, `data-end-row`, `data-cell-coord`).
+  * Bidirectional range normalization (`normalizeRange`) supporting fluid drag in all four quadrants (NW, NE, SW, SE).
+  * Shift+click range extension from anchor cell to target cell.
+  * Header range selection: row/column headers support pointer drag and Shift+click to select complete row/column ranges, with header highlight reflecting normalized bounds across all covered spans.
+  * Merged cell traversal without dead zones (`expandRangeForMerges`): selection rectangles intersecting any portion of a merged cell expand seamlessly to encompass the merge's bounding box without dropping pointer events.
+  * Strict merge data-safety rule: merge operations inspect all non-anchor cells; if ANY non-anchor cell has data, the merge is rejected.
+
+### 4. Structured Route Loading UX (`loading.tsx`)
+* **Route Boundaries:** Implemented calm, non-jarring loading skeletons across dynamic Vault route boundaries:
+  * `app/vault/loading.tsx` (Root Vault overview)
+  * `app/vault/projects/loading.tsx` (Projects directory)
+  * `app/vault/projects/[id]/loading.tsx` (Project overview & summary cards)
+  * `app/vault/projects/[id]/workbench/loading.tsx` (Workbench directory & artifacts)
+  * `app/vault/operations/loading.tsx` (Operations hub)
+
+### 5. Explicit Created-Item Entry Affordance Principle
+* **Standard:** While whole-card clickable surfaces remain convenient, high-cardinality directory cards MUST provide compact, explicit, high-contrast entry CTAs ("Open Project", "Open Folder", "Open Document", "Open Spreadsheet", "Preview", "View Review", "View Record", "View Metric", "View Contact", "View Company", "View Meeting", "View Decision", "View Claim").
+* **User Benefit:** Provides immediate visual clarity and obvious intent affordances on desktop browsers and assistive devices without relying solely on subtle card hover effects.

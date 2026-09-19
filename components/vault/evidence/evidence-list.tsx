@@ -157,6 +157,7 @@ export function EvidenceList({
               <div className="flex items-center gap-2.5 flex-wrap">
                 <Link
                   href={`/vault/evidence/${item.id}`}
+                  prefetch={false}
                   className="text-base font-semibold text-neutral-100 hover:text-emerald-400 transition flex items-center gap-1.5"
                 >
                   <span>{item.title}</span>
@@ -264,9 +265,10 @@ export function EvidenceList({
 
                 <Link
                   href={`/vault/evidence/${item.id}`}
+                  prefetch={false}
                   className="px-2.5 py-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded text-xs font-medium transition flex items-center gap-1"
                 >
-                  <span>Open</span>
+                  <span>View Claim</span>
                   <ExternalLink className="w-3 h-3" />
                 </Link>
               </div>

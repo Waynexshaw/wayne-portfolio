@@ -9,14 +9,13 @@ export default async function VaultLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const vaultContext = await getVaultContext()
 
-  if (!user) {
+  if (!vaultContext || !vaultContext.user) {
     redirect('/vault/login')
   }
 
-  const vaultContext = await getVaultContext()
+  const { user } = vaultContext
 
   return (
     <VaultNavProvider>

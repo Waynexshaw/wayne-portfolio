@@ -94,6 +94,7 @@ export function ResearchList({
               <div>
                 <Link
                   href={`/vault/research/${record.id}`}
+                  prefetch={false}
                   className="font-serif text-lg font-medium text-foreground group-hover:text-primary transition-colors line-clamp-1"
                 >
                   {record.title}
@@ -145,10 +146,11 @@ export function ResearchList({
               </div>
               <Link
                 href={`/vault/research/${record.id}`}
+                prefetch={false}
                 className="inline-flex items-center gap-1 text-primary hover:underline font-medium text-xs group/link"
               >
                 <span>View Record</span>
-                <ArrowRight className="w-3 h-3 transition-transform group-hover/link:translate-x-0.5" />
+                <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover/link:translate-x-0.5" />
               </Link>
             </div>
           </div>

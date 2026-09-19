@@ -97,6 +97,7 @@ export default async function VaultContactsPage({
                     <div>
                       <Link 
                         href={`/vault/contacts/${contact.id}`}
+                        prefetch={false}
                         className="text-base font-medium text-foreground hover:text-primary transition-colors flex items-center gap-1.5"
                       >
                         {contact.full_name}
@@ -115,6 +116,7 @@ export default async function VaultContactsPage({
                   {contact.company && (
                     <Link
                       href={`/vault/companies/${contact.company.id || contact.company_id}`}
+                      prefetch={false}
                       className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
                     >
                       <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
@@ -174,9 +176,10 @@ export default async function VaultContactsPage({
                     )}
                     <Link
                       href={`/vault/contacts/${contact.id}`}
+                      prefetch={false}
                       className="text-xs font-mono text-primary hover:underline flex items-center gap-1"
                     >
-                      View Record <ArrowRight className="w-3 h-3" />
+                      View Contact <ArrowRight className="w-3 h-3" />
                     </Link>
                   </div>
                 </div>

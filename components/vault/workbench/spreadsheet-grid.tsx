@@ -20,6 +20,7 @@ import {
   rangeContains,
   getCoveredCellsSet,
   findMergeForCell,
+  expandRangeForMerges,
   insertRow,
   deleteRow,
   moveRow,
@@ -75,6 +76,11 @@ export function SpreadsheetGrid({
 
   const containerRef = useRef<HTMLDivElement>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
+  const dragStateRef = useRef<{
+    mode: 'cells' | 'cols' | 'rows'
+    anchorCol: number
+    anchorRow: number
+  } | null>(null)
 
   // Sync width and height state if sheet props change
   useEffect(() => {
@@ -86,6 +92,10 @@ export function SpreadsheetGrid({
   }, [sheet.rowHeights])
 
   const selectedRange = controlledRange !== undefined ? controlledRange : internalRange
+
+  const normalizedSelectedRange = useMemo(() => {
+    return selectedRange ? normalizeRange(selectedRange) : null
+  }, [selectedRange])
 
   const setRange = useCallback(
     (range: SelectionRange | null) => {
@@ -176,31 +186,38 @@ export function SpreadsheetGrid({
   const moveActiveCell = useCallback(
     (deltaCol: number, deltaRow: number, extendSelection = false) => {
       const curr = coordToIndices(activeCell)
-      const newCol = Math.max(0, Math.min(colCount - 1, curr.col + deltaCol))
-      const newRow = Math.max(0, Math.min(rowCount - 1, curr.row + deltaRow))
-      const newCoord = indicesToCoord(newCol, newRow)
 
       if (extendSelection) {
         const anchor = selectedRange
           ? { col: selectedRange.startCol, row: selectedRange.startRow }
           : curr
-        setRange({
+        const currentEndCol = selectedRange ? selectedRange.endCol : curr.col
+        const currentEndRow = selectedRange ? selectedRange.endRow : curr.row
+        const newCol = Math.max(0, Math.min(colCount - 1, currentEndCol + deltaCol))
+        const newRow = Math.max(0, Math.min(rowCount - 1, currentEndRow + deltaRow))
+        const rawRange: SelectionRange = {
           startCol: anchor.col,
           startRow: anchor.row,
           endCol: newCol,
           endRow: newRow,
-        })
+        }
+        setRange(expandRangeForMerges(rawRange, sheet.merges))
       } else {
+        const newCol = Math.max(0, Math.min(colCount - 1, curr.col + deltaCol))
+        const newRow = Math.max(0, Math.min(rowCount - 1, curr.row + deltaRow))
+        const newCoord = indicesToCoord(newCol, newRow)
+        const merge = findMergeForCell(sheet.merges || [], newCol, newRow)
         setActiveCell(newCoord)
-        setRange({
-          startCol: newCol,
-          startRow: newRow,
-          endCol: newCol,
-          endRow: newRow,
-        })
+        const rawRange: SelectionRange = {
+          startCol: merge ? merge.startCol : newCol,
+          startRow: merge ? merge.startRow : newRow,
+          endCol: merge ? merge.endCol : newCol,
+          endRow: merge ? merge.endRow : newRow,
+        }
+        setRange(expandRangeForMerges(rawRange, sheet.merges))
       }
     },
-    [activeCell, colCount, rowCount, selectedRange, setRange]
+    [activeCell, colCount, rowCount, selectedRange, setRange, sheet.merges]
   )
 
   // Keyboard navigation & Shortcuts
@@ -366,25 +383,97 @@ export function SpreadsheetGrid({
     })
   }
 
-  // Header Selection Handlers
-  const selectEntireColumn = (colIdx: number) => {
+  // Header Selection Handlers (with Shift+Click and Pointer Drag support)
+  const handleColHeaderPointerDown = (colIdx: number, e: React.PointerEvent) => {
+    if (e.button !== 0) return
+    if (isEditing) commitEdit()
+
+    if (e.shiftKey) {
+      const anchorCol =
+        selectedRange !== null && selectedRange !== undefined
+          ? selectedRange.startCol
+          : coordToIndices(activeCell).col
+      const rawRange: SelectionRange = {
+        startCol: anchorCol,
+        startRow: 0,
+        endCol: colIdx,
+        endRow: rowCount - 1,
+      }
+      setRange(expandRangeForMerges(rawRange, sheet.merges))
+      return
+    }
+
     setActiveCell(indicesToCoord(colIdx, 0))
-    setRange({
+    const rawRange: SelectionRange = {
       startCol: colIdx,
       startRow: 0,
       endCol: colIdx,
       endRow: rowCount - 1,
-    })
+    }
+    setRange(expandRangeForMerges(rawRange, sheet.merges))
+    dragStateRef.current = {
+      mode: 'cols',
+      anchorCol: colIdx,
+      anchorRow: 0,
+    }
+    setIsSelecting(true)
   }
 
-  const selectEntireRow = (rowIdx: number) => {
+  const handleRowHeaderPointerDown = (rowIdx: number, e: React.PointerEvent) => {
+    if (e.button !== 0) return
+    if (isEditing) commitEdit()
+
+    if (e.shiftKey) {
+      const anchorRow =
+        selectedRange !== null && selectedRange !== undefined
+          ? selectedRange.startRow
+          : coordToIndices(activeCell).row
+      const rawRange: SelectionRange = {
+        startCol: 0,
+        startRow: anchorRow,
+        endCol: colCount - 1,
+        endRow: rowIdx,
+      }
+      setRange(expandRangeForMerges(rawRange, sheet.merges))
+      return
+    }
+
     setActiveCell(indicesToCoord(0, rowIdx))
-    setRange({
+    const rawRange: SelectionRange = {
       startCol: 0,
       startRow: rowIdx,
       endCol: colCount - 1,
       endRow: rowIdx,
-    })
+    }
+    setRange(expandRangeForMerges(rawRange, sheet.merges))
+    dragStateRef.current = {
+      mode: 'rows',
+      anchorCol: 0,
+      anchorRow: rowIdx,
+    }
+    setIsSelecting(true)
+  }
+
+  const selectEntireColumn = (colIdx: number) => {
+    setActiveCell(indicesToCoord(colIdx, 0))
+    const rawRange: SelectionRange = {
+      startCol: colIdx,
+      startRow: 0,
+      endCol: colIdx,
+      endRow: rowCount - 1,
+    }
+    setRange(expandRangeForMerges(rawRange, sheet.merges))
+  }
+
+  const selectEntireRow = (rowIdx: number) => {
+    setActiveCell(indicesToCoord(0, rowIdx))
+    const rawRange: SelectionRange = {
+      startCol: 0,
+      startRow: rowIdx,
+      endCol: colCount - 1,
+      endRow: rowIdx,
+    }
+    setRange(expandRangeForMerges(rawRange, sheet.merges))
   }
 
   const selectAll = () => {
@@ -397,8 +486,8 @@ export function SpreadsheetGrid({
     })
   }
 
-  // Cell Mouse Interaction (Selection Dragging)
-  const handleCellMouseDown = (colIdx: number, rowIdx: number, e: React.MouseEvent) => {
+  // Cell Pointer Interaction (Rectangular Selection Dragging & Shift+Click)
+  const handleCellPointerDown = (colIdx: number, rowIdx: number, e: React.PointerEvent) => {
     if (e.button !== 0) return // only left click
     if (isEditing) commitEdit()
 
@@ -411,45 +500,104 @@ export function SpreadsheetGrid({
       const anchor = selectedRange
         ? { col: selectedRange.startCol, row: selectedRange.startRow }
         : coordToIndices(activeCell)
-      setRange({
+      const rawRange: SelectionRange = {
         startCol: anchor.col,
         startRow: anchor.row,
-        endCol: merge ? merge.endCol : colIdx,
-        endRow: merge ? merge.endRow : rowIdx,
-      })
+        endCol: merge ? (colIdx <= anchor.col ? merge.startCol : merge.endCol) : colIdx,
+        endRow: merge ? (rowIdx <= anchor.row ? merge.startRow : merge.endRow) : rowIdx,
+      }
+      setRange(expandRangeForMerges(rawRange, sheet.merges))
       return
     }
 
     setActiveCell(targetCoord)
-    setRange({
+    const rawRange: SelectionRange = {
       startCol: effectiveCol,
       startRow: effectiveRow,
       endCol: merge ? merge.endCol : colIdx,
       endRow: merge ? merge.endRow : rowIdx,
-    })
+    }
+    setRange(expandRangeForMerges(rawRange, sheet.merges))
+    dragStateRef.current = {
+      mode: 'cells',
+      anchorCol: effectiveCol,
+      anchorRow: effectiveRow,
+    }
     setIsSelecting(true)
   }
 
-  const handleCellMouseEnter = (colIdx: number, rowIdx: number) => {
-    if (!isSelecting) return
-    const anchor = selectedRange
-      ? { col: selectedRange.startCol, row: selectedRange.startRow }
-      : coordToIndices(activeCell)
-    setRange({
-      startCol: anchor.col,
-      startRow: anchor.row,
-      endCol: colIdx,
-      endRow: rowIdx,
-    })
-  }
-
+  // Global Pointer Event Listeners for smooth rectangular drag hit-testing
   useEffect(() => {
-    const handleMouseUp = () => {
-      setIsSelecting(false)
+    const handlePointerMove = (e: PointerEvent) => {
+      const drag = dragStateRef.current
+      if (!drag) return
+
+      e.preventDefault()
+      const el = document.elementFromPoint(e.clientX, e.clientY)
+      if (!el) return
+
+      if (drag.mode === 'cells') {
+        const cellEl = el.closest('[data-cell-coord]') as HTMLElement | null
+        if (cellEl) {
+          const c = parseInt(cellEl.dataset.col || '0', 10)
+          const r = parseInt(cellEl.dataset.row || '0', 10)
+          const endC =
+            cellEl.dataset.endCol !== undefined ? parseInt(cellEl.dataset.endCol, 10) : c
+          const endR =
+            cellEl.dataset.endRow !== undefined ? parseInt(cellEl.dataset.endRow, 10) : r
+
+          const targetCol = c < drag.anchorCol ? c : endC
+          const targetRow = r < drag.anchorRow ? r : endR
+
+          const rawRange: SelectionRange = {
+            startCol: drag.anchorCol,
+            startRow: drag.anchorRow,
+            endCol: targetCol,
+            endRow: targetRow,
+          }
+          setRange(expandRangeForMerges(rawRange, sheet.merges))
+        }
+      } else if (drag.mode === 'cols') {
+        const colEl = el.closest('[data-col-header]') as HTMLElement | null
+        if (colEl) {
+          const targetCol = parseInt(colEl.dataset.col || '0', 10)
+          const rawRange: SelectionRange = {
+            startCol: drag.anchorCol,
+            startRow: 0,
+            endCol: targetCol,
+            endRow: rowCount - 1,
+          }
+          setRange(expandRangeForMerges(rawRange, sheet.merges))
+        }
+      } else if (drag.mode === 'rows') {
+        const rowEl = el.closest('[data-row-header]') as HTMLElement | null
+        if (rowEl) {
+          const targetRow = parseInt(rowEl.dataset.row || '0', 10)
+          const rawRange: SelectionRange = {
+            startCol: 0,
+            startRow: drag.anchorRow,
+            endCol: colCount - 1,
+            endRow: targetRow,
+          }
+          setRange(expandRangeForMerges(rawRange, sheet.merges))
+        }
+      }
     }
-    window.addEventListener('mouseup', handleMouseUp)
-    return () => window.removeEventListener('mouseup', handleMouseUp)
-  }, [])
+
+    const handlePointerUp = () => {
+      if (dragStateRef.current) {
+        dragStateRef.current = null
+        setIsSelecting(false)
+      }
+    }
+
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerUp)
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+    }
+  }, [sheet.merges, rowCount, colCount, setRange])
 
   // Close menus on outside click
   useEffect(() => {
@@ -487,6 +635,10 @@ export function SpreadsheetGrid({
           <tr>
             {/* Corner Cell: Select All */}
             <th
+              onPointerDown={(e) => {
+                e.stopPropagation()
+                selectAll()
+              }}
               onClick={selectAll}
               title="Select all cells"
               className="w-12 min-w-12 h-7 border-b border-r border-border bg-muted/90 text-center font-mono text-[10px] text-muted-foreground select-none sticky left-0 z-30 cursor-pointer hover:bg-primary/20 transition-colors"
@@ -498,14 +650,17 @@ export function SpreadsheetGrid({
               const letter = colIndexToLetter(colIdx)
               const width = columnWidths[letter] || DEFAULT_COL_WIDTH
               const isColSelected =
-                selectedRange &&
-                rangeContains(selectedRange, colIdx, coordToIndices(activeCell).row)
+                normalizedSelectedRange !== null &&
+                colIdx >= normalizedSelectedRange.startCol &&
+                colIdx <= normalizedSelectedRange.endCol
 
               return (
                 <th
                   key={letter}
+                  data-col-header=""
+                  data-col={colIdx}
                   style={{ width, minWidth: width }}
-                  onClick={() => selectEntireColumn(colIdx)}
+                  onPointerDown={(e) => handleColHeaderPointerDown(colIdx, e)}
                   className={`h-7 border-b border-r border-border px-2 text-center text-[11px] font-mono relative select-none cursor-pointer transition-colors group ${
                     isColSelected
                       ? 'bg-primary/20 text-primary font-semibold'
@@ -517,6 +672,7 @@ export function SpreadsheetGrid({
                     {/* Column Dropdown Menu Trigger */}
                     <button
                       type="button"
+                      onPointerDown={(e) => e.stopPropagation()}
                       onClick={(e) => {
                         e.stopPropagation()
                         setActiveColMenu(activeColMenu === colIdx ? null : colIdx)
@@ -531,6 +687,7 @@ export function SpreadsheetGrid({
                   {/* Column Context Menu */}
                   {activeColMenu === colIdx && (
                     <div
+                      onPointerDown={(e) => e.stopPropagation()}
                       onClick={(e) => e.stopPropagation()}
                       className="absolute left-0 top-full mt-1 w-44 bg-popover text-popover-foreground border border-border rounded-md shadow-md py-1 z-50 text-left font-sans text-xs font-normal"
                     >
@@ -611,6 +768,7 @@ export function SpreadsheetGrid({
 
                   {/* Resize Handle */}
                   <div
+                    onPointerDown={(e) => e.stopPropagation()}
                     onMouseDown={(e) => {
                       e.stopPropagation()
                       handleColResizeStart(letter, e.clientX, width)
@@ -635,15 +793,18 @@ export function SpreadsheetGrid({
             const rowKey = String(rowNum)
             const height = rowHeights[rowKey] || DEFAULT_ROW_HEIGHT
             const isRowSelected =
-              selectedRange &&
-              rangeContains(selectedRange, coordToIndices(activeCell).col, rowIdx)
+              normalizedSelectedRange !== null &&
+              rowIdx >= normalizedSelectedRange.startRow &&
+              rowIdx <= normalizedSelectedRange.endRow
 
             return (
               <tr key={rowNum} style={{ height }}>
                 {/* Row Header (sticky left) */}
                 <td
+                  data-row-header=""
+                  data-row={rowIdx}
                   style={{ height }}
-                  onClick={() => selectEntireRow(rowIdx)}
+                  onPointerDown={(e) => handleRowHeaderPointerDown(rowIdx, e)}
                   className={`border-b border-r border-border text-center text-[10px] font-mono sticky left-0 z-10 select-none cursor-pointer transition-colors group ${
                     isRowSelected
                       ? 'bg-primary/20 text-primary font-semibold'
@@ -655,6 +816,7 @@ export function SpreadsheetGrid({
                     {/* Row Dropdown Trigger */}
                     <button
                       type="button"
+                      onPointerDown={(e) => e.stopPropagation()}
                       onClick={(e) => {
                         e.stopPropagation()
                         setActiveRowMenu(activeRowMenu === rowIdx ? null : rowIdx)
@@ -669,6 +831,7 @@ export function SpreadsheetGrid({
                   {/* Row Context Menu */}
                   {activeRowMenu === rowIdx && (
                     <div
+                      onPointerDown={(e) => e.stopPropagation()}
                       onClick={(e) => e.stopPropagation()}
                       className="absolute left-full top-0 ml-1 w-44 bg-popover text-popover-foreground border border-border rounded-md shadow-md py-1 z-50 text-left font-sans text-xs font-normal"
                     >
@@ -749,6 +912,7 @@ export function SpreadsheetGrid({
 
                   {/* Row Resize Handle */}
                   <div
+                    onPointerDown={(e) => e.stopPropagation()}
                     onMouseDown={(e) => {
                       e.stopPropagation()
                       handleRowResizeStart(rowNum, e.clientY, height)
@@ -786,7 +950,11 @@ export function SpreadsheetGrid({
 
                   // Check if cell is within current selection range
                   const isInSelection =
-                    selectedRange && rangeContains(selectedRange, colIdx, rowIdx)
+                    normalizedSelectedRange !== null &&
+                    colIdx >= normalizedSelectedRange.startCol &&
+                    colIdx <= normalizedSelectedRange.endCol &&
+                    rowIdx >= normalizedSelectedRange.startRow &&
+                    rowIdx <= normalizedSelectedRange.endRow
 
                   // Text alignment
                   const align =
@@ -801,6 +969,11 @@ export function SpreadsheetGrid({
                   return (
                     <td
                       key={coord}
+                      data-cell-coord={coord}
+                      data-col={colIdx}
+                      data-row={rowIdx}
+                      data-end-col={merge ? merge.endCol : colIdx}
+                      data-end-row={merge ? merge.endRow : rowIdx}
                       colSpan={colSpan}
                       rowSpan={rowSpan}
                       style={{
@@ -808,8 +981,7 @@ export function SpreadsheetGrid({
                         minWidth: colSpan > 1 ? undefined : width,
                         height,
                       }}
-                      onMouseDown={(e) => handleCellMouseDown(colIdx, rowIdx, e)}
-                      onMouseEnter={() => handleCellMouseEnter(colIdx, rowIdx)}
+                      onPointerDown={(e) => handleCellPointerDown(colIdx, rowIdx, e)}
                       onDoubleClick={() => startEditing(coord)}
                       className={`border-b border-r border-border/80 px-2 py-0 text-foreground overflow-hidden text-ellipsis whitespace-nowrap relative cursor-cell select-none ${
                         isActive

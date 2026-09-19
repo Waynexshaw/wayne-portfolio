@@ -57,6 +57,55 @@ export function rangesIntersect(r1: SelectionRange, r2: SelectionRange): boolean
   )
 }
 
+export function expandRangeForMerges(
+  range: SelectionRange,
+  merges: CellMergeRange[] | undefined
+): SelectionRange {
+  if (!merges || merges.length === 0) return range
+
+  let minC = Math.min(range.startCol, range.endCol)
+  let maxC = Math.max(range.startCol, range.endCol)
+  let minR = Math.min(range.startRow, range.endRow)
+  let maxR = Math.max(range.startRow, range.endRow)
+
+  let expanded = true
+  while (expanded) {
+    expanded = false
+    for (const m of merges) {
+      if (
+        m.startCol <= maxC &&
+        m.endCol >= minC &&
+        m.startRow <= maxR &&
+        m.endRow >= minR
+      ) {
+        if (m.startCol < minC) {
+          minC = m.startCol
+          expanded = true
+        }
+        if (m.endCol > maxC) {
+          maxC = m.endCol
+          expanded = true
+        }
+        if (m.startRow < minR) {
+          minR = m.startRow
+          expanded = true
+        }
+        if (m.endRow > maxR) {
+          maxR = m.endRow
+          expanded = true
+        }
+      }
+    }
+  }
+
+  return {
+    startCol: range.startCol <= range.endCol ? minC : maxC,
+    endCol: range.startCol <= range.endCol ? maxC : minC,
+    startRow: range.startRow <= range.endRow ? minR : maxR,
+    endRow: range.startRow <= range.endRow ? maxR : minR,
+  }
+}
+
 export function findMergeForCell(
   merges: CellMergeRange[] | undefined,
   col: number,

@@ -90,6 +90,7 @@ export function MeetingList({
               <div className="flex flex-wrap items-center gap-2">
                 <Link
                   href={`/vault/operations/meetings/${meeting.id}`}
+                  prefetch={false}
                   className="text-base font-semibold text-foreground hover:text-primary transition-colors inline-flex items-center gap-1.5"
                 >
                   <span>{meeting.title}</span>
@@ -159,6 +160,7 @@ export function MeetingList({
                 {meeting.project && (
                   <Link
                     href={`/vault/projects/${meeting.project.id}`}
+                    prefetch={false}
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-secondary/80 hover:bg-secondary text-foreground transition-colors"
                   >
                     <FolderGit2 className="w-3 h-3 text-primary" />
@@ -169,6 +171,7 @@ export function MeetingList({
                 {meeting.company && (
                   <Link
                     href={`/vault/companies/${meeting.company_id}`}
+                    prefetch={false}
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-secondary/80 hover:bg-secondary text-foreground transition-colors"
                   >
                     <Building2 className="w-3 h-3 text-primary" />
@@ -182,6 +185,7 @@ export function MeetingList({
             <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
               <Link
                 href={`/vault/operations/meetings/${meeting.id}`}
+                prefetch={false}
                 className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors shadow-sm"
               >
                 View Meeting

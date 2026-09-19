@@ -219,6 +219,7 @@ export function WorkbenchDirectoryView({
         <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground flex-wrap">
           <Link
             href={`/vault/projects/${projectId}`}
+            prefetch={false}
             className="flex items-center gap-1 hover:text-foreground transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
@@ -242,7 +243,7 @@ export function WorkbenchDirectoryView({
 
             return (
               <div key={idx} className="flex items-center gap-2">
-                <Link href={href} className="hover:text-foreground transition-colors">
+                <Link href={href} prefetch={false} className="hover:text-foreground transition-colors">
                   {bc.name}
                 </Link>
                 <span>/</span>
@@ -426,6 +427,7 @@ export function WorkbenchDirectoryView({
                   href={`/vault/projects/${projectId}/workbench?folder=${f.id}${
                     showArchived ? '&archived=true' : ''
                   }`}
+                  prefetch={false}
                   className="flex items-center gap-2.5 min-w-0 flex-1"
                 >
                   <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
@@ -443,6 +445,17 @@ export function WorkbenchDirectoryView({
 
                 {/* Folder Actions Menu */}
                 <div className="flex items-center gap-1 shrink-0 opacity-80 group-hover:opacity-100">
+                  <Link
+                    href={`/vault/projects/${projectId}/workbench?folder=${f.id}${
+                      showArchived ? '&archived=true' : ''
+                    }`}
+                    prefetch={false}
+                    title="Open Folder"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-mono bg-secondary hover:bg-secondary/80 text-foreground transition-colors border border-border"
+                  >
+                    <span>Open</span>
+                    <ChevronRight className="w-3 h-3 text-muted-foreground" />
+                  </Link>
                   <button
                     onClick={() => {
                       setRenameItem({ id: f.id, name: f.name, type: 'folder' })
@@ -552,6 +565,7 @@ export function WorkbenchDirectoryView({
                       ) : (
                         <Link
                           href={targetHref}
+                          prefetch={false}
                           className="text-xs font-medium text-foreground group-hover:text-primary transition-colors truncate block"
                         >
                           {item.name}
@@ -590,14 +604,39 @@ export function WorkbenchDirectoryView({
                     </span>
 
                     {/* Action buttons */}
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1.5">
+                      {isDoc && (
+                        <Link
+                          href={targetHref}
+                          prefetch={false}
+                          title="Open Document"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-mono bg-secondary hover:bg-secondary/80 text-foreground transition-colors border border-border"
+                        >
+                          <span>Open</span>
+                          <ChevronRight className="w-3 h-3 text-muted-foreground" />
+                        </Link>
+                      )}
+
+                      {isSheet && (
+                        <Link
+                          href={targetHref}
+                          prefetch={false}
+                          title="Open Spreadsheet"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-mono bg-secondary hover:bg-secondary/80 text-foreground transition-colors border border-border"
+                        >
+                          <span>Open</span>
+                          <ChevronRight className="w-3 h-3 text-muted-foreground" />
+                        </Link>
+                      )}
+
                       {isFile && (
                         <button
                           onClick={() => setPreviewFileId(item.id)}
                           title="Preview / Download"
-                          className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-mono bg-secondary hover:bg-secondary/80 text-foreground transition-colors border border-border"
                         >
-                          <Eye className="w-3.5 h-3.5" />
+                          <Eye className="w-3 h-3 text-muted-foreground" />
+                          <span>Preview</span>
                         </button>
                       )}
 

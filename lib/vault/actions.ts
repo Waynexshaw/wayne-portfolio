@@ -4,91 +4,16 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
 
-export interface VaultWorkspace {
-  id: string
-  owner_id: string
-  name: string
-  slug: string
-  workspace_type: string
-  description?: string | null
-  icon?: string | null
-  is_default: boolean
-  archived_at?: string | null
-  created_at: string
-  updated_at: string
-  primary_identity?: VaultIdentity | null
-}
+import { getVaultContextCached, VaultWorkspace, VaultIdentity, VaultContextResult } from './context'
 
-export interface VaultIdentity {
-  id: string
-  user_id: string
-  name: string
-  handle?: string | null
-  type: string
-  bio?: string | null
-  avatar_url?: string | null
-  is_default: boolean
-}
+export type { VaultWorkspace, VaultIdentity, VaultContextResult }
 
 // ---------------------------------------------------------------------------
 // Workspaces & Identities
 // ---------------------------------------------------------------------------
 
-export async function getVaultContext() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-
-  // Fetch workspaces where user is member or owner
-  const { data: workspaces } = await (supabase as any)
-    .from('workspaces')
-    .select('*, primary_identity:identities(*)')
-    .order('is_default', { ascending: false })
-
-  // Fetch identities owned by user
-  const { data: identities } = await (supabase as any)
-    .from('identities')
-    .select('*')
-    .order('is_default', { ascending: false })
-
-  // Fetch user profile
-  const { data: profile } = await (supabase as any)
-    .from('user_profiles')
-    .select('*')
-    .eq('id', user.id)
-    .maybeSingle()
-
-  const wsList: VaultWorkspace[] = workspaces || []
-  const idList: VaultIdentity[] = identities || []
-
-  // Read preferred active workspace from cookie
-  const cookieStore = await cookies()
-  const activeWorkspaceId = cookieStore.get('wv_active_workspace_id')?.value
-
-  // Verify that the requested workspace is in the user's authorized workspaces (Requirement 7)
-  let activeWs = wsList.find(w => w.id === activeWorkspaceId)
-
-  // If not found or not a member, fall back to default workspace (PEVRA) (Requirement 8)
-  if (!activeWs) {
-    activeWs = wsList.find(w => w.is_default) || wsList[0] || null
-  }
-
-  // Determine active operating identity:
-  // Use the workspace's primary identity if linked and belonging to user,
-  // otherwise default to user's default identity (Requirement 9)
-  const activeId = activeWs?.primary_identity 
-    || idList.find(i => i.is_default) 
-    || idList[0] 
-    || null
-
-  return {
-    user,
-    profile,
-    workspaces: wsList,
-    identities: idList,
-    activeWorkspace: activeWs,
-    activeIdentity: activeId,
-  }
+export async function getVaultContext(): Promise<VaultContextResult | null> {
+  return getVaultContextCached()
 }
 
 export async function setActiveWorkspace(workspaceId: string) {

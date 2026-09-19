@@ -370,6 +370,7 @@ export function ProjectDetailView({
               {/* Open Workbench */}
               <Link
                 href={`/vault/projects/${project.id}/workbench`}
+                prefetch={false}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors shadow-sm"
               >
                 <FolderGit2 className="w-3.5 h-3.5" />
@@ -379,6 +380,7 @@ export function ProjectDetailView({
               {/* Open Operations */}
               <Link
                 href={`/vault/operations?projectId=${project.id}`}
+                prefetch={false}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-secondary hover:bg-secondary/80 text-foreground text-xs font-medium transition-colors shadow-sm"
               >
                 <ClipboardList className="w-3.5 h-3.5 text-primary" />
@@ -516,6 +518,7 @@ export function ProjectDetailView({
 
           <Link
             href={`/vault/projects/${project.id}/workbench`}
+            prefetch={false}
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors shadow-sm self-start sm:self-auto shrink-0"
           >
             <span>Open Workbench</span>
@@ -527,6 +530,7 @@ export function ProjectDetailView({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Link
             href={`/vault/projects/${project.id}/workbench`}
+            prefetch={false}
             className="p-3 rounded-xl bg-secondary/40 border border-border/70 hover:border-primary/40 transition-colors group"
           >
             <div className="text-[11px] font-mono text-muted-foreground">DOCUMENTS</div>
@@ -537,6 +541,7 @@ export function ProjectDetailView({
 
           <Link
             href={`/vault/projects/${project.id}/workbench`}
+            prefetch={false}
             className="p-3 rounded-xl bg-secondary/40 border border-border/70 hover:border-primary/40 transition-colors group"
           >
             <div className="text-[11px] font-mono text-muted-foreground">SPREADSHEETS</div>
@@ -547,6 +552,7 @@ export function ProjectDetailView({
 
           <Link
             href={`/vault/projects/${project.id}/workbench`}
+            prefetch={false}
             className="p-3 rounded-xl bg-secondary/40 border border-border/70 hover:border-primary/40 transition-colors group"
           >
             <div className="text-[11px] font-mono text-muted-foreground">FILES</div>
@@ -557,6 +563,7 @@ export function ProjectDetailView({
 
           <Link
             href={`/vault/projects/${project.id}/workbench`}
+            prefetch={false}
             className="p-3 rounded-xl bg-secondary/40 border border-border/70 hover:border-primary/40 transition-colors group"
           >
             <div className="text-[11px] font-mono text-muted-foreground">FOLDERS</div>
@@ -582,6 +589,7 @@ export function ProjectDetailView({
 
           <Link
             href={`/vault/operations?projectId=${project.id}`}
+            prefetch={false}
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground border border-border text-xs font-medium transition-colors shadow-sm self-start sm:self-auto shrink-0"
           >
             <span>View Operations</span>
@@ -593,6 +601,7 @@ export function ProjectDetailView({
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Link
             href={`/vault/operations?view=tasks&projectId=${project.id}`}
+            prefetch={false}
             className="p-3 rounded-xl bg-secondary/40 border border-border/70 hover:border-primary/40 transition-colors group"
           >
             <div className="text-[11px] font-mono text-muted-foreground">ACTIVE TASKS</div>
@@ -603,6 +612,7 @@ export function ProjectDetailView({
 
           <Link
             href={`/vault/operations?view=meetings&projectId=${project.id}`}
+            prefetch={false}
             className="p-3 rounded-xl bg-secondary/40 border border-border/70 hover:border-primary/40 transition-colors group"
           >
             <div className="text-[11px] font-mono text-muted-foreground">UPCOMING MEETINGS</div>
@@ -613,6 +623,7 @@ export function ProjectDetailView({
 
           <Link
             href={`/vault/operations?view=decisions&projectId=${project.id}`}
+            prefetch={false}
             className="p-3 rounded-xl bg-secondary/40 border border-border/70 hover:border-primary/40 transition-colors group"
           >
             <div className="text-[11px] font-mono text-muted-foreground">DECISIONS RECORDED</div>
@@ -628,15 +639,15 @@ export function ProjectDetailView({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/80">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-              <Award className="w-4 h-4" />
+              <Award className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="font-serif text-lg font-medium text-foreground">
-                  Evidence & Professional Claims
+                <h2 className="font-serif text-base font-medium text-foreground">
+                  Evidence & Claims
                 </h2>
-                <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
-                  {evidenceCounts?.total ?? 0} Recorded
+                <span className="text-xs font-mono text-muted-foreground">
+                  Portfolio Bridge
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">
@@ -649,6 +660,7 @@ export function ProjectDetailView({
             {!isArchived && (
               <Link
                 href={`/vault/evidence?projectId=${project.id}`}
+                prefetch={false}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition-colors shadow-sm"
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -657,6 +669,7 @@ export function ProjectDetailView({
             )}
             <Link
               href={`/vault/evidence?projectId=${project.id}`}
+              prefetch={false}
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground border border-border text-xs font-medium transition-colors shadow-sm self-start sm:self-auto shrink-0"
             >
               <span>View Claims</span>
@@ -669,6 +682,7 @@ export function ProjectDetailView({
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Link
             href={`/vault/evidence?status=approved&projectId=${project.id}`}
+            prefetch={false}
             className="p-3 rounded-xl bg-secondary/40 border border-border/70 hover:border-emerald-500/40 transition-colors group"
           >
             <div className="text-[11px] font-mono text-emerald-500">APPROVED CLAIMS</div>
@@ -679,6 +693,7 @@ export function ProjectDetailView({
 
           <Link
             href={`/vault/evidence?status=draft&projectId=${project.id}`}
+            prefetch={false}
             className="p-3 rounded-xl bg-secondary/40 border border-border/70 hover:border-amber-500/40 transition-colors group"
           >
             <div className="text-[11px] font-mono text-amber-500">DRAFT CLAIMS</div>
@@ -689,6 +704,7 @@ export function ProjectDetailView({
 
           <Link
             href={`/vault/evidence?projectId=${project.id}`}
+            prefetch={false}
             className="p-3 rounded-xl bg-secondary/40 border border-border/70 hover:border-primary/40 transition-colors group"
           >
             <div className="text-[11px] font-mono text-muted-foreground">TOTAL CLAIMS</div>
@@ -885,6 +901,7 @@ export function ProjectDetailView({
                 <Link
                   key={item.id}
                   href={`/vault/research/${item.research_record_id}`}
+                  prefetch={false}
                   className="block p-4 rounded-xl bg-card border border-border hover:border-primary/40 transition-colors group space-y-2.5"
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -932,6 +949,7 @@ export function ProjectDetailView({
 
           <Link
             href="/vault/reviews"
+            prefetch={false}
             className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground font-mono transition-colors"
           >
             <span>Browse Reviews</span>
@@ -945,6 +963,7 @@ export function ProjectDetailView({
             <p>No reviews are connected to this project yet.</p>
             <Link
               href="/vault/reviews"
+              prefetch={false}
               className="inline-flex items-center gap-1 text-primary hover:underline"
             >
               Explore retrospective reviews in workspace
@@ -964,6 +983,7 @@ export function ProjectDetailView({
                 <Link
                   key={item.id}
                   href={`/vault/reviews/${item.review_id}`}
+                  prefetch={false}
                   className="block p-4 rounded-xl bg-card border border-border hover:border-primary/40 transition-colors group space-y-2.5"
                 >
                   <div className="flex items-start justify-between gap-2">

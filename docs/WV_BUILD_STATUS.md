@@ -19,7 +19,7 @@
 | **Brand System V1** | Full Visual Standardization | `941cfe6` | Complete |
 | **Mobile Navigation** | Responsive Drawers & Header | `6623c58` | Complete |
 | **Projects** | Phase 1 Workspace Projects | `004_wv_workspace_projects` | Complete |
-| **Project Workbench** | V1 Consolidated Batch + Spreadsheet V1.1 | Migration 013 | Released / Complete |
+| **Project Workbench** | V1 Consolidated Batch + Spreadsheet V1.1 | Migration 013 | REOPENED — LIVE UX CORRECTIONS RELEASED / AWAITING LIVE ACCEPTANCE |
 | **Metrics** | Phase 1 + Refinement V1 | `8976424` | Complete |
 | **Research** | Phase 1 + Evidence + Refinement V1 | `efb0620` | Complete |
 | **Reviews** | Phase 1 + Connections + Refinement V1 | `c9717c9` | Complete |
@@ -68,6 +68,38 @@
   5. **Project Integration:** Workbench directory view accessible from Project Detail with aggregate workbench statistics.
 * **Formula Support:** `DEFERRED — FORMULAS V1.2+` (Formulas starting with `=` remain literal strings. Reference rewriting requirements documented).
 * **Database Migration:** Zero new migrations (Migration 016 strictly absent; upgraded document format stored in existing `project_spreadsheets.data` JSONB column).
+
+---
+
+## 4b. Live UX & Performance Corrections (Consolidated Batch)
+
+* **Status:** `WV LIVE UX + PERFORMANCE CORRECTION RELEASED / AWAITING LIVE ACCEPTANCE`
+* **Implementation Highlights:**
+  1. **Spreadsheet Selection & Merge Usability (Part A):**
+     - Replaced fragile DOM event listeners with pointer-based rectangular selection model (`pointerdown`, global `pointermove`, global `pointerup`) with coordinate hit-testing via `document.elementFromPoint` and `data-col`/`data-row`/`data-cell-coord` attributes.
+     - Smooth rectangular drag in all four directions (NW, NE, SW, SE) with bidirectional coordinate normalization.
+     - Shift+click range extension from anchor cell to target cell.
+     - Multi-row & multi-column header selection: clicking or dragging row/column headers selects full row/column ranges; Shift+click extends multi-header selection ranges. Header highlight reflects full selection spans.
+     - Merged cell traversal without dead zones (`expandRangeForMerges`): selection rectangles intersecting any part of a merged cell expand seamlessly to encompass the merge's bounding box without event dropping.
+     - Data-safety rule verified: merge attempts containing data in non-anchor cells are strictly rejected (`"Some selected cells contain data. Clear them before merging."`).
+     - In-memory undo/redo (50 steps) and copy/cut/paste interoperability preserved.
+  2. **Vault Context Performance & Deduplication (Part B):**
+     - Created `lib/vault/context.ts` using `React.cache()` to deduplicate `getVaultContextCached()` across server component tree during a single request render.
+     - Eliminated duplicate `auth.getUser()` calls; `app/vault/layout.tsx` consumes cached context directly.
+     - Parallelized independent context queries (`workspaces`, `identities`, `user_profiles`, and cookie retrieval) with `Promise.all`.
+  3. **High-Cardinality Link Prefetch Pressure Relief (Part C):**
+     - Disabled aggressive automatic prefetching with `prefetch={false}` on dynamic, high-cardinality item and detail links across Projects, Workbench, Reviews, Research, Metrics, Contacts, Companies, Operations, and Evidence.
+     - Preserved standard automatic prefetch on fixed navigation sidebar.
+  4. **Restrained Loading UX (Part D):**
+     - Implemented calm, structured `loading.tsx` skeletons across `app/vault`, `app/vault/projects`, `app/vault/projects/[id]`, `app/vault/projects/[id]/workbench`, and `app/vault/operations`.
+  5. **Explicit Created-Item Entry Affordances (Part E):**
+     - Added compact, explicit "Open Folder", "Open Document", "Open Spreadsheet", and "Preview" actions in Workbench directory.
+     - Added explicit "Open Project" CTA button in Projects overview.
+     - Standardized explicit "View Review", "View Record", "View Metric", "View Contact", "View Company", "View Meeting", "View Decision", and "View Claim" actions across directories.
+* **Locked Items:**
+  - Owner Access Lock: `DEFERRED — FINAL SECURITY HARDENING`
+  - Formula Engine: `DEFERRED — FORMULAS V1.2+`
+  - Migrations: 001–015 untouched; Migration 016 strictly absent; packages unchanged.
 
 ---
 
