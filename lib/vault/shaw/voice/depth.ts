@@ -256,7 +256,7 @@ export function getDepthDirectives(
   switch (format) {
     case 'x_post':
       formatInstruction =
-        'FORMAT: X POST (Single post). Deliver as a single, coherent post (not a thread). Modern X posts support long-form depth; do NOT artificially truncate or compress into legacy 280-character limits unless explicitly instructed. Do NOT automatically split into multiple tweets.'
+        'FORMAT: X POST (Single post). Deliver as a single, coherent post (not a thread). Modern X posts support long-form depth when detailed or deep is requested; do NOT artificially truncate into legacy 280-character limits unless explicitly instructed. Do NOT automatically split into multiple tweets. When short depth is requested, deliver as a genuinely compact social thought.'
       break
     case 'x_thread':
       formatInstruction =
@@ -285,7 +285,7 @@ export function getDepthDirectives(
   switch (depth) {
     case 'short':
       depthInstruction =
-        'DEPTH: SHORT. Make the point efficiently and concisely. Focus strictly on the core observation with no unnecessary expansion, padding, or elaboration.'
+        'DEPTH: SHORT (Compact development). Focus on one central idea with minimal supporting context. Deliver a compact development: one concrete observation, one supporting consequence, and a clean conclusion. Do NOT include an unnecessary second example, an extended backstory scenario, or repeated explanations. For a single X post, deliver a compact post that can be read quickly as one social thought—normally a single compact paragraph. End immediately once the core point is clear.'
       break
     case 'detailed':
       depthInstruction =
@@ -307,6 +307,9 @@ OUTPUT SHAPE & DEPTH DIRECTIVES (PRECEDENCE: CURRENT INSTRUCTION > FORMAT > DEPT
 - ${formatInstruction}
 - ${depthInstruction}
 - PRINCIPLE: FORMAT and DEPTH are independent dimensions. Format defines the shape; depth defines how thoroughly the reasoning is developed. Explicit depth instructions outrank general voice brevity defaults.
-- BREVITY RULE CLARIFICATION: "If the content has made its point, simply end it" means ending naturally once the requested idea has been developed to the requested depth. It does NOT mean ignoring "detailed", "deep", or "comprehensive" instructions and stopping after a single paragraph.
+- SHORT DEPTH SEMANTICS: "Short" means compact development—one focused idea, minimal supporting context, no unnecessary second example, no multi-paragraph inflation, ending immediately once the point is clear.
+- DETAILED DEPTH SEMANTICS: "Detailed" means developed reasoning—unfold the mechanism, context, and consequences with substance.
+- TOPIC SCOPE PRESERVATION: Preserve the user's subject scope. Broad prompts (e.g. "Web3 projects") must not be artificially narrowed to sub-domains (e.g. smart contracts, developers) unless specified. Technical prompts must retain their technical focus. Examples should support rather than redefine the user's subject.
+- BREVITY RULE CLARIFICATION: "If the content has made its point, simply end it" means ending naturally once the requested idea has been developed to the requested depth. It does NOT mean ignoring "detailed", "deep", or "comprehensive" instructions and stopping after a single paragraph. For SHORT depth, end immediately once the core point is established; do not linger.
   `.trim()
 }

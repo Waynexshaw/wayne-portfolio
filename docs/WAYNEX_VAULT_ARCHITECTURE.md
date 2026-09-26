@@ -655,11 +655,12 @@ SHAW owns all conversation history, prompt construction, identity context, voice
 SHAW architecture strictly separates output generation concerns into four orthogonal dimensions:
 * **Format (Shape):** Controls WHAT SHAPE the output takes (`x_post`, `x_thread`, `article`, `linkedin`, `report`, `general`). Formats define physical structure and channel requirements. An X post is a single coherent post (leveraging modern long-form support without legacy 280-character constraints unless explicitly requested); an X thread is a sequence of connected, numbered posts; an article provides narrative progression; a report provides structured analysis.
 * **Depth (Development):** Controls HOW FULLY the subject is developed (`short`, `normal`, `detailed`, `deep`). Depth governs reasoning development, explanatory mechanisms, concrete consequences, and real-world context—not arbitrary padding or rigid word counts.
-  - `short`: Efficient and concise. Zero fluff, zero unnecessary expansion.
+  - `short`: Compact development. One focused idea with minimal supporting context, no unnecessary second example or scenario, ending immediately once the core point is clear. For single X posts, normally a single compact paragraph.
   - `normal`: Natural development adequate to satisfy the prompt.
-  - `detailed`: Thorough development of reasoning, mechanisms, and concrete consequences. Does not stop after a single paragraph.
+  - `detailed`: Developed reasoning. Thorough development of mechanisms, real-world context, and concrete consequences. Does not stop after a single paragraph.
   - `deep`: Substantial exploration across multiple relevant dimensions, root causes, and practical trade-offs without repetition.
-* **Voice (Expression):** Controls HOW the content sounds (peer-to-peer, direct, unhurried, plain declarative language, concrete over abstract, no corporate buzzwords, no manufactured philosophical endings).
+* **Topic Scope Preservation:** Examples should support rather than redefine the user's subject. Broad topics (e.g. "Web3 projects") remain broad without silent narrowing into sub-disciplines (such as smart contracts or engineering teams) unless explicitly requested. Technical prompts preserve their technical focus.
+* **Voice (Expression):** Controls HOW the content sounds. Plain, conversational, concrete language over polished corporate consulting copy or institutional prose. Direct, calm, unhurried, peer-to-peer. Guided by the human speaking test: if a sentence sounds unnatural spoken directly to another founder, it is simplified.
 * **CTA (Signature):** Controls EXPLICIT SIGNATURE behavior. Strictly opt-in only (default `none`). Explicit negative instructions (*"Do not add my CTA"*, *"No CTA"*) immediately resolve to `none`.
 * **Instruction Precedence:**
   1. Safety / system constraints
@@ -668,7 +669,7 @@ SHAW architecture strictly separates output generation concerns into four orthog
   4. Requested depth
   5. Identity voice profile
   6. General stylistic defaults
-* **Brevity Rule Clarification:** The voice guideline *"If the content has made its point, simply end it"* means ending naturally once the requested idea has been developed to the requested depth. It does NOT mean ignoring *"detailed"*, *"deep"*, or *"comprehensive"* instructions and cutting off after a single paragraph. Voice controls tone; depth controls development.
+* **Brevity Rule Clarification:** The voice guideline *"If the content has made its point, simply end it"* means ending naturally once the requested idea has been developed to the requested depth. For short depth, end immediately once the core point is established. For detailed depth, develop the required reasoning thoroughly before concluding. Voice controls tone; depth controls development.
 
 ### 7. Core Schema (Migration 017)
 * `public.shaw_conversations`: Workspace-scoped persistent threads with routing mode, capability, and archive flags.
