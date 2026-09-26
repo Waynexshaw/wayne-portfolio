@@ -28,6 +28,7 @@ export async function POST(request: NextRequest) {
       capability = 'ask',
       routingMode = 'auto_free_first',
       selectedModel,
+      existingUserMessageId,
     } = body
 
     if (!workspaceId || !conversationId || !message || typeof message !== 'string') {
@@ -66,16 +67,78 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
     }
 
-    // 3. Persist user message
-    const { error: msgErr } = await (supabase as any).from('shaw_messages').insert({
-      conversation_id: conversationId,
-      workspace_id: workspaceId,
-      role: 'user',
-      content: trimmedMessage,
-    })
+    // 3. User Message Turn Handling (New Turn vs. Validated Retry)
+    let userMessageId: string | null = null
+    const isRetry = Boolean(existingUserMessageId)
 
-    if (msgErr) {
-      console.error('Error persisting user message:', msgErr)
+    if (existingUserMessageId) {
+      if (typeof existingUserMessageId !== 'string') {
+        return NextResponse.json({ error: 'Invalid retry message parameter' }, { status: 400 })
+      }
+
+      // Authorization & Scope Validation:
+      // Verify message exists, belongs to the current workspace, active conversation, and has role='user'
+      const { data: existingMsg, error: existErr } = await (supabase as any)
+        .from('shaw_messages')
+        .select('id, conversation_id, workspace_id, role, content, created_at')
+        .eq('id', existingUserMessageId)
+        .eq('workspace_id', workspaceId)
+        .eq('conversation_id', conversationId)
+        .eq('role', 'user')
+        .maybeSingle()
+
+      if (existErr || !existingMsg) {
+        return NextResponse.json(
+          { error: 'Invalid retry message: target message not found or unauthorized' },
+          { status: 400 }
+        )
+      }
+
+      // Retry Target Integrity:
+      // Content must match the logical user turn prompt
+      if (existingMsg.content !== trimmedMessage) {
+        return NextResponse.json(
+          { error: 'Invalid retry message: content does not match existing turn' },
+          { status: 400 }
+        )
+      }
+
+      // Verify that no assistant message was already successfully inserted after this user turn
+      const { data: subsequentAssistantMsgs, error: subErr } = await (supabase as any)
+        .from('shaw_messages')
+        .select('id')
+        .eq('conversation_id', conversationId)
+        .eq('workspace_id', workspaceId)
+        .eq('role', 'assistant')
+        .gt('created_at', existingMsg.created_at)
+        .limit(1)
+
+      if (subErr || (subsequentAssistantMsgs && subsequentAssistantMsgs.length > 0)) {
+        return NextResponse.json(
+          { error: 'Invalid retry message: turn has already received an assistant response' },
+          { status: 400 }
+        )
+      }
+
+      // Logical user turn preserved without duplicate insertion
+      userMessageId = existingMsg.id
+    } else {
+      // New user turn: persist user message
+      const { data: insertedMsg, error: msgErr } = await (supabase as any)
+        .from('shaw_messages')
+        .insert({
+          conversation_id: conversationId,
+          workspace_id: workspaceId,
+          role: 'user',
+          content: trimmedMessage,
+        })
+        .select('id')
+        .maybeSingle()
+
+      if (msgErr) {
+        console.error('Error persisting user message:', msgErr)
+      }
+      userMessageId = insertedMsg?.id || null
     }
 
     // 4. Load recent conversation history (bounded to last 12 messages)
@@ -127,6 +190,10 @@ export async function POST(request: NextRequest) {
           format,
           depth,
           cta_intent: ctaIntent,
+          user_message_id: userMessageId,
+          ...(isRetry && userMessageId
+            ? { is_retry: true, retry_of_message_id: userMessageId }
+            : {}),
         },
       })
       .select('id')
@@ -167,6 +234,7 @@ export async function POST(request: NextRequest) {
           error: routeErr.message || 'Routing failure',
           provider: routeErr.provider || (routingMode === 'auto_free_first' ? 'auto' : routingMode),
           statusCode: status,
+          userMessageId,
         },
         { status }
       )
@@ -309,13 +377,16 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return new Response(outputStream, {
-      headers: {
-        'Content-Type': 'text/event-stream; charset=utf-8',
-        'Cache-Control': 'no-cache, no-transform',
-        Connection: 'keep-alive',
-      },
-    })
+    const headers: Record<string, string> = {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+    }
+    if (userMessageId) {
+      headers['x-shaw-user-message-id'] = userMessageId
+    }
+
+    return new Response(outputStream, { headers })
   } catch (error: any) {
     console.error('Unhandled error in SHAW chat route:', error)
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })

@@ -340,18 +340,24 @@ export function ShawWorkspace({
     abortControllerRef.current = abortController
 
     try {
+      const requestPayload: Record<string, any> = {
+        workspaceId,
+        conversationId: targetConvId,
+        message: textToSend,
+        capability,
+        routingMode: targetRouting,
+      }
+
+      if (options?.isRetry && options.retryMessageId && !options.retryMessageId.startsWith('temp-')) {
+        requestPayload.existingUserMessageId = options.retryMessageId
+      }
+
       const response = await fetch('/api/vault/shaw/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          workspaceId,
-          conversationId: targetConvId,
-          message: textToSend,
-          capability,
-          routingMode: targetRouting,
-        }),
+        body: JSON.stringify(requestPayload),
         signal: abortController.signal,
       })
 
@@ -361,7 +367,18 @@ export function ShawWorkspace({
         const errObj: any = new Error(errMsg)
         errObj.statusCode = errJson?.statusCode || response.status
         errObj.provider = errJson?.provider || targetRouting
+        errObj.userMessageId =
+          errJson?.userMessageId || response.headers.get('x-shaw-user-message-id') || null
         throw errObj
+      }
+
+      // Reconcile optimistic user message ID to persistent database UUID from headers
+      const serverUserMsgId = response.headers.get('x-shaw-user-message-id')
+      if (serverUserMsgId && activeTargetMessageId !== serverUserMsgId) {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === activeTargetMessageId ? { ...m, id: serverUserMsgId } : m))
+        )
+        activeTargetMessageId = serverUserMsgId
       }
 
       if (!response.body) {
@@ -427,8 +444,16 @@ export function ShawWorkspace({
         console.log('Stream aborted by user')
       } else {
         console.error('Chat request error:', err)
+        const resolvedMessageId = err.userMessageId || activeTargetMessageId
+        if (err.userMessageId && activeTargetMessageId !== err.userMessageId) {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === activeTargetMessageId ? { ...m, id: err.userMessageId } : m))
+          )
+          activeTargetMessageId = err.userMessageId
+        }
+
         setInlineError({
-          messageId: activeTargetMessageId,
+          messageId: resolvedMessageId,
           userPrompt: textToSend,
           provider: err.provider || targetRouting,
           statusCode: err.statusCode || (err.message?.includes('503') ? 503 : undefined),
