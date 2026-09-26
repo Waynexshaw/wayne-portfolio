@@ -216,21 +216,68 @@
   - Scheduled Processor: `CONFIGURED DAILY` (`0 6 * * *`).
   - Daily-Safe Automations: `task.overdue_threshold`, `crm.contact_inactive_threshold`.
   - Meeting Reminder Status: `IMPLEMENTED IN ENGINE / LIMITED BY CURRENT SCHEDULER FREQUENCY`.
-  - Cron Secret Status: `CRON_SECRET PRODUCTION CONFIGURATION REQUIRES VERIFICATION`.
+  - Cron Secret Status: `CRON_SECRET PRODUCTION CONFIGURED & VERIFIED (HTTP 200)`.
+  - Automation System Status: `AUTOMATION V1 — PRODUCTION VERIFIED & CLOSED`.
 * **Locked Items (Strictly Preserved):**
   - Owner Access Lock: `DEFERRED — FINAL SECURITY HARDENING`
-  - AI / LLMs: `NOT STARTED`
   - External messaging: `PROHIBITED / ABSENT`
-  - Git state: `UNCOMMITTED / UNPUSHED`
 
 ---
 
-## 7. Planned / Immediate Security Work
+## 7. SHAW V1 — Core Intelligence Status
+
+* **Status:** `BATCH 1 IMPLEMENTED & VERIFIED`
+* **Implementation Scope (Batch 1):**
+  1. **Migration 017 (`017_wv_shaw_intelligence_core.sql`):**
+     - `public.shaw_conversations`: Workspace-scoped persistent threads with routing mode, capability, and archive flags.
+     - `public.shaw_messages`: Ordered conversation messages with model provider, tokens, latency, citations, and proposed actions.
+     - `public.shaw_ai_runs`: Dedicated audit ledger tracking intelligence execution status, token counts, latency, and estimated cost.
+     - `public.shaw_user_preferences`: User-level routing preferences, paid fallback toggle, and default voice profile.
+     - Enforces strict multi-tenancy, composite foreign keys, and RLS via `wv_internal.is_workspace_member(workspace_id)`.
+  2. **Intelligence Gateway & Adapters:**
+     - Server-side provider abstraction with stateless request normalization.
+     - Google Gemini adapter (`gemini-1.5-flash` or configured server value).
+     - Groq adapter (`llama-3.3-70b-versatile` or configured server value).
+     - Architecture-ready for OpenAI, Anthropic, OpenRouter, and local models.
+  3. **Auto Free-First Router:**
+     - Primary: Gemini Free $\rightarrow$ Secondary Free Fallback: Groq on 429 rate limit or service error.
+     - If all free routes exhausted: Halts with clear error (`"Free AI capacity is currently unavailable. Paid fallback is disabled."`).
+     - Paid Fallback Guard (`allow_paid_fallback`): Defaults to `false`. Zero silent billing.
+     - Manual Model Selection: Supports explicit Gemini, Groq, or Auto mode, preserving conversation context across switches.
+  4. **DeFiwaynex Voice Engine & Compliance:**
+     - Canonical voice profile directives embedded server-side (direct, calm, unhurried, plain declarative sentences, concrete language, earned metaphors, anti-AI rules).
+     - Deterministic voice compliance scanner analyzing drafts across em dashes, buzzwords, formulaic contrast patterns, cliché endings, and choppy punctuation. Zero fabricated numerical scores.
+     - Reusable signature CTA generator responding to explicit user requests (*"Add my CTA"*, *"Add research CTA"*). Never appended automatically.
+  5. **Streaming Chat Route (`/api/vault/shaw/chat`):**
+     - Server-Sent Events (SSE) streaming with native Web Streams (`ReadableStream`).
+     - User message and assistant response persistence, conversation title auto-generation, and execution run auditing.
+  6. **Functional Workspace UI (`/vault/shaw`):**
+     - Responsive thread management (new, list, archive), capability selector (Ask / Create), provider selector, streaming output, voice check modal, copy controls.
+* **Verification Status:**
+  - Automated test suite: Passing (`scratch/test_shaw_batch1.js`).
+  - TypeScript type-check: 0 errors (`npm run type-check`).
+  - ESLint: 0 errors (`npm run lint`).
+  - Next.js build: Clean build (`npm run build`).
+  - Git diff check: Clean whitespace and diff (`git diff --check`).
+  - Migrations: 001–016 untouched; Migration 017 created.
+  - Live Provider Configuration: `PENDING SERVER CONFIGURATION (GEMINI_API_KEY, GROQ_API_KEY)`.
+  - Migration 017 Deployment: `PENDING MANUAL SUPABASE DEPLOYMENT`.
+* **Deferred Roadmap for SHAW:**
+  - Full WV Context Retrieval & Analyze Engine: `DEFERRED — BATCH 2`
+  - Automation Proposed-Action Execution: `DEFERRED — BATCH 2`
+  - Deep Research (Tavily, Source Fetching, Evidence Extraction): `DEFERRED — BATCH 3`
+  - Cinematic Welcome View & Split Artifact Inspector: `DEFERRED — BATCH 3`
+  - Image Generation: `DEFERRED`
+
+---
+
+## 8. Planned / Immediate Security Work
 
 * **Vault Owner Access Lock:**
   * **Status:** `DEFERRED — FINAL SECURITY HARDENING`
   * **Description:** Vault Owner Access Lock will be implemented during the final security-hardening phase. The intended designated owner account remains `defiwaynex@gmail.com`. The three operating identities (`DeFiwayneX`, `Joseph Henshaw`, `PEVRA`) remain internal operating contexts, not authentication accounts. Actual authentication enforcement has NOT yet been implemented.
   * **Technical Scope for Hardening Phase:** Enforcement across Supabase Auth, server-side Vault authorization, route protection/middleware, server actions, and RLS/owner checks.
+
 
 ---
 

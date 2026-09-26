@@ -600,3 +600,65 @@ The Automation Hub provides four primary tabs synchronized with the URL query pa
   - Candidate processing loops wrap each evaluation in isolated `try/catch` blocks. A failure evaluating a single task, meeting, or contact is audited and logged without halting processing for subsequent items.
 - **Automated Approval Maintenance:**
   - The cron runner sweeps `automation_approvals` for pending records past `expires_at`, transitioning them to `expired` and updating associated runs to `cancelled`.
+- **Production Verification Status:**
+  - **AUTOMATION V1 — PRODUCTION VERIFIED & CLOSED**
+  - Vercel Cron: `0 6 * * *` configured in `vercel.json`
+  - Production Endpoint: `/api/vault/automation/process-cron` active
+  - `CRON_SECRET`: Configured server-side and verified (manual production cron invocation returned HTTP 200).
+
+---
+
+## VII. SHAW V1 Intelligence Layer Architecture
+
+### 1. Product Hierarchy & Canonical Boundary
+Waynex Vault enforces a strict tripartite product hierarchy:
+* **Waynex Vault:** Durable source of truth and operating environment.
+* **SHAW:** Native intelligence, reasoning, creation, research, and analysis layer.
+* **Automation V1:** Deterministic execution, idempotency, and approval layer.
+
+```
+Waynex Vault (Durable Truth)
+     │
+     ├── Stores truth, records, context, and operational entities
+     │
+     ├── SHAW understands, reasons, drafts, and proposes structured actions
+     │
+     └── Automation executes validated, approved, deterministic actions
+```
+
+**Consequential Action Invariant:**
+SHAW never receives unrestricted direct database mutation authority. Consequential actions (creating tasks, follow-ups, reviews, portfolio snapshots) are formulated as structured action proposals that route through validated server actions and Automation V1 human approvals before database execution.
+
+### 2. Model Independence & Intelligence Gateway
+SHAW owns all conversation history, prompt construction, identity context, voice profiles, citations, provenance, and action proposals. External LLM providers are treated as interchangeable utilities behind a unified, server-side **Intelligence Gateway** (`lib/vault/shaw/gateway/`).
+* **Stateless Provider Sessions:** External providers do not own SHAW thread state. SHAW constructs and injects required context per request.
+* **Model Identifiers as Configuration:** Model IDs are configurable data via server-side environment variables (`SHAW_GEMINI_MODEL`, `SHAW_GROQ_MODEL`) with safe defaults, preventing hardcoded model deprecation dependencies.
+* **Initial Provider Strategy:**
+  - **Primary:** Google Gemini (`gemini-1.5-flash` or configured default)
+  - **Secondary Free Fallback:** Groq (`llama-3.3-70b-versatile` or configured default)
+  - **Architecture-Ready:** OpenAI, Anthropic, OpenRouter, and future local endpoints.
+
+### 3. Routing Modes & Cost Safety
+* **Auto — Free First (Default):**
+  1. Attempts primary free route (Google Gemini).
+  2. On 429 rate limit, quota exhaustion, or service failure, automatically falls back to secondary free route (Groq).
+  3. If all configured free providers are exhausted, execution halts immediately with an explicit error: `"Free AI capacity is currently unavailable. Paid fallback is disabled."`
+* **Paid Fallback Invariant (`allow_paid_fallback`):** Default `false`. SHAW never automatically incurs paid usage unless explicitly authorized by the user.
+* **Manual Model Selection:** Allows operator to explicitly select Gemini, Groq, or Auto mode, pinning selection to the conversation without losing message history.
+
+### 4. Credential Security Boundary
+* **Server-Only Credentials:** Provider API keys (`GEMINI_API_KEY`, `GROQ_API_KEY`) reside exclusively in server-side environment variables.
+* **Zero Secret Storage in Database:** Migration 017 stores zero credentials in Supabase.
+* **Zero Secret Leakage:** Keys are never prefixed with `NEXT_PUBLIC_`, never exposed to client bundles, never returned in API responses, and never logged.
+
+### 5. DeFiwaynex Voice Engine & Compliance Scanner
+* **Voice Profile Directives:** Direct, calm, unhurried tone. Confident without performing confidence. Plain declarative sentences. Concrete language. Banned corporate jargon (*leverage, unlock, elevate, game-changing, cutting-edge, synergy, seamlessly, delve, paradigm*). Earned, unforced metaphors. Anti-AI rules eliminating artificial endings (*"The future isn't waiting..."*, *"And maybe, just maybe..."*).
+* **Deterministic Voice Compliance Scanner:** Analyzes generated drafts against voice invariants, returning structured statuses (`passed`, `warning`, `violation`) across em dashes, buzzwords, formulaic contrast patterns, cliché endings, and choppy punctuation. Zero fabricated numerical scores.
+* **Signature CTA:** Reusable closing signature appended only upon explicit user request (*"Add my CTA"*, *"Add research CTA"*). Never appended automatically.
+
+### 6. Core Schema (Migration 017)
+* `public.shaw_conversations`: Workspace-scoped persistent threads with routing mode, capability, and archive flags.
+* `public.shaw_messages`: Ordered conversation messages with model provider, tokens, latency, citations, and proposed actions.
+* `public.shaw_ai_runs`: Dedicated audit ledger tracking intelligence execution status, token counts, latency, and estimated cost.
+* `public.shaw_user_preferences`: User-level routing preferences, paid fallback toggle, and default voice profile.
+* All tables enforce multi-tenancy and Row Level Security via `wv_internal.is_workspace_member(workspace_id)`.
