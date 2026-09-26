@@ -119,6 +119,7 @@ export interface ShawStreamChunk {
 }
 
 export type CtaType = 'standard' | 'research' | 'strategy' | 'full'
+export type CtaIntent = 'none' | CtaType
 
 export interface ComplianceCheck {
   name: string

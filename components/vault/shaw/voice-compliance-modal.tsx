@@ -80,10 +80,13 @@ export function VoiceComplianceModal({
         <div className="flex items-center justify-between pt-2 border-t border-border text-xs">
           <div className="text-muted-foreground font-mono text-[11px]">
             {result.passed ? (
-              <span className="text-emerald-500 font-medium">Passed voice scan</span>
+              <span className="text-emerald-500 font-medium">No rule violations detected</span>
             ) : (
               <span className="text-red-400 font-medium">Violations detected</span>
             )}
+            <div className="text-[10px] text-muted-foreground font-sans mt-0.5">
+              Deterministic rule check only (em dashes, buzzwords, clichés). Does not evaluate subjective voice quality or tone.
+            </div>
           </div>
 
           <div className="flex items-center gap-2">

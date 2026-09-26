@@ -226,7 +226,19 @@
 
 ## 7. SHAW V1 — Core Intelligence Status
 
-* **Status:** `BATCH 1 IMPLEMENTED & VERIFIED`
+* **Status:** `BATCH 1 PRODUCTION LIVE — CORRECTION #1 RELEASED`
+* **Production Live Verification (Confirmed):**
+  - Migration 017 (`017_wv_shaw_intelligence_core.sql`): `DEPLOYED IN PRODUCTION`
+  - Live Gemini: `VERIFIED IN PRODUCTION`
+  - Live Groq: `VERIFIED IN PRODUCTION`
+  - Auto Free-First real fallback: `VERIFIED (real Gemini HTTP 503 triggers Groq fallback)`
+  - Persistent conversations: `VERIFIED (conversation history survives refresh)`
+  - Provider switching: `VERIFIED (preserves conversation context across switches)`
+  - Ask capability: `VERIFIED IN PRODUCTION`
+  - Create mode: `VERIFIED IN PRODUCTION`
+  - Voice Check modal: `VERIFIED (clarified to deterministic rule checking only)`
+  - CTA Control: `CORRECTED & HARDENED (OPT-IN ONLY, NEGATIVE-FIRST DETERMINISTIC RESOLUTION, SIGNATURE STRIPPING)`
+  - DeFiwayneX Voice Generation: `REFINED (CONCRETE SPOKEN REASONING, ANTI-FORMALISM, SHORT SOCIAL CADENCE, EXPLICIT ANTI-CTA)`
 * **Implementation Scope (Batch 1):**
   1. **Migration 017 (`017_wv_shaw_intelligence_core.sql`):**
      - `public.shaw_conversations`: Workspace-scoped persistent threads with routing mode, capability, and archive flags.
@@ -245,10 +257,10 @@
      - Paid Fallback Guard (`allow_paid_fallback`): Defaults to `false`. Zero silent billing.
      - Manual Model Selection: Supports explicit Gemini, Groq, or Auto mode, preserving conversation context across switches.
   4. **DeFiwaynex Voice Engine & Identity Neutrality:**
-     - Canonical voice profile directives embedded server-side for `DeFiwayneX` (direct, calm, unhurried, plain declarative sentences, concrete language, earned metaphors, anti-AI rules).
+     - Canonical voice profile directives embedded server-side for `DeFiwayneX` (direct, calm, unhurried, plain declarative sentences, concrete language, spoken cadence, anti-formalism, anti-AI rules).
      - Strict identity neutrality for `Joseph Henshaw` and `PEVRA`: strictly factual operating context only; zero fabricated voice personas.
      - Deterministic voice compliance scanner analyzing drafts across em dashes, buzzwords, formulaic contrast patterns, cliché endings, and choppy punctuation. Zero fabricated numerical scores.
-     - Reusable signature CTA generator responding to explicit user requests (*"Add my CTA"*, *"Add research CTA"*). Never appended automatically.
+     - Reusable signature CTA generator responding to explicit user requests (*"Add my CTA"*, *"Add research CTA"*). Opt-in only with deterministic negative-first resolution.
   5. **Streaming Chat Route (`/api/vault/shaw/chat`):**
      - Server-Sent Events (SSE) streaming with native Web Streams (`ReadableStream`).
      - Stream interruption safety: `cancel()` callback marks run as `failed` with abort error and prevents duplicate/empty message generation.
@@ -262,9 +274,7 @@
   - ESLint: 0 errors (`npm run lint`).
   - Next.js build: Clean build (`npm run build`).
   - Git diff check: Clean whitespace and diff (`git diff --check`).
-  - Migrations: 001–016 untouched; Migration 017 created.
-  - Live Provider Configuration: `PENDING SERVER CONFIGURATION (GEMINI_API_KEY, GROQ_API_KEY)`.
-  - Migration 017 Deployment: `PENDING MANUAL SUPABASE DEPLOYMENT`.
+  - Migrations: 001–016 untouched; Migration 017 deployed and unchanged.
 * **Deferred Roadmap for SHAW:**
   - Full WV Context Retrieval & Analyze Engine: `DEFERRED — BATCH 2`
   - Automation Proposed-Action Execution: `DEFERRED — BATCH 2`

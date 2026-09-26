@@ -651,11 +651,11 @@ SHAW owns all conversation history, prompt construction, identity context, voice
 * **Zero Secret Storage in Database:** Migration 017 stores zero credentials in Supabase.
 * **Zero Secret Leakage:** Keys are never prefixed with `NEXT_PUBLIC_`, never exposed to client bundles, never returned in API responses, and never logged.
 
-### 5. Identity Context, Voice Engine & Ask Capability Scope
-* **Canonical Voice Engine (DeFiwaynex):** The dedicated voice engine belongs exclusively to the `DeFiwayneX` identity (direct, calm, unhurried, plain declarative sentences, concrete language, anti-AI rules).
+### 5. Identity Context, Voice Engine & Deterministic CTA Control
+* **Canonical Voice Engine (DeFiwaynex):** The dedicated voice engine belongs exclusively to the `DeFiwayneX` identity. Principles: direct, calm, unhurried, spoken peer-to-peer cadence, concrete real-world mechanisms and consequences over abstract consulting boilerplate, short social posts that flow naturally without artificial hooks or line breaks, and strict anti-AI rules.
 * **Identity Neutrality (Joseph Henshaw & PEVRA):** Joseph Henshaw (founder/executive advisory) and PEVRA (company/legal entity) provide factual operational and organizational context only. Zero fabricated or invented tone profiles are applied to them.
-* **Deterministic Voice Compliance Scanner:** Analyzes generated drafts against voice invariants, returning structured statuses (`passed`, `warning`, `violation`) across em dashes, buzzwords, formulaic contrast patterns, cliché endings, and choppy punctuation. Zero fabricated numerical scores.
-* **Signature CTA:** Reusable closing signature appended only upon explicit user request (*"Add my CTA"*, *"Add research CTA"*). Never appended automatically.
+* **Deterministic Voice Compliance Scanner:** Analyzes generated drafts against voice invariants, returning structured statuses (`passed`, `warning`, `violation`) across em dashes, buzzwords, formulaic contrast patterns, cliché endings, and choppy punctuation. Softened in UI to clarify it is a deterministic rule scan only, not a subjective voice quality score. Zero fabricated numerical scores.
+* **Deterministic Signature CTA (Opt-In Only):** Reusable closing signature appended ONLY upon explicit user opt-in request (*"Add my CTA"*, *"Add research CTA"*, *"Use full CTA"*). Default is strictly `none`. Explicit negative instructions (*"Do not add my CTA"*, *"No CTA"*, *"Without CTA"*) always take precedence and resolve to `none`. Any hallucinated or unrequested signatures are deterministically stripped during post-processing.
 * **Ask Capability Scope (Batch 1 vs Batch 2):** In Batch 1, the `Ask` capability reasons across conversation history, active workspace metadata, selected identity context, and explicit user-provided text. Full cross-database operational retrieval (active tasks, upcoming meetings, portfolio reviews) is scheduled for Batch 2.
 
 ### 6. Core Schema (Migration 017)
