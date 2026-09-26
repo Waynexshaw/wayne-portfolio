@@ -141,19 +141,33 @@ export async function POST(request: NextRequest) {
       userMessageId = insertedMsg?.id || null
     }
 
-    // 4. Load recent conversation history (bounded to last 12 messages)
+    // 4. Load recent conversation history (bounded to last 12 messages ending with the latest user turn)
     const { data: recentMessages } = await (supabase as any)
       .from('shaw_messages')
       .select('role, content')
       .eq('conversation_id', conversationId)
       .eq('workspace_id', workspaceId)
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false })
       .limit(12)
 
-    const history: AdapterMessage[] = (recentMessages || []).map((m: any) => ({
-      role: m.role as 'user' | 'assistant' | 'system',
-      content: m.content,
-    }))
+    const history: AdapterMessage[] = (recentMessages || [])
+      .reverse()
+      .map((m: any) => ({
+        role: m.role as 'user' | 'assistant' | 'system',
+        content: m.content,
+      }))
+
+    // Guarantee provider payload ordering: the history must culminate in the current user turn
+    if (
+      history.length === 0 ||
+      history[history.length - 1].role !== 'user' ||
+      history[history.length - 1].content !== trimmedMessage
+    ) {
+      history.push({
+        role: 'user',
+        content: trimmedMessage,
+      })
+    }
 
     // 5. Build system instructions
     const identity = conversation.identity || null

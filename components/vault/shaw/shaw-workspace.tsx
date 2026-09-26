@@ -39,6 +39,7 @@ import { scanVoiceCompliance, sanitizeObviousViolations } from '@/lib/vault/shaw
 import { VoiceComplianceModal } from './voice-compliance-modal'
 
 export interface InlineRequestError {
+  conversationId: string
   messageId: string
   userPrompt: string
   provider?: string
@@ -234,6 +235,12 @@ export function ShawWorkspace({
   const handleNewConversation = async () => {
     try {
       setErrorMessage(null)
+      setInlineError(null)
+      setMessages([])
+      setInputMessage('')
+      setStreamingText('')
+      setStreamingMeta(null)
+
       const res = await createShawConversationAction(workspaceId, {
         title: 'New Conversation',
         identityId: activeIdentity?.id || null,
@@ -245,6 +252,7 @@ export function ShawWorkspace({
         setConversations((prev) => [res.conversation!, ...prev])
         setActiveConversationId(res.conversation.id)
         setMessages([])
+        setInlineError(null)
         setIsMobileDrawerOpen(false)
       } else {
         setErrorMessage(res.error || 'Failed to create conversation')
@@ -258,11 +266,14 @@ export function ShawWorkspace({
   const handleArchiveConversation = async (convId: string, e: React.MouseEvent) => {
     e.stopPropagation()
     try {
+      setInlineError(null)
       await updateShawConversationAction(workspaceId, convId, { is_archived: true })
       setConversations((prev) => prev.filter((c) => c.id !== convId))
       if (activeConversationId === convId) {
         const remaining = conversations.filter((c) => c.id !== convId)
         setActiveConversationId(remaining[0]?.id || null)
+        setMessages([])
+        setInlineError(null)
       }
     } catch (err) {
       console.error('Failed to archive conversation:', err)
@@ -275,6 +286,7 @@ export function ShawWorkspace({
     options?: {
       isRetry?: boolean
       retryMessageId?: string
+      retryConversationId?: string
       targetRoutingMode?: ShawRoutingMode
     }
   ) => {
@@ -348,7 +360,12 @@ export function ShawWorkspace({
         routingMode: targetRouting,
       }
 
-      if (options?.isRetry && options.retryMessageId && !options.retryMessageId.startsWith('temp-')) {
+      if (
+        options?.isRetry &&
+        options.retryMessageId &&
+        !options.retryMessageId.startsWith('temp-') &&
+        options.retryConversationId === targetConvId
+      ) {
         requestPayload.existingUserMessageId = options.retryMessageId
       }
 
@@ -453,6 +470,7 @@ export function ShawWorkspace({
         }
 
         setInlineError({
+          conversationId: targetConvId,
           messageId: resolvedMessageId,
           userPrompt: textToSend,
           provider: err.provider || targetRouting,
@@ -471,7 +489,7 @@ export function ShawWorkspace({
   }
 
   const handleRetry = async (overrideRoutingMode?: ShawRoutingMode) => {
-    if (!inlineError || isStreaming) return
+    if (!inlineError || isStreaming || inlineError.conversationId !== activeConversationId) return
     const currentError = inlineError
     const modeToUse = overrideRoutingMode || currentError.routingMode
     if (overrideRoutingMode) {
@@ -481,6 +499,7 @@ export function ShawWorkspace({
     await handleSendMessage(currentError.userPrompt, {
       isRetry: true,
       retryMessageId: currentError.messageId,
+      retryConversationId: currentError.conversationId,
       targetRoutingMode: modeToUse,
     })
   }
@@ -554,8 +573,15 @@ export function ShawWorkspace({
                 <div
                   key={conv.id}
                   onClick={() => {
-                    setActiveConversationId(conv.id)
-                    setIsMobileDrawerOpen(false)
+                    if (conv.id !== activeConversationId) {
+                      setActiveConversationId(conv.id)
+                      setInlineError(null)
+                      setErrorMessage(null)
+                      setMessages([])
+                      setIsMobileDrawerOpen(false)
+                    } else {
+                      setIsMobileDrawerOpen(false)
+                    }
                   }}
                   className={`group relative flex items-center justify-between p-2.5 rounded-lg cursor-pointer text-xs transition-colors ${
                     isActive
@@ -733,7 +759,10 @@ export function ShawWorkspace({
             messages.map((msg) => {
               const isUser = msg.role === 'user'
               const hasInlineErrorHere =
-                !isStreaming && inlineError && inlineError.messageId === msg.id
+                !isStreaming &&
+                inlineError &&
+                inlineError.conversationId === activeConversationId &&
+                inlineError.messageId === msg.id
 
               return (
                 <React.Fragment key={msg.id}>
@@ -816,6 +845,7 @@ export function ShawWorkspace({
           {/* Fallback inline error if error occurred without matching message */}
           {!isStreaming &&
             inlineError &&
+            inlineError.conversationId === activeConversationId &&
             !messages.some((m) => m.id === inlineError.messageId) && (
               <InlineFailureCard
                 error={inlineError}
