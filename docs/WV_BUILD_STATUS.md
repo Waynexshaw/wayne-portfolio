@@ -195,13 +195,14 @@
      - Mark single notification read and mark all read server actions.
      - Command Center attention section integration (`components/vault/attention-section.tsx`) surfacing pending approvals and recent run failures.
      - Zero external delivery channels (pure internal storage).
-     - Cron route (`/api/vault/automation/process-cron`) with Vercel cron configuration (`vercel.json` hourly: `0 * * * *`).
+     - Cron route (`/api/vault/automation/process-cron`) with Vercel cron configuration (`vercel.json` once daily: `0 6 * * *` for Vercel Hobby plan compatibility).
      - Strict authorization boundary: `CRON_SECRET` Bearer token authentication (unauthorized requests return 401; secret non-leakage guaranteed).
      - Elevated service-role client strictly scoped by workspace IDs retrieved from active rules.
-     - Deterministic time semantics: calendar day differences on ISO dates for tasks (excluding completed/cancelled/archived); timestamp ranges on canonical `scheduled_at` for upcoming meetings; elapsed activity days from canonical `last_contacted_at` (updated on interaction logs, never profile edits) for inactive contacts (proposal-only, zero automated contact).
+     - Deterministic time semantics: calendar day differences on ISO dates for tasks (excluding completed/cancelled/archived); elapsed activity days from canonical `last_contacted_at` (updated on interaction logs, never profile edits) for inactive contacts (proposal-only, zero automated contact).
      - Candidate failure isolation: isolated try/catch per candidate preventing cascade aborts.
-     - Deterministic idempotency keys: daily key for tasks, schedule-anchored key for meetings, and 30-day cycle bucket key + pending approval checks for contacts prevent hourly repeat flooding.
+     - Deterministic idempotency keys: daily key for tasks, schedule-anchored key for meetings, and 30-day cycle bucket key + pending approval checks for contacts prevent repeat flooding.
      - Automated approval expiration maintenance.
+     - Meeting Reminder Precision Boundary: `meeting.upcoming_reminder` is `IMPLEMENTED IN ENGINE / LIMITED BY CURRENT SCHEDULER FREQUENCY`. The Hobby once-daily cron at 06:00 UTC cannot provide reliable 2-hour meeting alerts; the template `upcoming_meeting_briefing_alert` is disabled in UI with clear messaging until higher-frequency scheduling is configured.
 * **Verification Status:**
   - Automated test suite: 31/31 passing (`test_automation_batch2.js`).
   - Production database verification: All 5 tables confirmed via live PostgREST schema (0 fake records).
@@ -211,7 +212,10 @@
   - Git diff check: Clean whitespace and diff (`git diff --check`).
   - Packages: `package.json` and `package-lock.json` untouched.
   - Migrations: 001–016 untouched; Migration 017 absent.
-  - Vercel Cron Status: `HOURLY CRON CONFIGURED — PRODUCTION PLAN COMPATIBILITY UNVERIFIED`.
+  - Vercel Production Plan: `HOBBY`.
+  - Scheduled Processor: `CONFIGURED DAILY` (`0 6 * * *`).
+  - Daily-Safe Automations: `task.overdue_threshold`, `crm.contact_inactive_threshold`.
+  - Meeting Reminder Status: `IMPLEMENTED IN ENGINE / LIMITED BY CURRENT SCHEDULER FREQUENCY`.
   - Cron Secret Status: `CRON_SECRET PRODUCTION CONFIGURATION REQUIRES VERIFICATION`.
 * **Locked Items (Strictly Preserved):**
   - Owner Access Lock: `DEFERRED — FINAL SECURITY HARDENING`

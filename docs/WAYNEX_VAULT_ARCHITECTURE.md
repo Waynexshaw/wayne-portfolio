@@ -582,7 +582,12 @@ The Automation Hub provides four primary tabs synchronized with the URL query pa
   - "Automation Run Failures": Flags recent rule execution errors for inspection in History.
 
 ### 4. Scheduled Processing & Time Semantics (`/api/vault/automation/process-cron`)
-- **Vercel Cron Trigger:** Configured via `vercel.json` to execute hourly (`0 * * * *`).
+- **Vercel Cron Trigger:** Configured via `vercel.json` to execute once daily at 06:00 UTC (`0 6 * * *`) for Vercel Hobby plan compatibility.
+- **Production Scheduler & Deployment Plan Boundary:**
+  - Vercel Production Plan: `HOBBY`
+  - Scheduled Processor: `CONFIGURED DAILY` (`0 6 * * *`)
+  - Daily-Safe Automations: `task.overdue_threshold` and `crm.contact_inactive_threshold` operate reliably under daily scheduling with existing idempotency guarantees.
+  - Meeting Reminder Limitation: `meeting.upcoming_reminder` is `IMPLEMENTED IN ENGINE / LIMITED BY CURRENT SCHEDULER FREQUENCY`. Reliable ~2-hour meeting reminders require a higher-frequency scheduler (e.g. hourly on Vercel Pro). The engine trigger and template architecture remain fully intact and ready for higher-frequency scheduling, but activation is clearly disabled with an explanatory badge in the UI under the current Hobby deployment.
 - **Security & Authorization Boundary:**
   - Route requires `Authorization: Bearer <CRON_SECRET>`. Missing or invalid tokens immediately reject with 401 Unauthorized.
   - Secret Non-Leakage: `CRON_SECRET` is never printed, logged, or reflected in API responses.

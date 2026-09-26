@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/vault/automation/process-cron",
-      "schedule": "0 * * * *"
+      "schedule": "0 6 * * *"
     }
   ]
 }

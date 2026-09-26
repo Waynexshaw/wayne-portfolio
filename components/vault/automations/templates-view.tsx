@@ -102,6 +102,10 @@ export function TemplatesView({
                     <span className="px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-mono tracking-wider font-semibold flex items-center gap-1 shrink-0">
                       <Check className="w-3 h-3" /> Active
                     </span>
+                  ) : template.is_disabled_on_hobby ? (
+                    <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-mono tracking-wider flex items-center gap-1 shrink-0">
+                      <AlertTriangle className="w-3 h-3" /> Requires Higher-Frequency Scheduler
+                    </span>
                   ) : template.is_batch2_scheduled ? (
                     <span className="px-2 py-0.5 rounded-full bg-secondary border border-border text-muted-foreground text-[10px] font-mono tracking-wider flex items-center gap-1 shrink-0">
                       <Clock className="w-3 h-3" /> Scheduled
@@ -116,6 +120,15 @@ export function TemplatesView({
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   {template.description}
                 </p>
+
+                {template.is_disabled_on_hobby && (
+                  <div className="p-2.5 rounded-lg bg-amber-500/5 border border-amber-500/20 text-[11px] text-amber-700 dark:text-amber-400/90 leading-relaxed flex items-start gap-2">
+                    <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <span>
+                      Requires higher-frequency scheduler (current deployment runs once daily at 06:00 UTC). Preserved in engine for future hourly scheduling.
+                    </span>
+                  </div>
+                )}
 
                 {/* Pipeline metadata */}
                 <div className="space-y-1.5 pt-1 text-[11px] font-mono text-muted-foreground">
@@ -155,6 +168,15 @@ export function TemplatesView({
                     className="px-3 py-1.5 rounded-lg border border-border bg-secondary/50 text-muted-foreground text-xs font-mono cursor-not-allowed flex items-center gap-1"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5 text-primary" /> Active in Workspace
+                  </button>
+                ) : template.is_disabled_on_hobby ? (
+                  <button
+                    type="button"
+                    disabled
+                    className="px-3 py-1.5 rounded-lg border border-border bg-secondary/40 text-muted-foreground text-xs font-mono cursor-not-allowed flex items-center gap-1.5"
+                    title={template.disabled_reason || 'Requires higher-frequency scheduler'}
+                  >
+                    <Clock className="w-3.5 h-3.5" /> Higher-Frequency Required
                   </button>
                 ) : (
                   <button

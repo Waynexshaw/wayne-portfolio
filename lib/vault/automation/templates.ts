@@ -140,6 +140,8 @@ export const AUTOMATION_TEMPLATES: Record<string, AutomationTemplate> = {
     },
     requires_approval: false,
     is_batch2_scheduled: true, // Reserved for Batch 2
+    is_disabled_on_hobby: true,
+    disabled_reason: 'Requires higher-frequency scheduler (deployment currently scheduled once daily at 06:00 UTC)',
   },
 }
 

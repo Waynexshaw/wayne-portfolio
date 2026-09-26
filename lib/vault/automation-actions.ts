@@ -256,6 +256,14 @@ export async function instantiateAutomationRuleFromTemplateAction(
     return { success: false, error: `Template '${templateId}' not found` }
   }
 
+  // Prevent activation of templates requiring higher-frequency scheduling on Hobby deployment
+  if (template.is_disabled_on_hobby) {
+    return {
+      success: false,
+      error: `Activation unavailable: "${template.title}" requires a higher-frequency scheduler. Current deployment runs once daily at 06:00 UTC.`,
+    }
+  }
+
   // Prevent accidental duplicate active instances of the same template in workspace (Section 20)
   const { data: existingActive } = await (supabase as any)
     .from('automation_rules')

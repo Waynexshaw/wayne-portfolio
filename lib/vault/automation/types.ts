@@ -163,4 +163,6 @@ export interface AutomationTemplate {
   default_action_config: Record<string, any>
   requires_approval: boolean
   is_batch2_scheduled?: boolean
+  is_disabled_on_hobby?: boolean
+  disabled_reason?: string
 }
