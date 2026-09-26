@@ -20,6 +20,7 @@ import {
   X,
   AlertCircle,
   StopCircle,
+  RotateCcw,
 } from 'lucide-react'
 import {
   ShawConversation,
@@ -36,6 +37,111 @@ import {
 } from '@/lib/vault/shaw-actions'
 import { scanVoiceCompliance, sanitizeObviousViolations } from '@/lib/vault/shaw/voice/compliance'
 import { VoiceComplianceModal } from './voice-compliance-modal'
+
+export interface InlineRequestError {
+  messageId: string
+  userPrompt: string
+  provider?: string
+  statusCode?: number | string
+  errorSummary: string
+  capability: ShawCapability
+  routingMode: ShawRoutingMode
+  createdAt: string
+}
+
+interface InlineFailureCardProps {
+  error: InlineRequestError
+  isStreaming: boolean
+  onRetry: (overrideRoutingMode?: ShawRoutingMode) => void
+}
+
+function InlineFailureCard({ error, isStreaming, onRetry }: InlineFailureCardProps) {
+  const provider = (error.provider || error.routingMode || '').toLowerCase()
+  let providerLabel = 'AI Provider'
+  let providerTitle = "Provider couldn't respond"
+
+  if (provider.includes('gemini')) {
+    providerLabel = 'Google Gemini'
+    providerTitle = "Gemini couldn't respond"
+  } else if (provider.includes('groq')) {
+    providerLabel = 'Groq'
+    providerTitle = "Groq couldn't respond"
+  } else if (provider.includes('auto')) {
+    providerLabel = 'Auto Free-First'
+    providerTitle = "SHAW couldn't complete request"
+  }
+
+  // Clean error message summary
+  let summary = error.errorSummary || 'An error occurred during response generation'
+  // Remove technical prefixes like [gemini] HTTP 503: or Error:
+  summary = summary.replace(/^\[[a-z0-9_-]+\]\s*(HTTP\s*\d+:\s*)?/i, '')
+  summary = summary.replace(/^(Error:\s*)+/i, '')
+  if (summary.startsWith('{') && summary.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(summary)
+      summary = parsed.message || parsed.error || summary
+    } catch {}
+  }
+
+  const isManualProvider = error.routingMode !== 'auto_free_first'
+
+  return (
+    <div className="flex gap-3 text-xs leading-relaxed max-w-3xl mr-auto justify-start animate-in fade-in-0 duration-150">
+      <div className="w-7 h-7 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500 shrink-0 mt-0.5">
+        <AlertCircle className="w-4 h-4" />
+      </div>
+
+      <div className="space-y-3 rounded-2xl p-3.5 sm:p-4 bg-card border border-red-500/20 text-foreground max-w-2xl shadow-xs">
+        <div className="space-y-1">
+          <div className="font-medium text-foreground text-xs font-mono">
+            {providerTitle}
+          </div>
+          <p className="text-muted-foreground text-xs leading-relaxed select-text">
+            {summary}
+          </p>
+        </div>
+
+        <div className="pt-2 border-t border-border/40 flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono text-muted-foreground">
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-secondary/80 text-muted-foreground">
+            <span>{providerLabel}</span>
+            {error.statusCode && (
+              <>
+                <span className="opacity-40">•</span>
+                <span>HTTP {error.statusCode}</span>
+              </>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {isManualProvider && (
+              <button
+                type="button"
+                onClick={() => onRetry('auto_free_first')}
+                disabled={isStreaming}
+                className="px-2.5 py-1 rounded-md bg-secondary hover:bg-secondary/80 text-foreground transition-colors flex items-center gap-1.5 font-sans text-xs disabled:opacity-50 min-h-[32px]"
+                title="Retry using Auto Free-First router"
+              >
+                <Sparkles className="w-3 h-3 text-primary" />
+                Use Auto Free-First
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => onRetry()}
+              disabled={isStreaming}
+              className="px-2.5 py-1 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex items-center gap-1.5 font-sans text-xs disabled:opacity-50 font-medium min-h-[32px]"
+              title="Retry request"
+            >
+              <RotateCcw className="w-3 h-3" />
+              Try again
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 interface ShawWorkspaceProps {
   workspaceId: string
@@ -68,6 +174,7 @@ export function ShawWorkspace({
   const [capability, setCapability] = useState<ShawCapability>('ask')
   const [routingMode, setRoutingMode] = useState<ShawRoutingMode>(defaultRoutingMode)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [inlineError, setInlineError] = useState<InlineRequestError | null>(null)
 
   // UI Drawer / Modals
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState<boolean>(false)
@@ -78,21 +185,23 @@ export function ShawWorkspace({
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Auto-scroll on new message / stream
+  // Auto-scroll on new message / stream / failure
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, streamingText])
+  }, [messages, streamingText, inlineError])
 
   // Load conversation messages on active id change
   useEffect(() => {
     if (!activeConversationId) {
       setMessages([])
+      setInlineError(null)
       return
     }
 
     let isMounted = true
     setIsLoadingMessages(true)
     setErrorMessage(null)
+    setInlineError(null)
 
     getShawConversationDetailAction(workspaceId, activeConversationId)
       .then((detail) => {
@@ -161,11 +270,21 @@ export function ShawWorkspace({
   }
 
   // Submit Prompt & Stream Response
-  const handleSendMessage = async (customPrompt?: string) => {
+  const handleSendMessage = async (
+    customPrompt?: string,
+    options?: {
+      isRetry?: boolean
+      retryMessageId?: string
+      targetRoutingMode?: ShawRoutingMode
+    }
+  ) => {
     const textToSend = (customPrompt || inputMessage).trim()
     if (!textToSend || isStreaming) return
 
     setErrorMessage(null)
+    setInlineError(null)
+
+    const targetRouting = options?.targetRoutingMode || routingMode
 
     // Guarantee active conversation exists
     let targetConvId = activeConversationId
@@ -174,7 +293,7 @@ export function ShawWorkspace({
         title: textToSend.slice(0, 48),
         identityId: activeIdentity?.id || null,
         capability,
-        routingMode,
+        routingMode: targetRouting,
       })
       if (!res.success || !res.conversation) {
         setErrorMessage(res.error || 'Failed to initialize conversation')
@@ -185,20 +304,29 @@ export function ShawWorkspace({
       setActiveConversationId(targetConvId)
     }
 
-    // Add optimistic user message to view
-    const tempUserMsg: ShawMessage = {
-      id: `temp-${Date.now()}`,
-      conversation_id: targetConvId,
-      workspace_id: workspaceId,
-      role: 'user',
-      content: textToSend,
-      citations: [],
-      proposed_actions: [],
-      created_at: new Date().toISOString(),
+    let activeTargetMessageId: string
+
+    if (options?.isRetry) {
+      // Re-use existing user message ID; do not append duplicate to UI
+      activeTargetMessageId =
+        options.retryMessageId || messages[messages.length - 1]?.id || `temp-${Date.now()}`
+    } else {
+      // Add optimistic user message to view
+      const tempUserMsg: ShawMessage = {
+        id: `temp-${Date.now()}`,
+        conversation_id: targetConvId,
+        workspace_id: workspaceId,
+        role: 'user',
+        content: textToSend,
+        citations: [],
+        proposed_actions: [],
+        created_at: new Date().toISOString(),
+      }
+      activeTargetMessageId = tempUserMsg.id
+      setMessages((prev) => [...prev, tempUserMsg])
+      setInputMessage('')
     }
 
-    setMessages((prev) => [...prev, tempUserMsg])
-    setInputMessage('')
     setIsStreaming(true)
     setStreamingText('')
     setStreamingMeta(null)
@@ -222,7 +350,7 @@ export function ShawWorkspace({
           conversationId: targetConvId,
           message: textToSend,
           capability,
-          routingMode,
+          routingMode: targetRouting,
         }),
         signal: abortController.signal,
       })
@@ -230,11 +358,17 @@ export function ShawWorkspace({
       if (!response.ok) {
         const errJson = await response.json().catch(() => null)
         const errMsg = errJson?.error || `HTTP ${response.status}: Failed to generate response`
-        throw new Error(errMsg)
+        const errObj: any = new Error(errMsg)
+        errObj.statusCode = errJson?.statusCode || response.status
+        errObj.provider = errJson?.provider || targetRouting
+        throw errObj
       }
 
       if (!response.body) {
-        throw new Error('Streaming response body is empty')
+        const errObj: any = new Error('Streaming response body is empty')
+        errObj.statusCode = response.status
+        errObj.provider = targetRouting
+        throw errObj
       }
 
       const reader = response.body.getReader()
@@ -266,7 +400,10 @@ export function ShawWorkspace({
               latestMeta = chunk
               setStreamingMeta(chunk)
             } else if (chunk.type === 'error') {
-              throw new Error(chunk.error || 'Stream error')
+              const streamErr: any = new Error(chunk.error || 'Stream error')
+              streamErr.statusCode = 500
+              streamErr.provider = targetRouting
+              throw streamErr
             }
           } catch (e: any) {
             if (e.message !== 'Unexpected end of JSON input') {
@@ -289,14 +426,38 @@ export function ShawWorkspace({
       if (err.name === 'AbortError') {
         console.log('Stream aborted by user')
       } else {
-        console.error('Chat error:', err)
-        setErrorMessage(err.message || 'An error occurred during response generation')
+        console.error('Chat request error:', err)
+        setInlineError({
+          messageId: activeTargetMessageId,
+          userPrompt: textToSend,
+          provider: err.provider || targetRouting,
+          statusCode: err.statusCode || (err.message?.includes('503') ? 503 : undefined),
+          errorSummary: err.message || 'An error occurred during response generation',
+          capability,
+          routingMode: targetRouting,
+          createdAt: new Date().toISOString(),
+        })
       }
     } finally {
       setIsStreaming(false)
       setStreamingText('')
       abortControllerRef.current = null
     }
+  }
+
+  const handleRetry = async (overrideRoutingMode?: ShawRoutingMode) => {
+    if (!inlineError || isStreaming) return
+    const currentError = inlineError
+    const modeToUse = overrideRoutingMode || currentError.routingMode
+    if (overrideRoutingMode) {
+      setRoutingMode(overrideRoutingMode)
+    }
+    setInlineError(null)
+    await handleSendMessage(currentError.userPrompt, {
+      isRetry: true,
+      retryMessageId: currentError.messageId,
+      targetRoutingMode: modeToUse,
+    })
   }
 
   const handleStopStream = () => {
@@ -546,74 +707,97 @@ export function ShawWorkspace({
             /* Dialogue Messages */
             messages.map((msg) => {
               const isUser = msg.role === 'user'
-              return (
-                <div
-                  key={msg.id}
-                  className={`flex gap-3 text-xs leading-relaxed max-w-3xl ${
-                    isUser ? 'ml-auto justify-end' : 'mr-auto justify-start'
-                  }`}
-                >
-                  {!isUser && (
-                    <div className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0 mt-0.5">
-                      <Bot className="w-4 h-4" />
-                    </div>
-                  )}
+              const hasInlineErrorHere =
+                !isStreaming && inlineError && inlineError.messageId === msg.id
 
+              return (
+                <React.Fragment key={msg.id}>
                   <div
-                    className={`space-y-2 rounded-2xl p-4 ${
-                      isUser
-                        ? 'bg-primary text-primary-foreground max-w-xl'
-                        : 'bg-card border border-border text-foreground max-w-2xl shadow-xs'
+                    className={`flex gap-3 text-xs leading-relaxed max-w-3xl ${
+                      isUser ? 'ml-auto justify-end' : 'mr-auto justify-start'
                     }`}
                   >
-                    <div className="whitespace-pre-wrap leading-relaxed select-text font-sans">
-                      {msg.content}
-                    </div>
-
                     {!isUser && (
-                      <div className="pt-2 border-t border-border/40 flex items-center justify-between text-[10px] font-mono text-muted-foreground">
-                        <div className="flex items-center gap-2">
-                          {msg.model_provider && (
-                            <span className="capitalize">{msg.model_provider}</span>
-                          )}
-                          {msg.latency_ms && (
-                            <span>{(msg.latency_ms / 1000).toFixed(1)}s</span>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-1.5">
-                          {capability === 'create' && (
-                            <button
-                              type="button"
-                              onClick={() => handleCheckVoiceCompliance(msg.content)}
-                              className="px-2 py-0.5 rounded hover:bg-secondary hover:text-foreground transition-colors flex items-center gap-1"
-                              title="Inspect Voice Compliance"
-                            >
-                              <ShieldCheck className="w-3 h-3 text-primary" />
-                              Voice Check
-                            </button>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() => handleCopy(msg.id, msg.content)}
-                            className="p-1 rounded hover:bg-secondary hover:text-foreground transition-colors"
-                            title="Copy to clipboard"
-                          >
-                            {copiedId === msg.id ? (
-                              <Check className="w-3 h-3 text-emerald-500" />
-                            ) : (
-                              <Copy className="w-3 h-3" />
-                            )}
-                          </button>
-                        </div>
+                      <div className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0 mt-0.5">
+                        <Bot className="w-4 h-4" />
                       </div>
                     )}
+
+                    <div
+                      className={`space-y-2 rounded-2xl p-4 ${
+                        isUser
+                          ? 'bg-primary text-primary-foreground max-w-xl'
+                          : 'bg-card border border-border text-foreground max-w-2xl shadow-xs'
+                      }`}
+                    >
+                      <div className="whitespace-pre-wrap leading-relaxed select-text font-sans">
+                        {msg.content}
+                      </div>
+
+                      {!isUser && (
+                        <div className="pt-2 border-t border-border/40 flex items-center justify-between text-[10px] font-mono text-muted-foreground">
+                          <div className="flex items-center gap-2">
+                            {msg.model_provider && (
+                              <span className="capitalize">{msg.model_provider}</span>
+                            )}
+                            {msg.latency_ms && (
+                              <span>{(msg.latency_ms / 1000).toFixed(1)}s</span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            {capability === 'create' && (
+                              <button
+                                type="button"
+                                onClick={() => handleCheckVoiceCompliance(msg.content)}
+                                className="px-2 py-0.5 rounded hover:bg-secondary hover:text-foreground transition-colors flex items-center gap-1"
+                                title="Inspect Voice Compliance"
+                              >
+                                <ShieldCheck className="w-3 h-3 text-primary" />
+                                Voice Check
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(msg.id, msg.content)}
+                              className="p-1 rounded hover:bg-secondary hover:text-foreground transition-colors"
+                              title="Copy to clipboard"
+                            >
+                              {copiedId === msg.id ? (
+                                <Check className="w-3 h-3 text-emerald-500" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
+
+                  {hasInlineErrorHere && (
+                    <InlineFailureCard
+                      error={inlineError}
+                      isStreaming={isStreaming}
+                      onRetry={handleRetry}
+                    />
+                  )}
+                </React.Fragment>
               )
             })
           )}
+
+          {/* Fallback inline error if error occurred without matching message */}
+          {!isStreaming &&
+            inlineError &&
+            !messages.some((m) => m.id === inlineError.messageId) && (
+              <InlineFailureCard
+                error={inlineError}
+                isStreaming={isStreaming}
+                onRetry={handleRetry}
+              />
+            )}
 
           {/* Active Streaming Chunk Display */}
           {isStreaming && (

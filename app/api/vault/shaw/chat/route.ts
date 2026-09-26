@@ -155,8 +155,21 @@ export async function POST(request: NextRequest) {
           .eq('id', runId)
       }
 
-      const status = routeErr instanceof ShawRoutingError ? 503 : 500
-      return NextResponse.json({ error: routeErr.message || 'Routing failure' }, { status })
+      const status =
+        typeof routeErr.statusCode === 'number'
+          ? routeErr.statusCode
+          : routeErr instanceof ShawRoutingError
+          ? 503
+          : 500
+
+      return NextResponse.json(
+        {
+          error: routeErr.message || 'Routing failure',
+          provider: routeErr.provider || (routingMode === 'auto_free_first' ? 'auto' : routingMode),
+          statusCode: status,
+        },
+        { status }
+      )
     }
 
     const { stream, provider, model, wasFallback, getUsage } = routeResult
