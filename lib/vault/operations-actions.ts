@@ -14,6 +14,7 @@ import {
   TaskPriority,
   OperationsStats,
 } from './operations/types'
+import { emitAutomationEvent } from './automation/engine'
 
 // Helper to verify user and workspace membership
 async function requireWorkspaceAccess(workspaceId: string) {
@@ -695,6 +696,19 @@ export async function updateMeetingAction(
     updatePayload.company_id = input.company_id || null
   }
 
+  let isTransitionToCompleted = false
+  if (input.status === 'completed') {
+    const { data: existingMeeting } = await (supabase as any)
+      .from('meetings')
+      .select('status')
+      .eq('id', meetingId)
+      .eq('workspace_id', workspaceId)
+      .maybeSingle()
+    if (existingMeeting && existingMeeting.status !== 'completed') {
+      isTransitionToCompleted = true
+    }
+  }
+
   const { data, error } = await (supabase as any)
     .from('meetings')
     .update(updatePayload)
@@ -726,6 +740,30 @@ export async function updateMeetingAction(
   if (error || !data) {
     console.error('Error updating meeting:', error)
     throw new Error(error?.message || 'Failed to update meeting')
+  }
+
+  if (isTransitionToCompleted) {
+    try {
+      await emitAutomationEvent({
+        workspaceId,
+        eventType: 'meeting.completed',
+        entityType: 'meeting',
+        entityId: data.id,
+        payload: {
+          id: data.id,
+          title: data.title,
+          project_id: data.project_id,
+          company_id: data.company_id,
+          outcomes: data.outcomes,
+          notes: data.notes,
+          scheduled_at: data.scheduled_at,
+          ended_at: data.ended_at,
+        },
+        client: supabase,
+      })
+    } catch (err) {
+      console.error('Automation dispatch error (meeting.completed):', err)
+    }
   }
 
   revalidatePath('/vault/operations')
@@ -1043,6 +1081,28 @@ export async function createDecisionAction(
   if (error || !data) {
     console.error('Error creating decision:', error)
     throw new Error(error?.message || 'Failed to create decision')
+  }
+
+  try {
+    await emitAutomationEvent({
+      workspaceId,
+      eventType: 'decision.created',
+      entityType: 'decision',
+      entityId: data.id,
+      payload: {
+        id: data.id,
+        title: data.title,
+        decision: data.decision,
+        consequences: data.consequences,
+        project_id: data.project_id,
+        meeting_id: data.meeting_id,
+        decided_at: data.decided_at,
+      },
+      actorId: user.id,
+      client: supabase,
+    })
+  } catch (err) {
+    console.error('Automation dispatch error (decision.created):', err)
   }
 
   revalidatePath('/vault/operations')

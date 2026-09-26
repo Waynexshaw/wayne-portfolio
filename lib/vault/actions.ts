@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { cookies } from 'next/headers'
 
 import { getVaultContextCached, VaultWorkspace, VaultIdentity, VaultContextResult } from './context'
+import { emitAutomationEvent } from './automation/engine'
 
 export type { VaultWorkspace, VaultIdentity, VaultContextResult }
 
@@ -1363,6 +1364,28 @@ export async function updateProjectLifecycle(
     .single()
 
   if (error) throw new Error(error.message)
+
+  if (action === 'complete') {
+    try {
+      await emitAutomationEvent({
+        workspaceId,
+        eventType: 'project.completed',
+        entityType: 'project',
+        entityId: data.id,
+        payload: {
+          id: data.id,
+          title: data.title,
+          description: data.description,
+          priority: data.priority,
+          completed_at: data.completed_at,
+        },
+        actorId: user.id,
+        client: supabase,
+      })
+    } catch (err) {
+      console.error('Automation dispatch error (project.completed):', err)
+    }
+  }
 
   revalidatePath('/vault/projects')
   revalidatePath(`/vault/projects/${id}`)

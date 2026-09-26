@@ -449,3 +449,78 @@ Following live product testing and UX diagnostics, Waynex Vault implements five 
 ### 5. Explicit Created-Item Entry Affordance Principle
 * **Standard:** While whole-card clickable surfaces remain convenient, high-cardinality directory cards MUST provide compact, explicit, high-contrast entry CTAs ("Open Project", "Open Folder", "Open Document", "Open Spreadsheet", "Preview", "View Review", "View Record", "View Metric", "View Contact", "View Company", "View Meeting", "View Decision", "View Claim").
 * **User Benefit:** Provides immediate visual clarity and obvious intent affordances on desktop browsers and assistive devices without relying solely on subtle card hover effects.
+
+---
+
+## 16. Automation System V1 Architecture (Batch 1: Engine & Approval Core)
+
+### Purpose & Conceptual Operating Model
+The Automation System transforms Waynex Vault from a purely manual record-keeping system into an **Assisted Operating System**. It reduces repetitive operational overhead while preserving sovereign human judgment. Consequential actions (creating tasks, staging relationship follow-ups, proposing portfolio bridges, drafting reviews) are never executed autonomously without explicit human authorization.
+
+```text
+DOMAIN EVENT
+  → EVENT LOG (Durable occurrence capture)
+    → MATCH ACTIVE RULES (Workspace-isolated filter)
+      → EVALUATE CONDITIONS (Deterministic non-eval JSON engine)
+        → CREATE RUN (Idempotent execution ledger)
+          → IF SAFE: AUTONOMOUS ACTION (Internal notifications only)
+          → IF CONSEQUENTIAL: STAGE APPROVAL (Human authorization required)
+            → HUMAN REVIEW (Approve / Reject / Edit+Approve)
+              → DETERMINISTIC ACTION EXECUTION + AUDIT UPDATE
+```
+
+### Canonical Schema Architecture (Migration 016)
+1. **`public.automation_rules`**: Parameterized automation rules scoped strictly to `(workspace_id)`.
+   - `trigger_type`: Namespaced trigger identifier (`meeting.completed`, `decision.created`, etc.).
+   - `conditions`: Normalized JSON schema holding `conjunction` (`AND` | `OR`) and `predicates` (`equals`, `not_equals`, `in`, `not_in`, `greater_than`, `less_than`, `is_null`, `is_not_null`).
+   - `action_type`: Namespaced action identifier (`suggest_task_creation`, `create_internal_notification`, etc.).
+   - `requires_approval`: Descriptive boolean flag (independently validated against the server-side hard safety registry).
+   - `version`: Monotonically incremented integer tracking rule updates.
+   - Lifecycle: `is_active` boolean toggle paired with `archived_at TIMESTAMPTZ`. Permanent deletes are omitted from the UI.
+2. **`public.automation_event_log`**: Durable audit ledger capturing raw business domain occurrences with actor ID, entity reference, and full JSON payload snapshot.
+3. **`public.automation_runs`**: Execution and audit record tracking rule execution, status lifecycle (`pending`, `awaiting_approval`, `approved`, `rejected`, `running`, `succeeded`, `failed`, `skipped`, `cancelled`), rule snapshot at execution time, execution details, and error diagnostics.
+   - Enforces unique idempotency: `UNIQUE (workspace_id, idempotency_key)`.
+4. **`public.automation_approvals`**: Human authorization queue storing proposed payloads, optional modified payloads, status (`pending`, `approved`, `rejected`, `expired`), source context provenance, and reviewer attribution.
+5. **`public.workspace_notifications`**: In-app internal notification ledger categorized by `approval_required`, `automation_alert`, `reminder`, `system`.
+
+### Structural Workspace Isolation & Composite Foreign Keys
+Following established WV multi-tenant principles, all automation tables enforce workspace boundaries at the database level:
+- Composite Unique constraints on `(id, workspace_id)` across all five tables.
+- Composite Foreign Keys:
+  - `automation_runs(rule_id, workspace_id) REFERENCES automation_rules(id, workspace_id)`
+  - `automation_runs(trigger_event_id, workspace_id) REFERENCES automation_event_log(id, workspace_id)`
+  - `automation_approvals(run_id, workspace_id) REFERENCES automation_runs(id, workspace_id)`
+  - `workspace_notifications(source_run_id, workspace_id) REFERENCES automation_runs(id, workspace_id)`
+- Immutability Triggers: `trg_prevent_auto_*_tampering` prevent modifying `workspace_id` (and `run_id` on approvals).
+- Cross-workspace references are structurally impossible at the database level.
+
+### Hard Approval Safety Registry
+The server-side action registry (`lib/vault/automation/actions.ts`) is authoritative for approval requirements:
+- `APPROVAL_REQUIRED_ACTION_TYPES`: `suggest_task_creation`, `suggest_follow_up_creation`, `suggest_portfolio_snapshot`, `suggest_review_creation`.
+- `SAFE_AUTONOMOUS_ACTION_TYPES`: `create_internal_notification`.
+- Invariant: A database rule cannot override hardcoded safety boundaries. Even if a malformed rule specifies `requires_approval: false` for `suggest_portfolio_snapshot`, the executor strictly refuses autonomous execution and diverts to the approval queue.
+
+### Portfolio Bridge Safety Contract
+- Invariant: **Evidence approval != publication.**
+- Invariant: **Portfolio snapshot != public CMS publication.**
+- The automation system cannot mutate public projects, public case studies, or public portfolio narratives. Snapshot generation creates private bridge proposals only, executed exclusively through the existing private `portfolio_evidence_bridges` architecture upon explicit approval.
+
+### Narrow Lifecycle Event Hooks & Reliable Dispatch (Batch 1)
+Event emission is integrated into four exact domain transitions:
+1. `meeting.completed`: Emitted strictly when meeting status transitions from a non-completed state into `completed`. Editing an already-completed meeting does not re-emit.
+2. `decision.created`: Emitted once upon successful creation of an immutable decision ledger record.
+3. `evidence.approved`: Emitted strictly when evidence status transitions from `draft` to `approved`. Editing an already-approved evidence does not re-emit.
+4. `project.completed`: Emitted strictly when project lifecycle action is `complete`. Other lifecycle actions (`start`, `pause`, `resume`, `reopen`, `archive`, `restore`) do not emit.
+
+- **Reliable Dispatch Model:** Server actions invoke `await emitAutomationEvent(...)` inside an isolated `try/catch` block **after** the primary database operation has completed. This ensures serverless environments (Vercel lambdas) do not terminate early before the event is recorded, while guaranteeing that any automation failure cannot roll back or fail the parent domain transaction.
+- **Event Failure Audit Guarantees by Stage:**
+  - *Stage 1 (Event Logging Failure):* If inserting into `automation_event_log` fails, logged to **console only** (no database rows created).
+  - *Stage 2 (Rule Loading Failure):* If loading rules fails, logged to **console and event log row** (`processed_at` remains null).
+  - *Stage 3 (Run Creation Failure):* If creating a run fails, logged to **console and event log row**.
+  - *Stage 4 (Action Execution Failure):* Logged to **console, event log row, and run audit row** (`status: 'failed'`, `error_details` populated).
+- **Concurrency & Approval Idempotency:**
+  - Double-click and race protection is guaranteed via atomic conditional status transitions (`UPDATE automation_approvals SET status = 'approved' ... WHERE id = ... AND status = 'pending' RETURNING *`).
+  - Database unique constraint `CONSTRAINT uq_automation_approvals_run UNIQUE (workspace_id, run_id)` enforces at-most-one approval per automation run.
+
+### Batch 2 Scope
+Scheduled time-based processors (Vercel Cron, `/api/vault/automation/process-cron`), time-triggered templates (`stale_contact_reconnection_alert`, `task_overdue_escalation_notice`, `upcoming_meeting_briefing_alert`), the full `/vault/automations` hub UI, and header notification bell are strictly reserved for Batch 2.

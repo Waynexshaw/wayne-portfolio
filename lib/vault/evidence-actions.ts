@@ -16,6 +16,7 @@ import {
   SourceCandidateItem,
   BridgeSyncStatus,
 } from './evidence/types'
+import { emitAutomationEvent } from './automation/engine'
 
 async function requireWorkspaceAccess(workspaceId: string) {
   const supabase = await createClient()
@@ -523,6 +524,16 @@ export async function approveEvidenceAction(
 ): Promise<WorkspaceEvidence> {
   const { supabase, user } = await requireWorkspaceAccess(workspaceId)
 
+  // Detect whether this is an actual transition from draft to approved
+  const { data: existingEv } = await (supabase as any)
+    .from('workspace_evidence')
+    .select('approval_status')
+    .eq('id', evidenceId)
+    .eq('workspace_id', workspaceId)
+    .maybeSingle()
+
+  const isTransitionFromDraft = existingEv?.approval_status === 'draft'
+
   const { data: evidence, error } = await (supabase as any)
     .from('workspace_evidence')
     .update({
@@ -558,6 +569,30 @@ export async function approveEvidenceAction(
   if (error) {
     console.error('Error approving evidence:', error)
     throw new Error('Failed to approve evidence')
+  }
+
+  if (isTransitionFromDraft) {
+    try {
+      await emitAutomationEvent({
+        workspaceId,
+        eventType: 'evidence.approved',
+        entityType: 'evidence',
+        entityId: evidence.id,
+        payload: {
+          id: evidence.id,
+          title: evidence.title,
+          evidence_type: evidence.evidence_type,
+          public_claim: evidence.public_claim,
+          public_summary: evidence.public_summary,
+          result_statement: evidence.result_statement,
+          project_id: evidence.project_id,
+        },
+        actorId: user.id,
+        client: supabase,
+      })
+    } catch (err) {
+      console.error('Automation dispatch error (evidence.approved):', err)
+    }
   }
 
   revalidatePath('/vault/evidence')

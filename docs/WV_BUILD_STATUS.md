@@ -30,6 +30,7 @@
 | **Opportunities** | Phase 1 + Refinement V1 | `48630cb` | Released / Complete |
 | **Operating Records** | V1 Consolidated Batch (Tasks, Meetings, Decisions) | Migration 014 | Released / Complete |
 | **Evidence & Portfolio Bridge** | V1 Consolidated Batch (Evidence, Sources, Snapshot Bridges) | Migration 015 | Released / Complete |
+| **Automation System** | V1 Batch 1 (Database + Engine + Approval Core) | Migration 016 | RELEASED / COMPLETE |
 | **Command Center** | Phase 1 Attention & Summary + Operations Integration | `app/vault/page.tsx` | Functioning |
 
 ---
@@ -137,6 +138,35 @@
      - Sidebar: Single `Evidence` entry (`Award` icon).
      - Project Detail: Compact Evidence & Professional Claims Summary Card with Approved/Draft counts and deep links.
 * **Database Migration:** Migration `015_wv_evidence_portfolio_bridge.sql` deployed and verified (3 tables, composite FKs, immutability triggers, RLS policies, 30 constraints, performance indexes). Zero unreleased migration 016.
+
+---
+
+## 6b. Released Batch: Automation V1 (Batch 1 — Database + Engine + Approval Core)
+
+* **Status:** `RELEASED / COMPLETE`
+* **Implementation Highlights:**
+  1. **Schema & Structural Isolation (Migration 016):**
+     - 5 normalized tables: `automation_rules`, `automation_event_log`, `automation_runs`, `automation_approvals`, `workspace_notifications`.
+     - Strict multi-tenancy enforced by composite unique constraints `(id, workspace_id)` and composite foreign keys preventing cross-workspace references.
+     - Immutability triggers `wv_internal.prevent_automation_item_tampering()` locking `workspace_id` across all five tables.
+     - Row Level Security (RLS) policies allowing authenticated workspace members (SELECT/INSERT/UPDATE) and admin-only DELETE. Zero public access.
+  2. **Deterministic Condition Engine:** Non-eval JSON condition evaluator supporting `equals`, `not_equals`, `in`, `not_in`, `greater_than`, `less_than`, `is_null`, `is_not_null` with `AND` / `OR` conjunction groups and dot-notation field access.
+  3. **Hard Approval Safety Registry:** Server-side registry is authoritative for approval enforcement (`APPROVAL_REQUIRED_ACTION_TYPES`: `suggest_task_creation`, `suggest_follow_up_creation`, `suggest_portfolio_snapshot`, `suggest_review_creation`). Malicious or misconfigured database rules cannot bypass approval requirement. Canonical WV review types enforced (`project`, `campaign`, `growth`, `strategy`, `opportunity`, `partnership`, `period`, `other`).
+  4. **Portfolio Bridge Safety Contract:** Invariant preserved: Evidence approval != publication; Portfolio snapshot != public CMS publication. Bridge actions create private snapshot bridge proposals only.
+  5. **Deterministic Idempotency & Concurrency Safety:** SHA-256 idempotency key over `(rule_id, event_id, action_type, target_entity_id)` enforced by database unique constraint `UNIQUE (workspace_id, idempotency_key)`. Double-click and race protection guaranteed via atomic conditional claim (`UPDATE automation_approvals SET status = 'approved' ... WHERE id = ... AND status = 'pending' RETURNING *`) and database unique constraint `UNIQUE (workspace_id, run_id)`.
+  6. **Reliable Server-Side Event Emitter:** Server actions invoke `await emitAutomationEvent` inside an isolated `try/catch` block **after** primary business operations commit. Serverless execution completes reliably without early worker freeze, while automation errors never roll back or fail the parent domain transaction.
+  7. **Narrow Event Hooks (Batch 1):**
+     - `meeting.completed`: Emitted on transition into completed; no re-emission on edits.
+     - `decision.created`: Emitted on immutable decision record creation.
+     - `evidence.approved`: Emitted on transition from draft into approved; no re-emission on edits.
+     - `project.completed`: Emitted on lifecycle complete action; no re-emission on other lifecycle actions.
+  8. **Template Catalog:** Initial 7 templates defined with 4 Batch 1 supported templates and 3 scheduled-trigger templates reserved for Batch 2.
+* **Deferred to Batch 2:**
+  - Scheduled time-based cron processor (`vercel.json`, `/api/vault/automation/process-cron`).
+  - Time-triggered template execution (`stale_contact_reconnection_alert`, `task_overdue_escalation_notice`, `upcoming_meeting_briefing_alert`).
+  - Full Automation Hub UI (`/vault/automations`), Automation Inbox UI, history viewer, rule manager, notification bell UI.
+* **Owner Access Lock:** `DEFERRED — FINAL SECURITY HARDENING`
+* **AI:** `NOT STARTED`
 
 ---
 
