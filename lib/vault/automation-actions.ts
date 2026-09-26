@@ -60,13 +60,38 @@ export async function respondToApprovalAction(
     .eq('id', approvalId)
     .eq('workspace_id', workspaceId)
     .eq('status', 'pending')
-    .select('id, workspace_id, run_id, action_type, proposed_payload')
+    .select('id, workspace_id, run_id, action_type, proposed_payload, expires_at')
     .maybeSingle()
 
   if (claimErr || !claimedApproval) {
     return {
       success: false,
       error: 'Approval request is no longer pending (it may have already been reviewed or claimed by a concurrent request)',
+    }
+  }
+
+  // Check expiration (Section 14)
+  if (claimedApproval.expires_at && new Date(claimedApproval.expires_at) < new Date()) {
+    await (supabase as any)
+      .from('automation_approvals')
+      .update({ status: 'expired' })
+      .eq('id', approvalId)
+      .eq('workspace_id', workspaceId)
+
+    await (supabase as any)
+      .from('automation_runs')
+      .update({
+        status: 'cancelled',
+        error_details: 'Approval request expired before human response',
+        completed_at: nowIso,
+      })
+      .eq('id', claimedApproval.run_id)
+      .eq('workspace_id', workspaceId)
+
+    revalidatePath('/vault')
+    return {
+      success: false,
+      error: 'This approval request has expired and is no longer actionable.',
     }
   }
 
@@ -231,10 +256,21 @@ export async function instantiateAutomationRuleFromTemplateAction(
     return { success: false, error: `Template '${templateId}' not found` }
   }
 
-  if (template.is_batch2_scheduled) {
+  // Prevent accidental duplicate active instances of the same template in workspace (Section 20)
+  const { data: existingActive } = await (supabase as any)
+    .from('automation_rules')
+    .select('id, title')
+    .eq('workspace_id', workspaceId)
+    .eq('template_id', template.id)
+    .eq('is_active', true)
+    .is('archived_at', null)
+    .maybeSingle()
+
+  if (existingActive) {
     return {
       success: false,
-      error: `Template '${template.title}' is a scheduled time trigger reserved for Batch 2`,
+      error: `An active automation rule based on "${template.title}" is already running in this workspace.`,
+      ruleId: existingActive.id,
     }
   }
 
@@ -449,4 +485,78 @@ export async function markNotificationReadAction(
 
   revalidatePath('/vault')
   return { success: true }
+}
+
+export async function getUnreadNotificationCountAction(
+  workspaceId: string
+): Promise<{ unreadCount: number }> {
+  try {
+    const { supabase } = await requireWorkspaceAccess(workspaceId)
+    const { count, error } = await (supabase as any)
+      .from('workspace_notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId)
+      .eq('is_read', false)
+      .is('archived_at', null)
+
+    if (error) {
+      console.error('Error fetching unread notification count:', error)
+      return { unreadCount: 0 }
+    }
+    return { unreadCount: count || 0 }
+  } catch {
+    return { unreadCount: 0 }
+  }
+}
+
+export async function markAllNotificationsReadAction(
+  workspaceId: string
+): Promise<{ success: boolean; error?: string }> {
+  const { supabase } = await requireWorkspaceAccess(workspaceId)
+  const { error } = await (supabase as any)
+    .from('workspace_notifications')
+    .update({
+      is_read: true,
+      read_at: new Date().toISOString(),
+    })
+    .eq('workspace_id', workspaceId)
+    .eq('is_read', false)
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath('/vault')
+  return { success: true }
+}
+
+export async function getCommandCenterAutomationAttentionAction(
+  workspaceId: string
+): Promise<{ pendingApprovalsCount: number; recentFailuresCount: number }> {
+  try {
+    const { supabase } = await requireWorkspaceAccess(workspaceId)
+
+    // 1. Pending approvals count
+    const { count: pendingCount, error: appErr } = await (supabase as any)
+      .from('automation_approvals')
+      .select('*', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId)
+      .eq('status', 'pending')
+
+    // 2. Recent failed runs in last 7 days
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    const { count: failCount, error: failErr } = await (supabase as any)
+      .from('automation_runs')
+      .select('*', { count: 'exact', head: true })
+      .eq('workspace_id', workspaceId)
+      .eq('status', 'failed')
+      .gte('created_at', sevenDaysAgo)
+
+    return {
+      pendingApprovalsCount: (!appErr && pendingCount) ? pendingCount : 0,
+      recentFailuresCount: (!failErr && failCount) ? failCount : 0,
+    }
+  } catch {
+    return { pendingApprovalsCount: 0, recentFailuresCount: 0 }
+  }
 }

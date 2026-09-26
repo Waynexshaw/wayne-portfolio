@@ -7,6 +7,7 @@ export interface TriggerDefinition {
   entityType: string
   isScheduled: boolean
   supportedInBatch1: boolean
+  supportedInBatch2?: boolean
 }
 
 export const TRIGGER_REGISTRY: Record<AutomationTriggerType, TriggerDefinition> = {
@@ -60,7 +61,7 @@ export const TRIGGER_REGISTRY: Record<AutomationTriggerType, TriggerDefinition> 
     supportedInBatch1: true,
   },
 
-  // Batch 2 Scheduled Events (Architecture Reserved)
+  // Batch 2 Scheduled Events (Operational)
   'task.due_date_approaching': {
     type: 'task.due_date_approaching',
     label: 'Task Due Date Approaching',
@@ -68,6 +69,7 @@ export const TRIGGER_REGISTRY: Record<AutomationTriggerType, TriggerDefinition> 
     entityType: 'task',
     isScheduled: true,
     supportedInBatch1: false,
+    supportedInBatch2: false,
   },
   'task.overdue_threshold': {
     type: 'task.overdue_threshold',
@@ -76,6 +78,7 @@ export const TRIGGER_REGISTRY: Record<AutomationTriggerType, TriggerDefinition> 
     entityType: 'task',
     isScheduled: true,
     supportedInBatch1: false,
+    supportedInBatch2: true,
   },
   'meeting.upcoming_reminder': {
     type: 'meeting.upcoming_reminder',
@@ -84,6 +87,7 @@ export const TRIGGER_REGISTRY: Record<AutomationTriggerType, TriggerDefinition> 
     entityType: 'meeting',
     isScheduled: true,
     supportedInBatch1: false,
+    supportedInBatch2: true,
   },
   'follow_up.due_today': {
     type: 'follow_up.due_today',
@@ -92,6 +96,7 @@ export const TRIGGER_REGISTRY: Record<AutomationTriggerType, TriggerDefinition> 
     entityType: 'follow_up',
     isScheduled: true,
     supportedInBatch1: false,
+    supportedInBatch2: false,
   },
   'crm.contact_inactive_threshold': {
     type: 'crm.contact_inactive_threshold',
@@ -100,6 +105,7 @@ export const TRIGGER_REGISTRY: Record<AutomationTriggerType, TriggerDefinition> 
     entityType: 'contact',
     isScheduled: true,
     supportedInBatch1: false,
+    supportedInBatch2: true,
   },
 
   // Manual
@@ -110,9 +116,16 @@ export const TRIGGER_REGISTRY: Record<AutomationTriggerType, TriggerDefinition> 
     entityType: 'manual',
     isScheduled: false,
     supportedInBatch1: true,
+    supportedInBatch2: true,
   },
 }
 
 export function isBatch1SupportedTrigger(triggerType: AutomationTriggerType): boolean {
   return TRIGGER_REGISTRY[triggerType]?.supportedInBatch1 ?? false
+}
+
+export function isTriggerSupported(triggerType: AutomationTriggerType): boolean {
+  const def = TRIGGER_REGISTRY[triggerType]
+  if (!def) return false
+  return def.supportedInBatch1 || (def as any).supportedInBatch2 || false
 }

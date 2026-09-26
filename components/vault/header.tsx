@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { LogOut, Shield, ChevronRight, Menu } from 'lucide-react'
 import { useVaultNav } from '@/components/vault/sidebar'
+import { NotificationBell } from '@/components/vault/notifications/notification-bell'
 
 export function VaultHeader({
   activeIdentity,
@@ -62,6 +63,10 @@ export function VaultHeader({
               <span className="text-muted-foreground font-mono text-[11px]">{activeIdentity.handle}</span>
             )}
           </div>
+        )}
+
+        {activeWorkspace?.id && (
+          <NotificationBell workspaceId={activeWorkspace.id} />
         )}
 
         <ThemeToggle />

@@ -10,7 +10,8 @@ import {
   Sparkles,
   CheckCircle2,
   Video,
-  ClipboardList
+  ClipboardList,
+  Zap
 } from 'lucide-react'
 import { FollowUpToggleButton } from '@/app/vault/follow-ups/toggle-button'
 
@@ -22,12 +23,17 @@ interface AttentionSectionProps {
     dueTodayTasks: any[]
     upcomingMeetings: any[]
   }
+  automationAttention?: {
+    pendingApprovalsCount: number
+    recentFailuresCount: number
+  }
 }
 
 export function AttentionSection({
   followUps,
   opportunities,
   operationsAttention,
+  automationAttention,
 }: AttentionSectionProps) {
   const now = new Date()
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
@@ -60,6 +66,8 @@ export function AttentionSection({
   const overdueTasks = operationsAttention?.overdueTasks || []
   const dueTodayTasks = operationsAttention?.dueTodayTasks || []
   const upcomingMeetings = operationsAttention?.upcomingMeetings || []
+  const pendingApprovalsCount = automationAttention?.pendingApprovalsCount || 0
+  const recentFailuresCount = automationAttention?.recentFailuresCount || 0
 
   const totalOverdue = overdueFollowUps.length + overdueTasks.length
 
@@ -70,7 +78,9 @@ export function AttentionSection({
     attentionOpportunities.length > 0 ||
     overdueTasks.length > 0 ||
     dueTodayTasks.length > 0 ||
-    upcomingMeetings.length > 0
+    upcomingMeetings.length > 0 ||
+    pendingApprovalsCount > 0 ||
+    recentFailuresCount > 0
 
   return (
     <section className="space-y-4">
@@ -104,6 +114,47 @@ export function AttentionSection({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           {/* Column 1: Follow-Ups and Operating Tasks */}
           <div className="space-y-4">
+            {/* Automation Attention Queue (Section 27) */}
+            {pendingApprovalsCount > 0 && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-amber-500 text-xs font-mono uppercase tracking-wider font-semibold">
+                    <Zap className="w-4 h-4" />
+                    Automation ({pendingApprovalsCount} {pendingApprovalsCount === 1 ? 'approval needs' : 'approvals need'} review)
+                  </div>
+                  <Link
+                    href="/vault/automations?view=inbox"
+                    className="text-[11px] font-mono text-amber-500 hover:text-amber-400 flex items-center gap-1"
+                  >
+                    Review <ArrowRight className="w-3 h-3" />
+                  </Link>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Automated proposals awaiting your decision in the human authorization queue.
+                </p>
+              </div>
+            )}
+
+            {recentFailuresCount > 0 && (
+              <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-rose-400 text-xs font-mono uppercase tracking-wider font-semibold">
+                    <AlertCircle className="w-4 h-4" />
+                    Automation ({recentFailuresCount} recent {recentFailuresCount === 1 ? 'failure' : 'failures'})
+                  </div>
+                  <Link
+                    href="/vault/automations?view=history"
+                    className="text-[11px] font-mono text-rose-400 hover:text-rose-300 flex items-center gap-1"
+                  >
+                    Inspect <ArrowRight className="w-3 h-3" />
+                  </Link>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Inspect execution errors and audit details in the history tab.
+                </p>
+              </div>
+            )}
+
             {/* Overdue Tasks */}
             {overdueTasks.length > 0 && (
               <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-4 space-y-3">

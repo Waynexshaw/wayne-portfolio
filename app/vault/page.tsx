@@ -8,6 +8,7 @@ import {
   getWorkspaceProjects
 } from '@/lib/vault/actions'
 import { getCommandCenterOperationsAttentionAction } from '@/lib/vault/operations-actions'
+import { getCommandCenterAutomationAttentionAction } from '@/lib/vault/automation-actions'
 import { CommandCenterHeader } from '@/components/vault/command-center-header'
 import { AttentionSection } from '@/components/vault/attention-section'
 import { RelationshipOverview } from '@/components/vault/relationship-overview'
@@ -22,7 +23,16 @@ export default async function VaultCommandCenterPage() {
   const activeWorkspaceId = context?.activeWorkspace?.id
 
   // Fetch all workspace-scoped data in parallel through authenticated Supabase client
-  const [contacts, companies, interactions, followUps, opportunities, projects, operationsAttention] = await Promise.all([
+  const [
+    contacts,
+    companies,
+    interactions,
+    followUps,
+    opportunities,
+    projects,
+    operationsAttention,
+    automationAttention
+  ] = await Promise.all([
     getContacts(activeWorkspaceId).catch(() => []),
     getCompanies(activeWorkspaceId).catch(() => []),
     getInteractions(activeWorkspaceId).catch(() => []),
@@ -36,6 +46,12 @@ export default async function VaultCommandCenterPage() {
           upcomingMeetings: [],
         }))
       : Promise.resolve({ overdueTasks: [], dueTodayTasks: [], upcomingMeetings: [] }),
+    activeWorkspaceId
+      ? getCommandCenterAutomationAttentionAction(activeWorkspaceId).catch(() => ({
+          pendingApprovalsCount: 0,
+          recentFailuresCount: 0,
+        }))
+      : Promise.resolve({ pendingApprovalsCount: 0, recentFailuresCount: 0 }),
   ])
 
   return (
@@ -46,11 +62,12 @@ export default async function VaultCommandCenterPage() {
         activeIdentity={context?.activeIdentity || null}
       />
 
-      {/* 2. Priority Attention Queue (Overdue, Due Today, Upcoming, Opportunities, Operations) */}
+      {/* 2. Priority Attention Queue (Overdue, Due Today, Upcoming, Opportunities, Operations, Automation) */}
       <AttentionSection 
         followUps={followUps}
         opportunities={opportunities}
         operationsAttention={operationsAttention}
+        automationAttention={automationAttention}
       />
 
       {/* 3. Compact Opportunity Pipeline Overview */}

@@ -20,6 +20,7 @@ import {
   Layers,
   ClipboardList,
   Award,
+  Zap,
   X
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -104,6 +105,7 @@ const navItems = [
   { href: '/vault/metrics', label: 'Metrics', icon: BarChart3 },
   { href: '/vault/research', label: 'Research', icon: BookOpen },
   { href: '/vault/reviews', label: 'Reviews', icon: RotateCcw },
+  { href: '/vault/automations', label: 'Automations', icon: Zap },
 ]
 
 interface SidebarContentProps {

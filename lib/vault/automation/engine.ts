@@ -12,7 +12,7 @@ import {
   doesActionRequireApproval,
   APPROVAL_REQUIRED_ACTION_TYPES,
 } from './actions'
-import { isBatch1SupportedTrigger } from './triggers'
+import { isBatch1SupportedTrigger, isTriggerSupported } from './triggers'
 
 export interface EmitAutomationEventParams {
   workspaceId: string
@@ -22,6 +22,7 @@ export interface EmitAutomationEventParams {
   payload: Record<string, any>
   actorId?: string | null
   client?: any
+  idempotencyKey?: string
 }
 
 export function generateIdempotencyKey(
@@ -115,11 +116,25 @@ export async function emitAutomationEvent(
   try {
     const { workspaceId, eventType, entityType, entityId, payload, actorId } = params
 
-    if (!isBatch1SupportedTrigger(eventType)) {
+    if (!isTriggerSupported(eventType)) {
       return { runsCreated: 0, skipped: 0 }
     }
 
     const supabase = params.client || (await createClient())
+
+    // If deterministic idempotencyKey is supplied, check if run already exists before logging event
+    if (params.idempotencyKey) {
+      const { data: existingRun } = await (supabase as any)
+        .from('automation_runs')
+        .select('id, status')
+        .eq('workspace_id', workspaceId)
+        .eq('idempotency_key', params.idempotencyKey)
+        .maybeSingle()
+
+      if (existingRun) {
+        return { runsCreated: 0, skipped: 1 }
+      }
+    }
 
     // 1. Record event in automation_event_log
     const { data: eventRecord, error: eventErr } = await (supabase as any)
@@ -179,7 +194,7 @@ export async function emitAutomationEvent(
       }
 
       // Compute deterministic idempotency key
-      const idempotencyKey = generateIdempotencyKey(rule.id, eventId, rule.action_type, entityId)
+      const idempotencyKey = params.idempotencyKey || generateIdempotencyKey(rule.id, eventId, rule.action_type, entityId)
 
       // Check if run already exists
       const { data: existingRun } = await (supabase as any)

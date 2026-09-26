@@ -522,5 +522,76 @@ Event emission is integrated into four exact domain transitions:
   - Double-click and race protection is guaranteed via atomic conditional status transitions (`UPDATE automation_approvals SET status = 'approved' ... WHERE id = ... AND status = 'pending' RETURNING *`).
   - Database unique constraint `CONSTRAINT uq_automation_approvals_run UNIQUE (workspace_id, run_id)` enforces at-most-one approval per automation run.
 
-### Batch 2 Scope
-Scheduled time-based processors (Vercel Cron, `/api/vault/automation/process-cron`), time-triggered templates (`stale_contact_reconnection_alert`, `task_overdue_escalation_notice`, `upcoming_meeting_briefing_alert`), the full `/vault/automations` hub UI, and header notification bell are strictly reserved for Batch 2.
+### Batch 1 Release Status
+Automation V1 Batch 1 (Database + Engine + Approval Core) was released in commit `d13efcd` with Migration 016 (`016_wv_automation_system.sql`).
+
+---
+
+## 17. Automation System V1 Architecture (Batch 2: UI + Approvals + Templates + History + Notifications + Scheduled Processing)
+
+### Purpose & User Experience
+Automation V1 Batch 2 operationalizes the Automation Engine, providing the sovereign human operator with a unified control surface to review suggestions, manage active rules, browse pre-built templates, inspect execution history, receive in-app alerts, and automate periodic background evaluations.
+
+### 1. Unified Automation Hub (`/vault/automations`)
+The Automation Hub provides four primary tabs synchronized with the URL query parameter (`?view=inbox|rules|history|templates`):
+- **Inbox (`?view=inbox`):**
+  - Live approval queue for pending automation actions awaiting human review.
+  - Cards present human-readable trigger provenance, proposed entity changes, target metadata, and expiration countdowns.
+  - Quick Approve: Atomic conditional authorization executing the proposed action immediately inside Waynex Vault.
+  - Quick Reject: Dismisses the suggestion, marking the approval and run as `rejected` with zero external or database side effects.
+  - Edit & Approve: Action-aware modal allowing modification of proposed payloads prior to authorization:
+    - Task: Title, description, priority, due date.
+    - Follow-up: Title, notes, priority, due date, contact association.
+    - Review: Canonical WV review types strictly enforced (`project`, `campaign`, `growth`, `strategy`, `opportunity`, `partnership`, `period`, `other`), title, period bounds.
+    - Portfolio Snapshot: Verified evidence claim association and target portfolio entity.
+- **Rules (`?view=rules`):**
+  - Inventory of configured automation rules in the active workspace.
+  - Real-time Active / Paused toggle (`is_active`) without record deletion.
+  - Descriptive view of trigger types, evaluated conditions, and action types.
+  - Archive lifecycle: Rules are soft-archived (`archived_at`); permanent deletions are omitted from the UI.
+- **Templates (`?view=templates`):**
+  - Curated catalog of 7 pre-built templates spanning reactive workflows and scheduled monitors:
+    1. `meeting_task_suggestion` (Reactive: `meeting.completed` → `suggest_task_creation`)
+    2. `decision_documentation_prompt` (Reactive: `decision.created` → `create_internal_notification`)
+    3. `evidence_snapshot_proposal` (Reactive: `evidence.approved` → `suggest_portfolio_snapshot`)
+    4. `project_retrospective_prompt` (Reactive: `project.completed` → `suggest_review_creation`)
+    5. `task_overdue_escalation_notice` (Scheduled: `task.overdue_threshold` → `create_internal_notification`)
+    6. `upcoming_meeting_briefing_alert` (Scheduled: `meeting.upcoming_reminder` → `create_internal_notification`)
+    7. `stale_contact_reconnection_alert` (Scheduled: `crm.contact_inactive_threshold` → `suggest_follow_up_creation`)
+  - "In Use" visual badge for templates already instantiated and active in the workspace.
+  - Duplicate-active-instance prevention: Workspace operators cannot instantiate duplicate active rules from the same template.
+- **History (`?view=history`):**
+  - Chronological run ledger tracking every rule evaluation and consequence.
+  - Filterable by run status (`all`, `pending`, `awaiting_approval`, `approved`, `rejected`, `running`, `succeeded`, `failed`, `skipped`, `cancelled`).
+  - History Detail Inspection Modal displaying run metadata, idempotency key, evaluated rule snapshot, trigger event payload, execution latency, and error diagnostics.
+
+### 2. Internal Notifications & Header Bell
+- **Header Notification Bell:**
+  - Integrated into the global Vault header (`components/vault/header.tsx`).
+  - Unread badge counter tracking active notifications.
+  - Interactive dropdown popover displaying notifications categorized by `approval_required`, `automation_alert`, `reminder`, and `system`.
+  - Actions: Click-to-mark-as-read, Mark All as Read.
+- **Zero External Delivery Boundary:**
+  - In-app notification records exist solely in `workspace_notifications`.
+  - Strictly internal: Zero email dispatch (no SendGrid/Postmark), zero SMS (no Twilio), zero webhooks, zero Discord/Slack/Telegram integrations.
+
+### 3. Command Center Attention Integration
+- The primary Command Center (`app/vault/page.tsx` & `components/vault/attention-section.tsx`) queries pending approvals and recent run failures.
+- Surfaces actionable attention cards:
+  - "Pending Automation Approvals": Directs operator to the Approval Inbox.
+  - "Automation Run Failures": Flags recent rule execution errors for inspection in History.
+
+### 4. Scheduled Processing & Time Semantics (`/api/vault/automation/process-cron`)
+- **Vercel Cron Trigger:** Configured via `vercel.json` to execute hourly (`0 * * * *`).
+- **Security & Authorization Boundary:**
+  - Route requires `Authorization: Bearer <CRON_SECRET>`. Missing or invalid tokens immediately reject with 401 Unauthorized.
+  - Secret Non-Leakage: `CRON_SECRET` is never printed, logged, or reflected in API responses.
+  - Service-Role Boundary: Scheduled processing runs in the background outside of user sessions, utilizing the Supabase service-role client strictly scoped by workspace IDs retrieved from active rules.
+- **Deterministic Time Semantics & Idempotency Keys:**
+  - `task.overdue_threshold`: Calculates calendar day differences using `CURRENT_DATE` against ISO `YYYY-MM-DD` date strings (`task.due_date`). Only evaluates incomplete tasks (`todo`, `in_progress`, `blocked`); completed, cancelled, and archived tasks are strictly excluded. Deduplication uses daily deterministic key `sha256(task_overdue:rule_id:task_id:due_date:YYYY-MM-DD)` to ensure at most one escalation notification per calendar day.
+  - `meeting.upcoming_reminder`: Evaluates ISO timestamp ranges (`TIMESTAMPTZ`) within a bounded forward-looking window (e.g. 2 hours before `scheduled_at`). Cancelled and archived meetings are strictly excluded. Deduplication uses schedule-anchored key `sha256(meeting_reminder:rule_id:meeting_id:scheduled_at)` ensuring exactly one reminder per scheduled meeting across repeated cron runs.
+  - `crm.contact_inactive_threshold`: Calculates elapsed calendar days since last logged interaction (`workspace_contacts.last_contacted_at`, falling back to relationship or contact creation). Generic contact profile updates do not reset inactivity. Uses 30-day cycle bucket key `sha256(contact_inactive:rule_id:contact_id:last_activity_date:cycle_bucket)` and active pending approval checks to prevent hourly approval flooding. Consequence is human approval proposal only (`suggest_follow_up_creation`), zero automated outbound contact.
+- **Candidate Failure Isolation:**
+  - Candidate processing loops wrap each evaluation in isolated `try/catch` blocks. A failure evaluating a single task, meeting, or contact is audited and logged without halting processing for subsequent items.
+- **Automated Approval Maintenance:**
+  - The cron runner sweeps `automation_approvals` for pending records past `expires_at`, transitioning them to `expired` and updating associated runs to `cancelled`.

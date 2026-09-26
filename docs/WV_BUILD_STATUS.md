@@ -30,7 +30,9 @@
 | **Opportunities** | Phase 1 + Refinement V1 | `48630cb` | Released / Complete |
 | **Operating Records** | V1 Consolidated Batch (Tasks, Meetings, Decisions) | Migration 014 | Released / Complete |
 | **Evidence & Portfolio Bridge** | V1 Consolidated Batch (Evidence, Sources, Snapshot Bridges) | Migration 015 | Released / Complete |
-| **Automation System** | V1 Batch 1 (Database + Engine + Approval Core) | Migration 016 | RELEASED / COMPLETE |
+| **Automation System (V1 Batch 1)** | Database + Engine + Approval Core | Migration 016 (`d13efcd`) | RELEASED / COMPLETE |
+| **Automation System (V1 Batch 2)** | UI + Approvals + Templates + History + Notifications + Scheduled Processing | Batch 2 | RELEASED / COMPLETE |
+| **Automation V1** | Assisted Operating System (Complete System) | V1 Batch 1 + Batch 2 | IMPLEMENTED |
 | **Command Center** | Phase 1 Attention & Summary + Operations Integration | `app/vault/page.tsx` | Functioning |
 
 ---
@@ -161,12 +163,61 @@
      - `evidence.approved`: Emitted on transition from draft into approved; no re-emission on edits.
      - `project.completed`: Emitted on lifecycle complete action; no re-emission on other lifecycle actions.
   8. **Template Catalog:** Initial 7 templates defined with 4 Batch 1 supported templates and 3 scheduled-trigger templates reserved for Batch 2.
-* **Deferred to Batch 2:**
-  - Scheduled time-based cron processor (`vercel.json`, `/api/vault/automation/process-cron`).
-  - Time-triggered template execution (`stale_contact_reconnection_alert`, `task_overdue_escalation_notice`, `upcoming_meeting_briefing_alert`).
-  - Full Automation Hub UI (`/vault/automations`), Automation Inbox UI, history viewer, rule manager, notification bell UI.
 * **Owner Access Lock:** `DEFERRED — FINAL SECURITY HARDENING`
 * **AI:** `NOT STARTED`
+
+---
+
+## 6c. Released Batch: Automation V1 (Batch 2 — UI + Approvals + Templates + History + Notifications + Scheduled Processing)
+
+* **Status:** `RELEASED / COMPLETE` (Automation V1: `IMPLEMENTED`)
+* **Baseline HEAD:** `d13efcd feat(vault): add automation engine`
+* **Implementation Highlights:**
+  1. **Automation Hub (`/vault/automations`):**
+     - Full multi-tab operator workspace (`?view=inbox|rules|history|templates`).
+     - Skeleton loading state (`app/vault/automations/loading.tsx`).
+     - Sidebar entry: Single `Automations` item with `Zap` icon (`components/vault/sidebar.tsx`).
+  2. **Human Approval Inbox:**
+     - Queue cards displaying trigger provenance, proposed entity changes, target metadata, and expiration countdowns.
+     - Quick Approve: Atomic conditional status transition executing internal domain actions immediately.
+     - Quick Reject: Safe dismissal executing zero database actions.
+     - Edit & Approve: Action-aware editing modal with schema validation (canonical review types strictly enforced: `project`, `campaign`, `growth`, `strategy`, `opportunity`, `partnership`, `period`, `other`).
+     - Expiration: Expired approvals cannot be claimed or executed.
+  3. **Rules & Templates Management:**
+     - Workspace rule catalog with active/paused toggle (`is_active`) and soft archive.
+     - Full 7-template catalog view with "In Use" indicators and duplicate-active-rule prevention.
+     - Batch 2 operational triggers enabled (`task.overdue_threshold`, `meeting.upcoming_reminder`, `crm.contact_inactive_threshold`).
+  4. **Execution History Ledger:**
+     - Chronological audit runs list with status filter.
+     - Detailed inspection modal surfacing run metadata, idempotency key, evaluated rule snapshot, trigger event payload, execution duration, and error diagnostics.
+  5. **Internal Notifications & Attention Integration:**
+     - Header notification bell (`components/vault/notifications/notification-bell.tsx`) with unread badge counter and categorized popover (`approval_required`, `automation_alert`, `reminder`, `system`).
+     - Mark single notification read and mark all read server actions.
+     - Command Center attention section integration (`components/vault/attention-section.tsx`) surfacing pending approvals and recent run failures.
+     - Zero external delivery channels (pure internal storage).
+     - Cron route (`/api/vault/automation/process-cron`) with Vercel cron configuration (`vercel.json` hourly: `0 * * * *`).
+     - Strict authorization boundary: `CRON_SECRET` Bearer token authentication (unauthorized requests return 401; secret non-leakage guaranteed).
+     - Elevated service-role client strictly scoped by workspace IDs retrieved from active rules.
+     - Deterministic time semantics: calendar day differences on ISO dates for tasks (excluding completed/cancelled/archived); timestamp ranges on canonical `scheduled_at` for upcoming meetings; elapsed activity days from canonical `last_contacted_at` (updated on interaction logs, never profile edits) for inactive contacts (proposal-only, zero automated contact).
+     - Candidate failure isolation: isolated try/catch per candidate preventing cascade aborts.
+     - Deterministic idempotency keys: daily key for tasks, schedule-anchored key for meetings, and 30-day cycle bucket key + pending approval checks for contacts prevent hourly repeat flooding.
+     - Automated approval expiration maintenance.
+* **Verification Status:**
+  - Automated test suite: 31/31 passing (`test_automation_batch2.js`).
+  - Production database verification: All 5 tables confirmed via live PostgREST schema (0 fake records).
+  - TypeScript type-check: 0 errors (`npm run type-check`).
+  - ESLint: 0 errors (`npm run lint`).
+  - Next.js build: Clean build, 55 routes compiled (`npm run build`).
+  - Git diff check: Clean whitespace and diff (`git diff --check`).
+  - Packages: `package.json` and `package-lock.json` untouched.
+  - Migrations: 001–016 untouched; Migration 017 absent.
+  - Vercel Cron Status: `HOURLY CRON CONFIGURED — PRODUCTION PLAN COMPATIBILITY UNVERIFIED`.
+  - Cron Secret Status: `CRON_SECRET PRODUCTION CONFIGURATION REQUIRES VERIFICATION`.
+* **Locked Items (Strictly Preserved):**
+  - Owner Access Lock: `DEFERRED — FINAL SECURITY HARDENING`
+  - AI / LLMs: `NOT STARTED`
+  - External messaging: `PROHIBITED / ABSENT`
+  - Git state: `UNCOMMITTED / UNPUSHED`
 
 ---
 
