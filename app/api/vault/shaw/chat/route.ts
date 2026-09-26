@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { routeRequest, ShawRoutingError } from '@/lib/vault/shaw/gateway/router'
 import { getSystemPromptForIdentity } from '@/lib/vault/shaw/voice/defiwaynex'
-import { appendCtaIfRequested } from '@/lib/vault/shaw/voice/cta'
+import { appendCtaIfRequested, resolveCtaIntent } from '@/lib/vault/shaw/voice/cta'
+import { resolveFormatIntent, resolveDepthIntent } from '@/lib/vault/shaw/voice/depth'
 import { ShawCapability, ShawRoutingMode, ShawStreamChunk } from '@/lib/vault/shaw/types'
 import { AdapterMessage } from '@/lib/vault/shaw/gateway/adapters/types'
 
@@ -93,7 +94,14 @@ export async function POST(request: NextRequest) {
 
     // 5. Build system instructions
     const identity = conversation.identity || null
-    const systemPrompt = getSystemPromptForIdentity(identity, capability as ShawCapability)
+    const format = resolveFormatIntent(trimmedMessage)
+    const depth = resolveDepthIntent(trimmedMessage)
+    const ctaIntent = resolveCtaIntent(trimmedMessage)
+
+    const systemPrompt = getSystemPromptForIdentity(identity, capability as ShawCapability, {
+      format,
+      depth,
+    })
 
     // 6. Check user preferences for paid fallback
     const { data: prefs } = await (supabase as any)
@@ -105,7 +113,7 @@ export async function POST(request: NextRequest) {
 
     const allowPaidFallback = Boolean(prefs?.allow_paid_fallback)
 
-    // 7. Create initial audit run entry
+    // 7. Create initial audit run entry with non-sensitive generation intent
     const { data: runRecord } = await (supabase as any)
       .from('shaw_ai_runs')
       .insert({
@@ -115,6 +123,11 @@ export async function POST(request: NextRequest) {
         provider: routingMode === 'auto_free_first' ? 'auto' : routingMode,
         model: selectedModel || 'default',
         status: 'started',
+        metadata: {
+          format,
+          depth,
+          cta_intent: ctaIntent,
+        },
       })
       .select('id')
       .maybeSingle()

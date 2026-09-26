@@ -133,3 +133,13 @@ export interface ComplianceResult {
   checks: ComplianceCheck[]
   sanitizedText?: string
 }
+
+export type ShawOutputDepth = 'short' | 'normal' | 'detailed' | 'deep'
+export type ShawOutputFormat = 'x_post' | 'x_thread' | 'article' | 'linkedin' | 'report' | 'general'
+
+export interface ShawGenerationIntent {
+  capability: ShawCapability
+  format: ShawOutputFormat
+  depth: ShawOutputDepth
+  ctaIntent: CtaIntent
+}

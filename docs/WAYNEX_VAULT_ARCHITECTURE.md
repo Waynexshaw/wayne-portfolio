@@ -651,16 +651,28 @@ SHAW owns all conversation history, prompt construction, identity context, voice
 * **Zero Secret Storage in Database:** Migration 017 stores zero credentials in Supabase.
 * **Zero Secret Leakage:** Keys are never prefixed with `NEXT_PUBLIC_`, never exposed to client bundles, never returned in API responses, and never logged.
 
-### 5. Identity Context, Voice Engine & Deterministic CTA Control
-* **Canonical Voice Engine (DeFiwaynex):** The dedicated voice engine belongs exclusively to the `DeFiwayneX` identity. Principles: direct, calm, unhurried, spoken peer-to-peer cadence, concrete real-world mechanisms and consequences over abstract consulting boilerplate, short social posts that flow naturally without artificial hooks or line breaks, and strict anti-AI rules.
-* **Identity Neutrality (Joseph Henshaw & PEVRA):** Joseph Henshaw (founder/executive advisory) and PEVRA (company/legal entity) provide factual operational and organizational context only. Zero fabricated or invented tone profiles are applied to them.
-* **Deterministic Voice Compliance Scanner:** Analyzes generated drafts against voice invariants, returning structured statuses (`passed`, `warning`, `violation`) across em dashes, buzzwords, formulaic contrast patterns, cliché endings, and choppy punctuation. Softened in UI to clarify it is a deterministic rule scan only, not a subjective voice quality score. Zero fabricated numerical scores.
-* **Deterministic Signature CTA (Opt-In Only):** Reusable closing signature appended ONLY upon explicit user opt-in request (*"Add my CTA"*, *"Add research CTA"*, *"Use full CTA"*). Default is strictly `none`. Explicit negative instructions (*"Do not add my CTA"*, *"No CTA"*, *"Without CTA"*) always take precedence and resolve to `none`. Any hallucinated or unrequested signatures are deterministically stripped during post-processing.
-* **Ask Capability Scope (Batch 1 vs Batch 2):** In Batch 1, the `Ask` capability reasons across conversation history, active workspace metadata, selected identity context, and explicit user-provided text. Full cross-database operational retrieval (active tasks, upcoming meetings, portfolio reviews) is scheduled for Batch 2.
+### 6. Independent Generation Dimensions: Format, Depth, Voice & CTA
+SHAW architecture strictly separates output generation concerns into four orthogonal dimensions:
+* **Format (Shape):** Controls WHAT SHAPE the output takes (`x_post`, `x_thread`, `article`, `linkedin`, `report`, `general`). Formats define physical structure and channel requirements. An X post is a single coherent post (leveraging modern long-form support without legacy 280-character constraints unless explicitly requested); an X thread is a sequence of connected, numbered posts; an article provides narrative progression; a report provides structured analysis.
+* **Depth (Development):** Controls HOW FULLY the subject is developed (`short`, `normal`, `detailed`, `deep`). Depth governs reasoning development, explanatory mechanisms, concrete consequences, and real-world context—not arbitrary padding or rigid word counts.
+  - `short`: Efficient and concise. Zero fluff, zero unnecessary expansion.
+  - `normal`: Natural development adequate to satisfy the prompt.
+  - `detailed`: Thorough development of reasoning, mechanisms, and concrete consequences. Does not stop after a single paragraph.
+  - `deep`: Substantial exploration across multiple relevant dimensions, root causes, and practical trade-offs without repetition.
+* **Voice (Expression):** Controls HOW the content sounds (peer-to-peer, direct, unhurried, plain declarative language, concrete over abstract, no corporate buzzwords, no manufactured philosophical endings).
+* **CTA (Signature):** Controls EXPLICIT SIGNATURE behavior. Strictly opt-in only (default `none`). Explicit negative instructions (*"Do not add my CTA"*, *"No CTA"*) immediately resolve to `none`.
+* **Instruction Precedence:**
+  1. Safety / system constraints
+  2. Explicit current user instruction
+  3. Requested format
+  4. Requested depth
+  5. Identity voice profile
+  6. General stylistic defaults
+* **Brevity Rule Clarification:** The voice guideline *"If the content has made its point, simply end it"* means ending naturally once the requested idea has been developed to the requested depth. It does NOT mean ignoring *"detailed"*, *"deep"*, or *"comprehensive"* instructions and cutting off after a single paragraph. Voice controls tone; depth controls development.
 
-### 6. Core Schema (Migration 017)
+### 7. Core Schema (Migration 017)
 * `public.shaw_conversations`: Workspace-scoped persistent threads with routing mode, capability, and archive flags.
 * `public.shaw_messages`: Ordered conversation messages with model provider, tokens, latency, citations, and proposed actions.
-* `public.shaw_ai_runs`: Dedicated audit ledger tracking intelligence execution status, token counts, latency, and estimated cost.
+* `public.shaw_ai_runs`: Dedicated audit ledger tracking intelligence execution status, token counts, latency, estimated cost, and non-sensitive generation metadata (`format`, `depth`, `cta_intent`).
 * `public.shaw_user_preferences`: User-level routing preferences, paid fallback toggle, and default voice profile.
 * All tables enforce multi-tenancy and Row Level Security via `wv_internal.is_workspace_member(workspace_id)`.

@@ -1,4 +1,5 @@
-import { ShawCapability } from '../types'
+import { ShawCapability, ShawOutputDepth, ShawOutputFormat } from '../types'
+import { getDepthDirectives } from './depth'
 
 /**
  * Canonical DeFiwaynex Voice Engine
@@ -36,6 +37,7 @@ SENTENCE RHYTHM & STRUCTURE:
   * Do not force every sentence onto a separate line.
   * Do not use artificial hook lines (e.g., "Most people don't understand this:", "Here's the truth:").
   * Do not manufacture quotable philosophical endings or dramatic pauses.
+  * Note: an X post is a format shape, not a mandate to be artificially brief. If the user requests a detailed X post, develop the argument and mechanisms with substance rather than reducing the idea to a quick slogan. Modern X posts support long-form depth; do not assume legacy 280-character constraints unless explicitly requested. Keep as a single coherent post unless a thread is explicitly requested.
 - No unnecessary em dashes (—).
 - Never use formulaic contrasts such as:
   "it's not X, it's Y"
@@ -75,7 +77,7 @@ ANTI-AI & CLOSING RULES:
   "The future isn't waiting. It's already being built."
   "The question is no longer whether X. The question is Y."
   "And maybe, just maybe, that's where the real opportunity lies."
-- If the content has made its point, simply end it.
+- If the content has made its point, simply end it. This means: do not manufacture an artificial ending after the requested idea has been developed to the requested depth. It does NOT mean stopping prematurely before developing the requested idea or ignoring explicit depth instructions.
 `.trim()
 
 export interface IdentityContext {
@@ -88,7 +90,11 @@ export interface IdentityContext {
 
 export function getSystemPromptForIdentity(
   identity: IdentityContext | null,
-  capability: ShawCapability
+  capability: ShawCapability,
+  options?: {
+    format?: ShawOutputFormat
+    depth?: ShawOutputDepth
+  }
 ): string {
   const identityName = identity?.name || 'DeFiwayneX'
   const handle = identity?.handle ? `@${identity.handle}` : '@defiwaynex'
@@ -122,7 +128,7 @@ CAPABILITY: CREATE
   * Keep paragraph breaks natural; do not separate every single sentence.
 - Obey all concrete language and anti-AI guidelines.
 - Do NOT append any signature, sign-off, or author CTA.
-- If the point is complete, stop immediately.
+- If the point is complete, stop immediately. Do not add artificial padding, but fully develop the requested depth and reasoning before concluding.
     `.trim(),
     research: `
 CAPABILITY: RESEARCH
@@ -136,5 +142,10 @@ CAPABILITY: ANALYZE
     `.trim(),
   }
 
-  return `${basePrompt}\n\n${capabilityDirectives[capability] || ''}`.trim()
+  const depthDirectives = options
+    ? getDepthDirectives(options.format || 'general', options.depth || 'normal', capability)
+    : ''
+  const fullPrompt = `${basePrompt}\n\n${capabilityDirectives[capability] || ''}`.trim()
+
+  return depthDirectives ? `${fullPrompt}\n\n${depthDirectives}`.trim() : fullPrompt
 }

@@ -239,6 +239,7 @@
   - Voice Check modal: `VERIFIED (clarified to deterministic rule checking only)`
   - CTA Control: `CORRECTED & HARDENED (OPT-IN ONLY, NEGATIVE-FIRST DETERMINISTIC RESOLUTION, SIGNATURE STRIPPING)`
   - DeFiwayneX Voice Generation: `REFINED (CONCRETE SPOKEN REASONING, ANTI-FORMALISM, SHORT SOCIAL CADENCE, EXPLICIT ANTI-CTA)`
+  - Output Depth & Shape Control: `CORRECTED & HARDENED (INSTRUCTION-AWARE DEPTH, FORMAT / DEPTH / VOICE / CTA SEPARATION)`
 * **Implementation Scope (Batch 1):**
   1. **Migration 017 (`017_wv_shaw_intelligence_core.sql`):**
      - `public.shaw_conversations`: Workspace-scoped persistent threads with routing mode, capability, and archive flags.
