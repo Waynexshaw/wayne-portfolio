@@ -236,23 +236,26 @@
      - Enforces strict multi-tenancy, composite foreign keys, and RLS via `wv_internal.is_workspace_member(workspace_id)`.
   2. **Intelligence Gateway & Adapters:**
      - Server-side provider abstraction with stateless request normalization.
-     - Google Gemini adapter (`gemini-1.5-flash` or configured server value).
-     - Groq adapter (`llama-3.3-70b-versatile` or configured server value).
+     - Google Gemini adapter (verified default `gemini-2.0-flash` or configured `SHAW_GEMINI_MODEL`).
+     - Groq adapter (verified default `llama-3.3-70b-versatile` or configured `SHAW_GROQ_MODEL`).
      - Architecture-ready for OpenAI, Anthropic, OpenRouter, and local models.
   3. **Auto Free-First Router:**
      - Primary: Gemini Free $\rightarrow$ Secondary Free Fallback: Groq on 429 rate limit or service error.
      - If all free routes exhausted: Halts with clear error (`"Free AI capacity is currently unavailable. Paid fallback is disabled."`).
      - Paid Fallback Guard (`allow_paid_fallback`): Defaults to `false`. Zero silent billing.
      - Manual Model Selection: Supports explicit Gemini, Groq, or Auto mode, preserving conversation context across switches.
-  4. **DeFiwaynex Voice Engine & Compliance:**
-     - Canonical voice profile directives embedded server-side (direct, calm, unhurried, plain declarative sentences, concrete language, earned metaphors, anti-AI rules).
+  4. **DeFiwaynex Voice Engine & Identity Neutrality:**
+     - Canonical voice profile directives embedded server-side for `DeFiwayneX` (direct, calm, unhurried, plain declarative sentences, concrete language, earned metaphors, anti-AI rules).
+     - Strict identity neutrality for `Joseph Henshaw` and `PEVRA`: strictly factual operating context only; zero fabricated voice personas.
      - Deterministic voice compliance scanner analyzing drafts across em dashes, buzzwords, formulaic contrast patterns, cliché endings, and choppy punctuation. Zero fabricated numerical scores.
      - Reusable signature CTA generator responding to explicit user requests (*"Add my CTA"*, *"Add research CTA"*). Never appended automatically.
   5. **Streaming Chat Route (`/api/vault/shaw/chat`):**
      - Server-Sent Events (SSE) streaming with native Web Streams (`ReadableStream`).
+     - Stream interruption safety: `cancel()` callback marks run as `failed` with abort error and prevents duplicate/empty message generation.
      - User message and assistant response persistence, conversation title auto-generation, and execution run auditing.
   6. **Functional Workspace UI (`/vault/shaw`):**
      - Responsive thread management (new, list, archive), capability selector (Ask / Create), provider selector, streaming output, voice check modal, copy controls.
+     - Ask capability scope accurately scoped to active workspace context and explicit user input (deep cross-database retrieval deferred to Batch 2).
 * **Verification Status:**
   - Automated test suite: Passing (`scratch/test_shaw_batch1.js`).
   - TypeScript type-check: 0 errors (`npm run type-check`).

@@ -529,7 +529,7 @@ export function ShawWorkspace({
                   type="button"
                   onClick={() => {
                     setCapability('ask')
-                    handleSendMessage('What are my high-priority active tasks and upcoming deadlines?')
+                    handleSendMessage('Help me structure an operational plan for this workspace')
                   }}
                   className="p-3 rounded-xl border border-border bg-card/60 hover:bg-secondary/70 hover:border-border/80 transition-all text-xs space-y-1"
                 >
@@ -537,7 +537,7 @@ export function ShawWorkspace({
                     <Compass className="w-3.5 h-3.5 text-primary" /> Ask Vault
                   </div>
                   <div className="text-muted-foreground text-[11px] leading-relaxed">
-                    Check active tasks, meetings, and attention items.
+                    Ask questions using active workspace and identity context.
                   </div>
                 </button>
               </div>

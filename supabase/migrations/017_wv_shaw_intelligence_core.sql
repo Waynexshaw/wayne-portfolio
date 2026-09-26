@@ -245,3 +245,18 @@ BEGIN
       WITH CHECK (wv_internal.is_workspace_member(workspace_id) AND user_id = (SELECT auth.uid()));
   END IF;
 END $$;
+
+-- 6. Updated At Triggers
+-- ============================================================================
+
+DROP TRIGGER IF EXISTS update_shaw_conversations_updated_at ON public.shaw_conversations;
+CREATE TRIGGER update_shaw_conversations_updated_at
+  BEFORE UPDATE ON public.shaw_conversations
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_shaw_user_preferences_updated_at ON public.shaw_user_preferences;
+CREATE TRIGGER update_shaw_user_preferences_updated_at
+  BEFORE UPDATE ON public.shaw_user_preferences
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();

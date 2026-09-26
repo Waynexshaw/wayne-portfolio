@@ -164,6 +164,7 @@ export async function POST(request: NextRequest) {
     const reader = stream.getReader()
     const encoder = new TextEncoder()
     let fullResponseText = ''
+    let isCompleted = false
 
     const outputStream = new ReadableStream({
       async pull(controller) {
@@ -171,6 +172,9 @@ export async function POST(request: NextRequest) {
           while (true) {
             const { done, value } = await reader.read()
             if (done) {
+              if (isCompleted) return
+              isCompleted = true
+
               // Post-processing on stream completion
               const finalWithCta = appendCtaIfRequested(fullResponseText, trimmedMessage)
 
@@ -184,20 +188,22 @@ export async function POST(request: NextRequest) {
 
               const usage = getUsage()
 
-              // Save assistant message to database
-              await (supabase as any).from('shaw_messages').insert({
-                conversation_id: conversationId,
-                workspace_id: workspaceId,
-                role: 'assistant',
-                content: fullResponseText,
-                model_provider: provider,
-                model_name: model,
-                tokens_in: usage.tokensIn || null,
-                tokens_out: usage.tokensOut || null,
-                latency_ms: usage.latencyMs || null,
-              })
+              // Only persist assistant message if non-empty response was generated
+              if (fullResponseText.trim().length > 0) {
+                await (supabase as any).from('shaw_messages').insert({
+                  conversation_id: conversationId,
+                  workspace_id: workspaceId,
+                  role: 'assistant',
+                  content: fullResponseText,
+                  model_provider: provider,
+                  model_name: model,
+                  tokens_in: usage.tokensIn || null,
+                  tokens_out: usage.tokensOut || null,
+                  latency_ms: usage.latencyMs || null,
+                })
+              }
 
-              // Update run audit record
+              // Update run audit record to completed
               if (runId) {
                 await (supabase as any)
                   .from('shaw_ai_runs')
@@ -236,12 +242,13 @@ export async function POST(request: NextRequest) {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(value)}\n\n`))
           }
         } catch (err: any) {
-          if (runId) {
+          if (!isCompleted && runId) {
+            isCompleted = true
             await (supabase as any)
               .from('shaw_ai_runs')
               .update({
                 status: 'failed',
-                error_message: err.message,
+                error_message: err.message || 'Stream processing error',
               })
               .eq('id', runId)
           }
@@ -254,8 +261,25 @@ export async function POST(request: NextRequest) {
           controller.close()
         }
       },
-      cancel() {
-        reader.cancel()
+      async cancel(reason) {
+        try {
+          await reader.cancel(reason)
+        } catch {}
+
+        if (!isCompleted && runId) {
+          isCompleted = true
+          try {
+            await (supabase as any)
+              .from('shaw_ai_runs')
+              .update({
+                status: 'failed',
+                error_message: 'Client disconnected or stream cancelled by user',
+              })
+              .eq('id', runId)
+          } catch (dbErr) {
+            console.error('Error updating run status on cancel:', dbErr)
+          }
+        }
       },
     })
 

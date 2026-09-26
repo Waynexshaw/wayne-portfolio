@@ -634,8 +634,8 @@ SHAW owns all conversation history, prompt construction, identity context, voice
 * **Stateless Provider Sessions:** External providers do not own SHAW thread state. SHAW constructs and injects required context per request.
 * **Model Identifiers as Configuration:** Model IDs are configurable data via server-side environment variables (`SHAW_GEMINI_MODEL`, `SHAW_GROQ_MODEL`) with safe defaults, preventing hardcoded model deprecation dependencies.
 * **Initial Provider Strategy:**
-  - **Primary:** Google Gemini (`gemini-1.5-flash` or configured default)
-  - **Secondary Free Fallback:** Groq (`llama-3.3-70b-versatile` or configured default)
+  - **Primary:** Google Gemini (verified default `gemini-2.0-flash` or configured `SHAW_GEMINI_MODEL`)
+  - **Secondary Free Fallback:** Groq (verified default `llama-3.3-70b-versatile` or configured `SHAW_GROQ_MODEL`)
   - **Architecture-Ready:** OpenAI, Anthropic, OpenRouter, and future local endpoints.
 
 ### 3. Routing Modes & Cost Safety
@@ -651,10 +651,12 @@ SHAW owns all conversation history, prompt construction, identity context, voice
 * **Zero Secret Storage in Database:** Migration 017 stores zero credentials in Supabase.
 * **Zero Secret Leakage:** Keys are never prefixed with `NEXT_PUBLIC_`, never exposed to client bundles, never returned in API responses, and never logged.
 
-### 5. DeFiwaynex Voice Engine & Compliance Scanner
-* **Voice Profile Directives:** Direct, calm, unhurried tone. Confident without performing confidence. Plain declarative sentences. Concrete language. Banned corporate jargon (*leverage, unlock, elevate, game-changing, cutting-edge, synergy, seamlessly, delve, paradigm*). Earned, unforced metaphors. Anti-AI rules eliminating artificial endings (*"The future isn't waiting..."*, *"And maybe, just maybe..."*).
+### 5. Identity Context, Voice Engine & Ask Capability Scope
+* **Canonical Voice Engine (DeFiwaynex):** The dedicated voice engine belongs exclusively to the `DeFiwayneX` identity (direct, calm, unhurried, plain declarative sentences, concrete language, anti-AI rules).
+* **Identity Neutrality (Joseph Henshaw & PEVRA):** Joseph Henshaw (founder/executive advisory) and PEVRA (company/legal entity) provide factual operational and organizational context only. Zero fabricated or invented tone profiles are applied to them.
 * **Deterministic Voice Compliance Scanner:** Analyzes generated drafts against voice invariants, returning structured statuses (`passed`, `warning`, `violation`) across em dashes, buzzwords, formulaic contrast patterns, cliché endings, and choppy punctuation. Zero fabricated numerical scores.
 * **Signature CTA:** Reusable closing signature appended only upon explicit user request (*"Add my CTA"*, *"Add research CTA"*). Never appended automatically.
+* **Ask Capability Scope (Batch 1 vs Batch 2):** In Batch 1, the `Ask` capability reasons across conversation history, active workspace metadata, selected identity context, and explicit user-provided text. Full cross-database operational retrieval (active tasks, upcoming meetings, portfolio reviews) is scheduled for Batch 2.
 
 ### 6. Core Schema (Migration 017)
 * `public.shaw_conversations`: Workspace-scoped persistent threads with routing mode, capability, and archive flags.

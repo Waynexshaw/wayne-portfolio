@@ -9,12 +9,21 @@ import { ShawProvider, ProviderConfig } from '../types'
  * - No secrets are exposed to client code or serialized to browser bundles.
  */
 
+/**
+ * Centrally defined current verified provider defaults.
+ * Can be overridden anytime via server environment variables:
+ * - SHAW_GEMINI_MODEL
+ * - SHAW_GROQ_MODEL
+ */
+export const CURRENT_VERIFIED_GEMINI_MODEL = 'gemini-2.0-flash'
+export const CURRENT_VERIFIED_GROQ_MODEL = 'llama-3.3-70b-versatile'
+
 export function getGeminiModel(): string {
-  return process.env.SHAW_GEMINI_MODEL || 'gemini-1.5-flash'
+  return process.env.SHAW_GEMINI_MODEL || CURRENT_VERIFIED_GEMINI_MODEL
 }
 
 export function getGroqModel(): string {
-  return process.env.SHAW_GROQ_MODEL || 'llama-3.3-70b-versatile'
+  return process.env.SHAW_GROQ_MODEL || CURRENT_VERIFIED_GROQ_MODEL
 }
 
 export function getProviderApiKey(provider: ShawProvider): string | null {
