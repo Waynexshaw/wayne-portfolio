@@ -8,6 +8,7 @@
 
 import { VaultContextEnvelope, VaultRecord } from './types'
 import { ShawMessageCitation } from '../types'
+import { createRequestSourceMap, RequestSourceMap } from './provenance'
 
 /**
  * Escapes sensitive XML-like delimiter characters in user-entered data
@@ -24,7 +25,15 @@ function escapeRecordContent(str: any): string {
     .replace(/>/g, '&gt;')
 }
 
-export function serializeVaultContextForPrompt(envelope: VaultContextEnvelope): string {
+export function serializeVaultContextForPrompt(
+  envelope: VaultContextEnvelope,
+  sourceMap?: RequestSourceMap
+): string {
+  const map = sourceMap || createRequestSourceMap(envelope)
+  const recToHandle = new Map<VaultRecord, string>()
+  for (const [handle, record] of map.entries()) {
+    recToHandle.set(record, handle)
+  }
   const parts: string[] = []
 
   parts.push('<vault_context>')
@@ -102,9 +111,18 @@ export function serializeVaultContextForPrompt(envelope: VaultContextEnvelope): 
 
   // 3. Vault Records
   if (envelope.records.length > 0) {
+    parts.push('<!-- PROVENANCE CITATION DIRECTIVE (CRITICAL): -->')
+    parts.push('<!-- Each record below is assigned a server-managed request-local source handle (e.g. ref="S1", ref="S2"). -->')
+    parts.push('<!-- If your answer draws upon or references information from any retrieved record, you MUST append a trailing provenance tag at the very end of your response in this exact format: -->')
+    parts.push('<!-- [SOURCES: S1, S2 | BASIS: DIRECT_FACT] -->')
+    parts.push('<!-- Supported BASIS values: DIRECT_FACT, SYNTHESIS, INFERENCE, UNKNOWN, CONFLICT. -->')
+    parts.push('<!-- Use ONLY the handle identifiers (e.g. S1, S2). NEVER generate, guess, or invent database UUIDs or arbitrary source handles. -->')
+    parts.push('<!-- If no retrieved records were used in your answer, do NOT include a [SOURCES: ...] tag. -->')
     parts.push('<records>')
-    for (const rec of envelope.records) {
-      parts.push(serializeRecord(rec))
+    for (let i = 0; i < envelope.records.length; i++) {
+      const rec = envelope.records[i]
+      const handle = recToHandle.get(rec) || `S${i + 1}`
+      parts.push(serializeRecord(rec, handle))
     }
     parts.push('</records>')
   }
@@ -118,10 +136,11 @@ export function serializeVaultContextForPrompt(envelope: VaultContextEnvelope): 
   return parts.join('\n')
 }
 
-function serializeRecord(rec: VaultRecord): string {
+function serializeRecord(rec: VaultRecord, handle?: string): string {
   const lines: string[] = []
   const relStr = rec.relationship ? ` relationship="${escapeRecordContent(JSON.stringify(rec.relationship))}"` : ''
-  lines.push(`  <record type="${rec.entityType}" id="${rec.entityId}" title="${escapeRecordContent(rec.title)}" epistemic_class="${rec.epistemicClass}"${relStr}>`)
+  const handleStr = handle ? ` ref="${handle}"` : ''
+  lines.push(`  <record${handleStr} type="${rec.entityType}" id="${rec.entityId}" title="${escapeRecordContent(rec.title)}" epistemic_class="${rec.epistemicClass}"${relStr}>`)
   
   // Timestamps
   const tsEntries = Object.entries(rec.timestamps).filter(([_, v]) => Boolean(v))

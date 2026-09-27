@@ -13,6 +13,10 @@ import {
   executeVaultRetrieval,
   serializeVaultContextForPrompt,
   extractCitationsFromEnvelope,
+  createRequestSourceMap,
+  resolveAuthoritativeProvenance,
+  createProvenanceStreamFilter,
+  RequestSourceMap,
   VaultContextEnvelope,
 } from '@/lib/vault/shaw/retrieval'
 
@@ -203,6 +207,7 @@ export async function POST(request: NextRequest) {
     let vaultEnvelope: VaultContextEnvelope | null = null
     let vaultContextPrompt: string | undefined = undefined
     let retrievalLatencyMs = 0
+    let requestSourceMap: RequestSourceMap = new Map()
 
     if (retrievalPlan.shouldRetrieve) {
       const retrievalStart = Date.now()
@@ -213,7 +218,8 @@ export async function POST(request: NextRequest) {
       }
       retrievalLatencyMs = Date.now() - retrievalStart
       if (vaultEnvelope) {
-        vaultContextPrompt = serializeVaultContextForPrompt(vaultEnvelope)
+        requestSourceMap = createRequestSourceMap(vaultEnvelope)
+        vaultContextPrompt = serializeVaultContextForPrompt(vaultEnvelope, requestSourceMap)
       }
     }
 
@@ -340,6 +346,14 @@ export async function POST(request: NextRequest) {
     const outputStream = new ReadableStream({
       async pull(controller) {
         try {
+          const provenanceFilter = createProvenanceStreamFilter((cleanChunk: string) => {
+            if (cleanChunk.length > 0) {
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ type: 'text', text: cleanChunk })}\n\n`)
+              )
+            }
+          })
+
           while (true) {
             const { done, value } = await reader.read()
             if (done) {
@@ -348,7 +362,7 @@ export async function POST(request: NextRequest) {
 
             if (value.type === 'text' && value.text) {
               fullResponseText += value.text
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify(value)}\n\n`))
+              provenanceFilter.push(value.text)
             } else if (value.type === 'meta') {
               if (value.finishReason) adapterFinishReason = value.finishReason
               if (value.rawFinishReason) adapterRawFinishReason = value.rawFinishReason
@@ -382,23 +396,35 @@ export async function POST(request: NextRequest) {
 
           if (isConfirmedNormal) {
             // Post-processing on stream completion
-            const finalWithCta = appendCtaIfRequested(fullResponseText, trimmedMessage)
+            const parsedProvenance = provenanceFilter.flush()
+            let cleanResponseText = parsedProvenance.cleanText
+
+            const finalWithCta = appendCtaIfRequested(cleanResponseText, trimmedMessage)
 
             // If CTA was appended, stream extra chunk
-            if (finalWithCta.length > fullResponseText.length) {
-              const ctaDiff = finalWithCta.slice(fullResponseText.length)
+            if (finalWithCta.length > cleanResponseText.length) {
+              const ctaDiff = finalWithCta.slice(cleanResponseText.length)
               const ctaChunk: ShawStreamChunk = { type: 'text', text: ctaDiff }
               controller.enqueue(encoder.encode(`data: ${JSON.stringify(ctaChunk)}\n\n`))
-              fullResponseText = finalWithCta
+              cleanResponseText = finalWithCta
+            }
+
+            fullResponseText = cleanResponseText
+
+            // Authoritatively resolve provenance against real Vault records
+            const provenanceResult = resolveAuthoritativeProvenance(
+              requestSourceMap,
+              parsedProvenance,
+              vaultEnvelope?.completeness
+            )
+
+            let citations = provenanceResult.citations
+            if (!parsedProvenance.hasTag && vaultEnvelope && vaultEnvelope.records.length > 0) {
+              citations = extractCitationsFromEnvelope(vaultEnvelope)
             }
 
             // Only persist assistant message if non-empty response was generated
             if (fullResponseText.trim().length > 0) {
-              const citations =
-                vaultEnvelope && vaultEnvelope.records.length > 0
-                  ? extractCitationsFromEnvelope(vaultEnvelope)
-                  : []
-
               await (supabase as any).from('shaw_messages').insert({
                 conversation_id: conversationId,
                 workspace_id: workspaceId,
@@ -449,6 +475,16 @@ export async function POST(request: NextRequest) {
                           should_retrieve: false,
                           reason: retrievalPlan.reason,
                         },
+                    provenance: {
+                      status: provenanceResult.status,
+                      basis: provenanceResult.basis || null,
+                      retrieved_records_count: vaultEnvelope?.records.length ?? 0,
+                      material_sources_count: provenanceResult.validHandlesCount,
+                      valid_handles_count: provenanceResult.validHandlesCount,
+                      invalid_handles_count: provenanceResult.invalidHandlesCount,
+                      invalid_handles: provenanceResult.invalidHandles,
+                      citations_count: citations.length,
+                    },
                     ...(isRetry && userMessageId
                       ? { is_retry: true, retry_of_message_id: userMessageId }
                       : {}),
@@ -472,7 +508,13 @@ export async function POST(request: NextRequest) {
               .eq('id', conversationId)
 
             controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ type: 'done', finishReason: 'stop' })}\n\n`)
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: 'done',
+                  finishReason: 'stop',
+                  citations,
+                })}\n\n`
+              )
             )
             controller.close()
             return

@@ -47,6 +47,15 @@ export interface ShawConversation {
   latest_message_at?: string | null
 }
 
+export type AnswerBasis =
+  | 'DIRECT_FACT'
+  | 'SYNTHESIS'
+  | 'INFERENCE'
+  | 'UNKNOWN'
+  | 'CONFLICT'
+
+export type ProvenanceStatus = 'COMPLETE' | 'PARTIAL' | 'UNAVAILABLE'
+
 export interface ShawMessageCitation {
   type: 'vault' | 'external' | 'user' | 'synthesis'
   title: string
@@ -54,6 +63,31 @@ export interface ShawMessageCitation {
   entityType?: string
   entityId?: string
   reference?: string
+  // Batch 2B.1 Authoritative Provenance Extensions (fully backward compatible)
+  sourceHandle?: string
+  domain?: string
+  epistemicClass?:
+    | 'WV_RECORD'
+    | 'RESEARCH_EVIDENCE'
+    | 'WORKSPACE_EVIDENCE'
+    | 'USER_SUPPLIED'
+    | 'MODEL_INFERENCE'
+    | 'UNKNOWN'
+    | 'ILLUSTRATIVE'
+  routeUrl?: string
+  fieldLocations?: string[]
+  timestamps?: Record<string, string | null | undefined>
+  relationship?: Record<string, any>
+  isMaterial?: boolean
+  basis?: AnswerBasis
+  retrievalScope?: {
+    queryMode: 'catalog' | 'targeted'
+    resultScope: 'exhaustive' | 'bounded' | 'filtered' | 'ambiguous'
+    returnedCount: number
+    totalCount?: number | null
+    appliedLimit?: number
+    hasMore?: boolean
+  }
 }
 
 export interface ShawActionProposal {
