@@ -174,20 +174,41 @@ When your phone number is recycled, your digital identity isn't clean; you're li
     topic: 'Japanese stadium cleanup parable, SIM recycling in Nigeria, and permanent trace',
     lengthClass: 'detailed',
     sourceLabel: 'DeFiwayneX — The Bird That Leaves No Trace (user supplied)',
-    exemplarText: `I came across a video of Japan’s football fans cleaning the stadium after a World Cup match. Mind you not the staff but the fans. Thousands of them, staying behind after a game they came to watch and enjoy, picking up rubbish that wasn’t even theirs.
+    exemplarText: `I came across a video of Japan’s football fans cleaning the stadium after a World Cup match.
+Mind you not the staff but the fans. Thousands of them, staying behind after a game they came to watch and enjoy, picking up rubbish that wasn’t even theirs.
 
 Someone asked one of the players about it. She said something that stayed with me. She said that’s just the culture. That they feel honored to be there, honored to watch, honored to be part of it, and because of that, they don’t want to leave a mess behind.
 
-There’s a Japanese proverb: "A departing bird does not muddy the water." The idea that your character isn’t measured by how you arrive somewhere, but by what you leave behind when you go.
+I’ve been thinking about that word “Honored”.
 
-Now I want you to think about something closer to home. In Nigeria, criminals make ransom calls from prepaid SIM cards. When they’re done, they throw the SIM away and move on. The number goes back to the carrier. The carrier recycles it. And that number, with everything attached to it, lands in the hands of someone completely innocent. A trader. A student. Someone’s father.
+It changes everything about how you show up somewhere when you feel that way. You stop thinking about what you can take from a place and start thinking about what you owe it.
 
-When the police trace that number, they find that person. And that person has almost no way to prove the number wasn’t theirs when the crime happened. There’s no public record. No history. Nothing. The criminal left. The mess stayed. And someone else is living in it.
+There’s a Japanese proverb (Tatsu toriato wo nigosazu). Literally, it means "A departing bird does not muddy the water" - it comes from the image of a waterbird taking off from a pond without stirring up the mud or clouding the clear water.
 
-When I think about why we’re building Pevra, I always come back to that gap: the space between someone doing something wrong and someone else paying for it, and how completely avoidable it is if there’s just a permanent, honest record of who owned a number and when. The person who walks away from a crime can’t make the record walk away with them. And the person who inherits that number inherits the truth, not someone else’s mess.
+The message is a life principle: “A bird that leaves no trace.” The idea that your character isn’t measured by how you arrive somewhere, but by what you leave behind when you go.
 
-The Japanese fans don’t clean the stadium because someone is watching. That’s what we’re trying to build into the infrastructure of Pevra. A trace that stays. Even when the person is long gone.`,
-    notes: 'Primary V1 narrative exemplar from "The Bird That Leaves No Trace". Preserves exact sequence: stadium cleaning, what one leaves behind, Nigerian SIM recycling, innocent owner consequences, on-chain record, and returning to the trace metaphor.',
+Now I want you to think about something closer to home.
+
+In Nigeria, criminals make ransom calls from prepaid SIM cards. When they’re done, they throw the SIM away and move on. The number goes back to the carrier. The carrier recycles it. And that number, with everything attached to it, lands in the hands of someone completely innocent.
+
+A trader. A student. Someone’s father.
+
+When the police trace that number, they find that person. And that person has almost no way to prove the number wasn’t theirs when the crime happened. There’s no public record. No history. Nothing.
+
+The criminal left. The mess stayed. And someone else is living in it.
+
+When I think about why we’re building Pevra, I always come back to that gap, the space between someone doing something wrong and someone else paying for it and how completely avoidable it is if there’s just a permanent, honest record of who owned a number and when.
+
+That’s what Pevra does. Every number on the platform has a full history recorded on-chain from the moment it’s issued. Every time it changes hands, that event is recorded. Permanently. Publicly. Anyone who receives that number can see exactly where it’s been.
+
+The person who walks away from a crime can’t make the record walk away with them. And the person who inherits that number inherits the truth, not someone else’s mess.
+
+The Japanese fans don’t clean the stadium because someone is watching. They do it because of something they carry inside them about what it means to be somewhere, to be part of something.
+
+That’s what we’re trying to build into the infrastructure of Pevra. Not just a product that works, but a system that holds people accountable to what they’ve done and protects people from what they didn’t.
+
+A trace that stays. Even when the person is long gone.`,
+    notes: 'Primary V1 narrative exemplar from "The Bird That Leaves No Trace". Verbatim connected excerpt preserving authentic sequence: stadium cleaning observation, reflection on "Honored", Japanese proverb, Nigerian SIM recycling, innocent owner consequence, on-chain record, and returning to the permanent trace metaphor.',
   },
   // SECONDARY: Historical verified chess opening parable
   {
@@ -214,18 +235,77 @@ I have watched Web3 projects die this exact death. They launch a token, pay KOLs
     topic: 'AI drafts versus human thinking, question-first research, source verification, and voice',
     lengthClass: 'detailed',
     sourceLabel: 'DeFiwayneX — The Draft AI Gave You Is Not Your Content Yet (user supplied)',
-    exemplarText: `You open ChatGPT. You type a prompt. A few seconds later, you have a full article. The grammar is clean. The structure makes sense. You read it once and think: "Yeah, this is good." So you change a few words, add your name and post it.
+    exemplarText: `You open ChatGPT.
+You type a prompt.
 
-This is where I think we need to slow down, because getting a draft from AI is not the same thing as finishing your work. The words are there. The thinking still has to happen.
+A few seconds later, you have a full article.
 
-Did I ask AI to help me express something I already understood? Or did I ask it to figure out what I should say? There is a big difference between the two. If I have researched a subject, collected my sources, formed my opinion and written down my main points, AI can help me turn that material into something cleaner. But if I know nothing about the subject and ask AI to research it, form the argument and give me the sources, I have a different problem: I may have a finished-looking document without actually understanding the subject.
+The grammar is clean.
+The structure makes sense.
+The points are arranged nicely.
 
-A good sentence can still contain a bad fact. AI is very good at writing sentences that sound certain. That does not mean the information inside those sentences is correct. That is why I don’t accept a research claim simply because AI gave me a source. I open the source. I read it. I check what the researcher actually said.
+You read it once and think:
+“Yeah, this is good.”
 
-Research starts with a question. Not with a prompt. AI can help me organise what I find. It can help me spot gaps. It can challenge an argument. But I still need to do the work of understanding the subject.
+So you change a few words, add your name and post it.
 
-This is where your voice comes in. Your voice isn't just the way you write. It comes from the things you have seen and the conclusions you have reached from them. When you give AI a blank page and ask it to fill everything, you get something that reads well but has no fingerprints. Writing is still thinking. Research is still checking. The draft AI gave you is only the beginning.`,
-    notes: 'Primary V1 educational exemplar. Demonstrates first-principles teaching on AI drafts vs thinking, question-based research, source verification, and authentic voice without using signature CTA.',
+This is where I think we need to slow down, because getting a draft from AI is not the same thing as finishing your work.
+
+The words are there.
+The thinking still has to happen.
+
+What exactly did you ask AI to do?
+This is the first thing I would ask myself.
+Did I ask AI to help me express something I already understood?
+Or did I ask it to figure out what I should say?
+There is a big difference between the two.
+
+If I have researched a subject, collected my sources, formed my opinion and written down my main points, AI can help me turn that material into something cleaner.
+That is useful.
+But if I know nothing about the subject and ask AI to research it, form the argument, write the article and give me the sources, I have a different problem.
+I may have a finished-looking document without actually understanding the subject.
+
+A good sentence can still contain a bad fact.
+This is probably the biggest thing people need to remember.
+AI is very good at writing sentences that sound certain.
+That does not mean the information inside those sentences is correct.
+The citation can look real.
+The author’s name can look real.
+The title can look real.
+And the claim can still be wrong.
+That is why I don’t accept a research claim simply because AI gave me a source.
+I open the source.
+I read it.
+I check the number.
+I check what the researcher actually said.
+Then I decide whether the claim belongs in my work.
+
+Research starts with a question.
+Not with a prompt.
+If I want to research recycled phone numbers, for example, I shouldn’t start with:
+“Write me an article about phone number recycling.”
+I should start with questions.
+How does number recycling work?
+Why are numbers reassigned?
+What problems can this create?
+Those questions determine what I search for.
+AI can help me organise what I find.
+It can help me spot gaps.
+It can explain something I don’t understand.
+It can challenge an argument.
+But I still need to do the work of understanding the subject.
+
+This is where your voice comes in.
+Your voice isn’t just the way you write.
+It comes from the things you have seen and the conclusions you have reached from them.
+When you give AI a blank page and ask it to fill everything, you can end up with something that reads well but could have been written by almost anyone.
+That is usually what people mean when they say something “sounds like AI.”
+The grammar isn’t necessarily the problem.
+The writing has no fingerprints.
+
+The draft AI gave you is only the beginning.
+The work becomes yours through what you do with it.`,
+    notes: 'Primary V1 educational exemplar from "The Draft AI Gave You Is Not Your Content Yet". Verbatim connected excerpt demonstrating first-principles teaching on AI drafts vs thinking, question-based research, source verification, and authentic voice without using signature CTA.',
   },
   // SECONDARY: Historical verified chess pieces framework
   {
