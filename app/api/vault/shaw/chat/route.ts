@@ -4,6 +4,8 @@ import { routeRequest, ShawRoutingError } from '@/lib/vault/shaw/gateway/router'
 import { getSystemPromptForIdentity } from '@/lib/vault/shaw/voice/defiwaynex'
 import { appendCtaIfRequested, resolveCtaIntent } from '@/lib/vault/shaw/voice/cta'
 import { resolveFormatIntent, resolveDepthIntent } from '@/lib/vault/shaw/voice/depth'
+import { resolveFormatProfile } from '@/lib/vault/shaw/voice/profiles'
+import { scanVoiceCompliance, getHardViolations } from '@/lib/vault/shaw/voice/compliance'
 import { ShawCapability, ShawRoutingMode, ShawStreamChunk } from '@/lib/vault/shaw/types'
 import { AdapterMessage } from '@/lib/vault/shaw/gateway/adapters/types'
 
@@ -172,12 +174,15 @@ export async function POST(request: NextRequest) {
     // 5. Build system instructions
     const identity = conversation.identity || null
     const format = resolveFormatIntent(trimmedMessage)
+    const profile = resolveFormatProfile(trimmedMessage)
     const depth = resolveDepthIntent(trimmedMessage)
     const ctaIntent = resolveCtaIntent(trimmedMessage)
 
     const systemPrompt = getSystemPromptForIdentity(identity, capability as ShawCapability, {
       format,
+      profile,
       depth,
+      prompt: trimmedMessage,
     })
 
     // 6. Check user preferences for paid fallback
@@ -202,6 +207,7 @@ export async function POST(request: NextRequest) {
         status: 'started',
         metadata: {
           format,
+          profile,
           depth,
           cta_intent: ctaIntent,
           user_message_id: userMessageId,
@@ -311,6 +317,10 @@ export async function POST(request: NextRequest) {
                 })
               }
 
+              // Scan voice compliance for observability and audit logging (no blind regex rewriting)
+              const compliance = scanVoiceCompliance(fullResponseText, { ctaIntent })
+              const hardViolations = getHardViolations(compliance)
+
               // Update run audit record to completed
               if (runId) {
                 await (supabase as any)
@@ -320,6 +330,18 @@ export async function POST(request: NextRequest) {
                     tokens_in: usage.tokensIn || null,
                     tokens_out: usage.tokensOut || null,
                     latency_ms: usage.latencyMs || null,
+                    metadata: {
+                      format,
+                      profile,
+                      depth,
+                      cta_intent: ctaIntent,
+                      compliance_passed: compliance.passed,
+                      hard_violations: hardViolations.map((v) => v.name),
+                      user_message_id: userMessageId,
+                      ...(isRetry && userMessageId
+                        ? { is_retry: true, retry_of_message_id: userMessageId }
+                        : {}),
+                    },
                   })
                   .eq('id', runId)
               }

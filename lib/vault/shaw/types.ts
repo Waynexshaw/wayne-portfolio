@@ -136,10 +136,21 @@ export interface ComplianceResult {
 
 export type ShawOutputDepth = 'short' | 'normal' | 'detailed' | 'deep'
 export type ShawOutputFormat = 'x_post' | 'x_thread' | 'article' | 'linkedin' | 'report' | 'general'
+export type DeFiwayneXFormatProfile =
+  | 'x_post'
+  | 'x_reply'
+  | 'x_thread'
+  | 'research_analysis'
+  | 'founder_commentary'
+  | 'narrative_story'
+  | 'educational'
+  | 'growth_strategy'
+  | 'general'
 
 export interface ShawGenerationIntent {
   capability: ShawCapability
   format: ShawOutputFormat
+  profile?: DeFiwayneXFormatProfile
   depth: ShawOutputDepth
   ctaIntent: CtaIntent
 }

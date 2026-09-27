@@ -1,6 +1,24 @@
-import { ComplianceCheck, ComplianceResult } from '../types'
+import { ComplianceCheck, ComplianceResult, CtaIntent } from '../types'
+import { DEFIWAYNEX_SIGNATURE_REGEX } from './cta'
 
-const BANNED_BUZZWORDS = [
+/**
+ * Voice Compliance Engine (Voice Check V2)
+ *
+ * Implements deterministic compliance verification for the DeFiwayneX voice.
+ * Strictly separates:
+ * 1. HARD VIOLATIONS (controlled correction triggers):
+ *    - em_dash (— or --)
+ *    - unwanted_cta (signature CTA present when intent is 'none')
+ *    - duplicate_cta (more than one signature CTA present)
+ *    - formulaic_contrast (high-confidence template contrasts like "it's not X, it's Y")
+ *
+ * 2. SOFT CONTEXTUAL WARNINGS (reported honestly, NEVER trigger auto-correction or loops):
+ *    - banned_buzzwords (contextual advisory; words like "leverage" have legitimate financial meanings)
+ *    - cliche_endings (stylistic advisory)
+ *    - choppy_punctuation (sentence rhythm advisory)
+ */
+
+export const BANNED_BUZZWORDS = [
   'leverage',
   'unlock',
   'elevate',
@@ -15,14 +33,14 @@ const BANNED_BUZZWORDS = [
   'supercharge',
 ]
 
-const FORMULAIC_CONTRAST_PATTERNS = [
+export const FORMULAIC_CONTRAST_PATTERNS = [
   /\bnot\s+[^,.]+,\s*it(?:'s|\s+is)\b/i,
   /\bthe\s+people\s+who\s+[^,.]+\s+aren't\s+the\s+ones\s+who\b/i,
   /\bit(?:'s|\s+is)\s+not\s+about\s+[^,.]+,\s*it(?:'s|\s+is)\s+about\b/i,
   /\bthe\s+question\s+is\s+no\s+longer\b/i,
 ]
 
-const CLICHE_ENDINGS = [
+export const CLICHE_ENDINGS = [
   /the\s+future\s+isn't\s+waiting[.,]/i,
   /the\s+question\s+is\s+no\s+longer\s+whether/i,
   /and\s+maybe,\s+just\s+maybe/i,
@@ -30,20 +48,48 @@ const CLICHE_ENDINGS = [
   /it's\s+already\s+being\s+built[.,]/i,
 ]
 
-export function scanVoiceCompliance(text: string): ComplianceResult {
+export interface ScanComplianceOptions {
+  ctaIntent?: CtaIntent
+}
+
+/**
+ * Evaluates whether a compliance check represents a hard generation violation / correction trigger.
+ * Strictly triggers ONLY for: em_dash, unwanted_cta, duplicate_cta, formulaic_contrast.
+ * Never triggers for buzzwords, clichés, or choppy punctuation.
+ */
+export function isHardCorrectionTrigger(check: ComplianceCheck): boolean {
+  if (check.name === 'em_dash' && check.matches && check.matches.length > 0) return true
+  if (check.name === 'unwanted_cta' && check.status === 'violation') return true
+  if (check.name === 'duplicate_cta' && check.status === 'violation') return true
+  if (check.name === 'formulaic_contrast' && check.status === 'violation') return true
+  return false
+}
+
+export function isHardViolation(check: ComplianceCheck): boolean {
+  return isHardCorrectionTrigger(check)
+}
+
+/**
+ * Scans text for voice compliance against deterministic DeFiwayneX rules.
+ */
+export function scanVoiceCompliance(
+  text: string,
+  options?: ScanComplianceOptions
+): ComplianceResult {
   if (!text || text.trim().length === 0) {
     return { passed: true, checks: [] }
   }
 
   const checks: ComplianceCheck[] = []
+  const ctaIntent = options?.ctaIntent || 'none'
 
-  // 1. Em Dash Check
+  // 1. HARD CORRECTION TRIGGER: Em Dash Check
   const emDashMatches = text.match(/—|--/g)
   if (emDashMatches && emDashMatches.length > 0) {
     checks.push({
       name: 'em_dash',
       status: 'warning',
-      description: `Found ${emDashMatches.length} em dash(es). Prefer plain declarative sentences with commas or periods.`,
+      description: `Found ${emDashMatches.length} em dash(es). Express thoughts with natural commas or periods.`,
       matches: emDashMatches,
     })
   } else {
@@ -54,31 +100,31 @@ export function scanVoiceCompliance(text: string): ComplianceResult {
     })
   }
 
-  // 2. Banned Corporate Buzzwords Check
-  const foundBuzzwords: string[] = []
-  for (const word of BANNED_BUZZWORDS) {
-    const regex = new RegExp(`\\b${word}\\b`, 'gi')
-    if (regex.test(text)) {
-      foundBuzzwords.push(word)
-    }
-  }
-
-  if (foundBuzzwords.length > 0) {
+  // 2. HARD: CTA Opt-In & Duplicate Signature Check
+  const signatureMatches = text.match(new RegExp(DEFIWAYNEX_SIGNATURE_REGEX, 'gi')) || []
+  if (ctaIntent === 'none' && signatureMatches.length > 0) {
     checks.push({
-      name: 'banned_buzzwords',
+      name: 'unwanted_cta',
       status: 'violation',
-      description: `Contains corporate buzzword(s): ${foundBuzzwords.join(', ')}. Prefer concrete plain language.`,
-      matches: foundBuzzwords,
+      description: 'Detected author signature CTA when CTA was not requested or explicitly forbidden.',
+      matches: signatureMatches,
+    })
+  } else if (signatureMatches.length > 1) {
+    checks.push({
+      name: 'duplicate_cta',
+      status: 'violation',
+      description: `Detected ${signatureMatches.length} signature CTAs in generated output. Only one signature is permitted.`,
+      matches: signatureMatches,
     })
   } else {
     checks.push({
-      name: 'banned_buzzwords',
+      name: 'cta_compliance',
       status: 'passed',
-      description: 'Zero banned corporate buzzwords.',
+      description: 'CTA conforms strictly to user opt-in intent.',
     })
   }
 
-  // 3. Formulaic Contrast Structure Check
+  // 3. HARD: Formulaic Contrast Structure Check
   const matchedContrasts: string[] = []
   for (const pattern of FORMULAIC_CONTRAST_PATTERNS) {
     const match = text.match(pattern)
@@ -102,8 +148,31 @@ export function scanVoiceCompliance(text: string): ComplianceResult {
     })
   }
 
-  // 4. Cliché / Dramatic Ending Check
-  // Check the last 300 characters of text
+  // 4. Stylistic: Corporate Buzzwords Check (Soft violation: reported in check, but NEVER a hard auto-correction trigger)
+  const foundBuzzwords: string[] = []
+  for (const word of BANNED_BUZZWORDS) {
+    const regex = new RegExp(`\\b${word}\\b`, 'gi')
+    if (regex.test(text)) {
+      foundBuzzwords.push(word)
+    }
+  }
+
+  if (foundBuzzwords.length > 0) {
+    checks.push({
+      name: 'banned_buzzwords',
+      status: 'violation',
+      description: `Contains corporate buzzword(s): ${foundBuzzwords.join(', ')}. Prefer concrete plain language.`,
+      matches: foundBuzzwords,
+    })
+  } else {
+    checks.push({
+      name: 'banned_buzzwords',
+      status: 'passed',
+      description: 'Zero banned corporate buzzwords.',
+    })
+  }
+
+  // 5. Stylistic: Cliché / Dramatic Ending Check (Soft violation: reported in check, but NEVER a hard auto-correction trigger)
   const lastChunk = text.slice(-300)
   const matchedEndings: string[] = []
   for (const pattern of CLICHE_ENDINGS) {
@@ -128,7 +197,7 @@ export function scanVoiceCompliance(text: string): ComplianceResult {
     })
   }
 
-  // 5. Choppy Punctuation Check (excessive consecutive ultra-short sentences)
+  // 6. SOFT: Choppy Punctuation Check (Advisory warning only)
   const sentences = text
     .split(/[.!?]+/)
     .map((s) => s.trim())
@@ -173,11 +242,17 @@ export function scanVoiceCompliance(text: string): ComplianceResult {
 }
 
 /**
- * Deterministically sanitizes safe, obvious formatting issues
- * (e.g. replacing em dashes with commas or clean periods).
+ * Returns any hard violations found in the compliance result.
+ */
+export function getHardViolations(result: ComplianceResult): ComplianceCheck[] {
+  return result.checks.filter(isHardViolation)
+}
+
+/**
+ * Sanitizes obvious formatting issues for manual user correction in the UI modal.
+ * Note: Never applied automatically without explicit user action or controlled correction.
  */
 export function sanitizeObviousViolations(text: string): string {
   if (!text) return text
-  // Replace standalone em dash with a comma or hyphen
   return text.replace(/\s*—\s*/g, ', ').replace(/\s*--\s*/g, ', ')
 }

@@ -1,5 +1,6 @@
 import { ShawCapability, ShawOutputDepth, ShawOutputFormat, ShawGenerationIntent } from '../types'
 import { resolveCtaIntent } from './cta'
+import { resolveFormatProfile } from './profiles'
 
 /**
  * Format and Depth Intent Resolution Engine for SHAW
@@ -219,7 +220,7 @@ export function resolveDepthIntent(prompt: string): ShawOutputDepth {
 }
 
 /**
- * Resolves the full generation intent tuple: capability, format, depth, ctaIntent.
+ * Resolves the full generation intent tuple: capability, format, profile, depth, ctaIntent.
  */
 export function resolveGenerationIntent(
   prompt: string,
@@ -228,6 +229,7 @@ export function resolveGenerationIntent(
   return {
     capability,
     format: resolveFormatIntent(prompt),
+    profile: resolveFormatProfile(prompt),
     depth: resolveDepthIntent(prompt),
     ctaIntent: resolveCtaIntent(prompt),
   }
