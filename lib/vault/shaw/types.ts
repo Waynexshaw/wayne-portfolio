@@ -107,6 +107,16 @@ export interface ShawUserPreferences {
   updated_at: string
 }
 
+export type ShawCompletionReason =
+  | 'stop'
+  | 'length'
+  | 'content_filter'
+  | 'safety'
+  | 'recitation'
+  | 'interrupted'
+  | 'error'
+  | 'other'
+
 export interface ShawStreamChunk {
   type: 'text' | 'meta' | 'error' | 'done'
   text?: string
@@ -116,6 +126,10 @@ export interface ShawStreamChunk {
   tokensIn?: number
   tokensOut?: number
   latencyMs?: number
+  finishReason?: ShawCompletionReason
+  rawFinishReason?: string | null
+  statusCode?: number
+  userMessageId?: string | null
 }
 
 export type CtaType = 'standard' | 'research' | 'strategy' | 'full'

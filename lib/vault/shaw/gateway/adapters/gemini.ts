@@ -5,7 +5,27 @@ import {
   ProviderError,
 } from './types'
 import { getProviderApiKey, getGeminiModel, isProviderConfigured } from '../config'
-import { ShawStreamChunk } from '../../types'
+import { ShawStreamChunk, ShawCompletionReason } from '../../types'
+
+export function normalizeGeminiFinishReason(raw: string | null | undefined): ShawCompletionReason {
+  if (!raw) return 'interrupted'
+  switch (raw) {
+    case 'STOP':
+      return 'stop'
+    case 'MAX_TOKENS':
+      return 'length'
+    case 'SAFETY':
+      return 'safety'
+    case 'RECITATION':
+      return 'recitation'
+    case 'BLOCKLIST':
+    case 'PROHIBITED_CONTENT':
+    case 'SPII':
+      return 'content_filter'
+    default:
+      return 'other'
+  }
+}
 
 export class GeminiAdapter implements ProviderAdapter {
   id = 'gemini' as const
@@ -31,6 +51,7 @@ export class GeminiAdapter implements ProviderAdapter {
     const startTime = Date.now()
     let tokensIn = 0
     let tokensOut = 0
+    let rawFinishReason: string | null = null
 
     // Map conversation messages to Gemini contents format
     // Gemini roles: 'user' or 'model'
@@ -127,6 +148,7 @@ export class GeminiAdapter implements ProviderAdapter {
             const { done, value } = await reader.read()
             if (done) {
               const latencyMs = Date.now() - startTime
+              const finishReason = normalizeGeminiFinishReason(rawFinishReason)
               controller.enqueue({
                 type: 'meta',
                 provider: 'gemini',
@@ -134,8 +156,24 @@ export class GeminiAdapter implements ProviderAdapter {
                 tokensIn,
                 tokensOut,
                 latencyMs,
+                finishReason,
+                rawFinishReason: rawFinishReason || undefined,
               })
-              controller.enqueue({ type: 'done' })
+
+              if (finishReason === 'stop') {
+                controller.enqueue({
+                  type: 'done',
+                  finishReason: 'stop',
+                  rawFinishReason: rawFinishReason || undefined,
+                })
+              } else {
+                controller.enqueue({
+                  type: 'error',
+                  error: `Gemini generation ended abnormally: ${rawFinishReason || 'upstream_eof'} (reason: ${finishReason})`,
+                  finishReason,
+                  rawFinishReason: rawFinishReason || undefined,
+                })
+              }
               controller.close()
               return
             }
@@ -165,6 +203,10 @@ export class GeminiAdapter implements ProviderAdapter {
 
                 // Check candidates
                 const candidate = parsed.candidates?.[0]
+                if (candidate?.finishReason) {
+                  rawFinishReason = candidate.finishReason
+                }
+
                 if (candidate?.content?.parts) {
                   for (const part of candidate.content.parts) {
                     if (part.text) {
@@ -186,6 +228,8 @@ export class GeminiAdapter implements ProviderAdapter {
           controller.enqueue({
             type: 'error',
             error: err.message || 'Stream read error from Gemini',
+            finishReason: 'interrupted',
+            rawFinishReason: 'stream_exception',
           })
           controller.close()
         }
@@ -201,6 +245,8 @@ export class GeminiAdapter implements ProviderAdapter {
         tokensIn,
         tokensOut,
         latencyMs: Date.now() - startTime,
+        finishReason: normalizeGeminiFinishReason(rawFinishReason),
+        rawFinishReason,
       }),
     }
   }

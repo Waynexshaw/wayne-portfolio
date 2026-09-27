@@ -1,7 +1,7 @@
 import { GeminiAdapter } from './adapters/gemini'
 import { GroqAdapter } from './adapters/groq'
 import { AdapterMessage, ProviderStreamResult, ProviderError } from './adapters/types'
-import { ShawProvider, ShawRoutingMode, ShawStreamChunk } from '../types'
+import { ShawProvider, ShawRoutingMode, ShawStreamChunk, ShawCompletionReason } from '../types'
 import { getGeminiModel, getGroqModel } from './config'
 
 export interface RouteRequestParams {
@@ -18,7 +18,13 @@ export interface RouteRequestResult {
   provider: ShawProvider
   model: string
   wasFallback: boolean
-  getUsage: () => { tokensIn: number; tokensOut: number; latencyMs: number }
+  getUsage: () => {
+    tokensIn: number
+    tokensOut: number
+    latencyMs: number
+    finishReason?: ShawCompletionReason
+    rawFinishReason?: string | null
+  }
 }
 
 export class ShawRoutingError extends Error {

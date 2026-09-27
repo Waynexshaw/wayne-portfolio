@@ -1,4 +1,5 @@
-import { ShawProvider, ShawStreamChunk } from '../../types'
+import { ShawProvider, ShawStreamChunk, ShawCompletionReason } from '../../types'
+export type { ShawCompletionReason }
 
 export interface AdapterMessage {
   role: 'user' | 'assistant' | 'system'
@@ -38,7 +39,13 @@ export class ProviderError extends Error {
 
 export interface ProviderStreamResult {
   stream: ReadableStream<ShawStreamChunk>
-  getUsage: () => { tokensIn: number; tokensOut: number; latencyMs: number }
+  getUsage: () => {
+    tokensIn: number
+    tokensOut: number
+    latencyMs: number
+    finishReason?: ShawCompletionReason
+    rawFinishReason?: string | null
+  }
 }
 
 export interface ProviderAdapter {

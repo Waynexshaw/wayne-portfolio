@@ -5,7 +5,21 @@ import {
   ProviderError,
 } from './types'
 import { getProviderApiKey, getGroqModel, isProviderConfigured } from '../config'
-import { ShawStreamChunk } from '../../types'
+import { ShawStreamChunk, ShawCompletionReason } from '../../types'
+
+export function normalizeGroqFinishReason(raw: string | null | undefined): ShawCompletionReason {
+  if (!raw) return 'interrupted'
+  switch (raw) {
+    case 'stop':
+      return 'stop'
+    case 'length':
+      return 'length'
+    case 'content_filter':
+      return 'content_filter'
+    default:
+      return 'other'
+  }
+}
 
 export class GroqAdapter implements ProviderAdapter {
   id = 'groq' as const
@@ -31,6 +45,7 @@ export class GroqAdapter implements ProviderAdapter {
     const startTime = Date.now()
     let tokensIn = 0
     let tokensOut = 0
+    let rawFinishReason: string | null = null
 
     const formattedMessages: Array<{ role: string; content: string }> = []
 
@@ -116,6 +131,7 @@ export class GroqAdapter implements ProviderAdapter {
             const { done, value } = await reader.read()
             if (done) {
               const latencyMs = Date.now() - startTime
+              const finishReason = normalizeGroqFinishReason(rawFinishReason)
               controller.enqueue({
                 type: 'meta',
                 provider: 'groq',
@@ -123,8 +139,24 @@ export class GroqAdapter implements ProviderAdapter {
                 tokensIn,
                 tokensOut,
                 latencyMs,
+                finishReason,
+                rawFinishReason: rawFinishReason || undefined,
               })
-              controller.enqueue({ type: 'done' })
+
+              if (finishReason === 'stop') {
+                controller.enqueue({
+                  type: 'done',
+                  finishReason: 'stop',
+                  rawFinishReason: rawFinishReason || undefined,
+                })
+              } else {
+                controller.enqueue({
+                  type: 'error',
+                  error: `Groq generation ended abnormally: ${rawFinishReason || 'upstream_eof'} (reason: ${finishReason})`,
+                  finishReason,
+                  rawFinishReason: rawFinishReason || undefined,
+                })
+              }
               controller.close()
               return
             }
@@ -151,7 +183,12 @@ export class GroqAdapter implements ProviderAdapter {
                   tokensOut = parsed.usage.completion_tokens || tokensOut
                 }
 
-                const deltaText = parsed.choices?.[0]?.delta?.content
+                const choice = parsed.choices?.[0]
+                if (choice?.finish_reason) {
+                  rawFinishReason = choice.finish_reason
+                }
+
+                const deltaText = choice?.delta?.content
                 if (deltaText) {
                   controller.enqueue({
                     type: 'text',
@@ -169,6 +206,8 @@ export class GroqAdapter implements ProviderAdapter {
           controller.enqueue({
             type: 'error',
             error: err.message || 'Stream read error from Groq',
+            finishReason: 'interrupted',
+            rawFinishReason: 'stream_exception',
           })
           controller.close()
         }
@@ -184,6 +223,8 @@ export class GroqAdapter implements ProviderAdapter {
         tokensIn,
         tokensOut,
         latencyMs: Date.now() - startTime,
+        finishReason: normalizeGroqFinishReason(rawFinishReason),
+        rawFinishReason,
       }),
     }
   }

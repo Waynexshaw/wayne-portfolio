@@ -410,6 +410,7 @@ export function ShawWorkspace({
       let buffer = ''
       let accumulated = ''
       let latestMeta: any = null
+      let receivedDone = false
 
       while (true) {
         const { done, value } = await reader.read()
@@ -425,26 +426,40 @@ export function ShawWorkspace({
           const jsonStr = trimmed.slice(5).trim()
           if (!jsonStr) continue
 
+          let chunk: any
           try {
-            const chunk = JSON.parse(jsonStr)
-            if (chunk.type === 'text' && chunk.text) {
-              accumulated += chunk.text
-              setStreamingText(accumulated)
-            } else if (chunk.type === 'meta') {
-              latestMeta = chunk
-              setStreamingMeta(chunk)
-            } else if (chunk.type === 'error') {
-              const streamErr: any = new Error(chunk.error || 'Stream error')
-              streamErr.statusCode = 500
-              streamErr.provider = targetRouting
-              throw streamErr
-            }
+            chunk = JSON.parse(jsonStr)
           } catch (e: any) {
             if (e.message !== 'Unexpected end of JSON input') {
               console.warn('Chunk parse error:', e)
             }
+            continue
+          }
+
+          if (chunk.type === 'text' && chunk.text) {
+            accumulated += chunk.text
+            setStreamingText(accumulated)
+          } else if (chunk.type === 'meta') {
+            latestMeta = chunk
+            setStreamingMeta(chunk)
+          } else if (chunk.type === 'done') {
+            receivedDone = true
+          } else if (chunk.type === 'error') {
+            const streamErr: any = new Error(chunk.error || 'Stream error')
+            streamErr.statusCode = chunk.statusCode || 500
+            streamErr.provider = chunk.provider || targetRouting
+            streamErr.userMessageId = chunk.userMessageId || activeTargetMessageId
+            throw streamErr
           }
         }
+      }
+
+      if (!receivedDone) {
+        const interruptedErr: any = new Error('Response generation was interrupted before completion')
+        interruptedErr.statusCode = 500
+        interruptedErr.provider = targetRouting
+        interruptedErr.userMessageId = activeTargetMessageId
+        throw interruptedErr
       }
 
       // Stream successfully finished, reload messages to get persistent DB record
