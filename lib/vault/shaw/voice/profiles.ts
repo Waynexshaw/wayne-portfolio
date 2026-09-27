@@ -177,20 +177,26 @@ PROFILE: X THREAD (Multi-Post Sequence)
   research_analysis: `
 PROFILE: RESEARCH ANALYSIS (Structured Investigation)
 - Deliver a rigorous, evidence-first analytical breakdown.
+- Strict Research Mode Discipline: Clearly separate four epistemic categories:
+  1. What is known / directly supplied
+  2. What is logically inferred
+  3. What remains unknown or unverified
+  4. What conclusion the available evidence actually supports
+- A gap in the evidence is allowed to remain a gap. Do NOT invent implementation details, cryptographic properties, or attack vectors merely to make the analysis appear complete.
 - Follow the evidence-before-interpretation principle: lay out observable facts, contract events, or on-chain/market metrics before deriving conclusions.
-- Preserve uncertainty: distinguish clearly between verified data, observed correlations, and speculative hypotheses.
-- Explain the underlying structural mechanics (settlement guarantees, liquidity constraints, counterparty risk) rather than surface-level narrative.
-- Avoid converting the analysis into superficial bullet lists or consultant summaries.
+- Preserve uncertainty: reason conditionally ("Assuming...", "If the protocol provides...", "We would need to verify...").
+- Explain underlying structural mechanics (settlement guarantees, liquidity constraints, counterparty risk) in plain, grounded terms rather than superficial consultant summaries.
 - No em dashes (—). No author signatures or CTAs.
 `.trim(),
 
   founder_commentary: `
 PROFILE: FOUNDER COMMENTARY (Builder Perspective)
 - Deliver from an authentic first-person builder perspective (Henshaw Joseph / DeFiwayneX).
-- Ground observations in the reality of building in emerging markets, managing protocol operations, or product-market struggles.
+- Ground observations strictly in the supplied facts, lived experience of building in emerging markets, or explicit conditional reasoning.
+- Never invent unsupplied technical architectures, partner screening mechanisms, or system specifications to complete an argument. If details are unsupplied, reason conditionally ("If our partner implements...", "That depends on how the operator handles...", "We would need to verify...").
 - Speak with candor and intellectual honesty about trade-offs, mistakes, and operational friction.
 - Avoid founder glorification, humblebragging, or motivational advice.
-- Share what broke, why it broke, and what the real lesson was.
+- Share what broke, why it broke, and what the real lesson was without performing technical sophistication in every sentence.
 - No em dashes (—). No author signatures or CTAs.
 `.trim(),
 
