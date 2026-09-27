@@ -8,6 +8,13 @@ import { resolveFormatProfile } from '@/lib/vault/shaw/voice/profiles'
 import { scanVoiceCompliance, getHardViolations } from '@/lib/vault/shaw/voice/compliance'
 import { ShawCapability, ShawRoutingMode, ShawStreamChunk, ShawCompletionReason } from '@/lib/vault/shaw/types'
 import { AdapterMessage } from '@/lib/vault/shaw/gateway/adapters/types'
+import {
+  planRetrieval,
+  executeVaultRetrieval,
+  serializeVaultContextForPrompt,
+  extractCitationsFromEnvelope,
+  VaultContextEnvelope,
+} from '@/lib/vault/shaw/retrieval'
 
 export const dynamic = 'force-dynamic'
 
@@ -178,11 +185,36 @@ export async function POST(request: NextRequest) {
     const depth = resolveDepthIntent(trimmedMessage)
     const ctaIntent = resolveCtaIntent(trimmedMessage)
 
+    // Batch 2A: Deterministic Retrieval Planner & Execution
+    const retrievalPlan = planRetrieval({
+      prompt: trimmedMessage,
+      capability: capability as ShawCapability,
+      history,
+    })
+
+    let vaultEnvelope: VaultContextEnvelope | null = null
+    let vaultContextPrompt: string | undefined = undefined
+    let retrievalLatencyMs = 0
+
+    if (retrievalPlan.shouldRetrieve) {
+      const retrievalStart = Date.now()
+      try {
+        vaultEnvelope = await executeVaultRetrieval(supabase, workspaceId, retrievalPlan)
+      } catch (retrievalErr) {
+        console.error('Vault retrieval failed, continuing with unaugmented prompt:', retrievalErr)
+      }
+      retrievalLatencyMs = Date.now() - retrievalStart
+      if (vaultEnvelope) {
+        vaultContextPrompt = serializeVaultContextForPrompt(vaultEnvelope)
+      }
+    }
+
     const systemPrompt = getSystemPromptForIdentity(identity, capability as ShawCapability, {
       format,
       profile,
       depth,
       prompt: trimmedMessage,
+      vaultContext: vaultContextPrompt,
     })
 
     // 6. Check user preferences for paid fallback
@@ -211,6 +243,19 @@ export async function POST(request: NextRequest) {
           depth,
           cta_intent: ctaIntent,
           user_message_id: userMessageId,
+          retrieval: retrievalPlan.shouldRetrieve
+            ? {
+                should_retrieve: true,
+                domains: Array.from(new Set(retrievalPlan.intents.map((i) => i.domain))),
+                record_count: vaultEnvelope?.records.length ?? 0,
+                ambiguity_count: vaultEnvelope?.ambiguities.length ?? 0,
+                truncated: vaultEnvelope?.truncated ?? false,
+                retrieval_latency_ms: retrievalLatencyMs,
+              }
+            : {
+                should_retrieve: false,
+                reason: retrievalPlan.reason,
+              },
           ...(isRetry && userMessageId
             ? { is_retry: true, retry_of_message_id: userMessageId }
             : {}),
@@ -341,6 +386,11 @@ export async function POST(request: NextRequest) {
 
             // Only persist assistant message if non-empty response was generated
             if (fullResponseText.trim().length > 0) {
+              const citations =
+                vaultEnvelope && vaultEnvelope.records.length > 0
+                  ? extractCitationsFromEnvelope(vaultEnvelope)
+                  : []
+
               await (supabase as any).from('shaw_messages').insert({
                 conversation_id: conversationId,
                 workspace_id: workspaceId,
@@ -351,6 +401,7 @@ export async function POST(request: NextRequest) {
                 tokens_in: usage.tokensIn || null,
                 tokens_out: usage.tokensOut || null,
                 latency_ms: usage.latencyMs || null,
+                citations,
               })
             }
 
@@ -377,6 +428,19 @@ export async function POST(request: NextRequest) {
                     user_message_id: userMessageId,
                     finish_reason: 'stop',
                     raw_finish_reason: effectiveRawFinishReason || 'stop',
+                    retrieval: retrievalPlan.shouldRetrieve
+                      ? {
+                          should_retrieve: true,
+                          domains: Array.from(new Set(retrievalPlan.intents.map((i) => i.domain))),
+                          record_count: vaultEnvelope?.records.length ?? 0,
+                          ambiguity_count: vaultEnvelope?.ambiguities.length ?? 0,
+                          truncated: vaultEnvelope?.truncated ?? false,
+                          retrieval_latency_ms: retrievalLatencyMs,
+                        }
+                      : {
+                          should_retrieve: false,
+                          reason: retrievalPlan.reason,
+                        },
                     ...(isRetry && userMessageId
                       ? { is_retry: true, retry_of_message_id: userMessageId }
                       : {}),
@@ -437,6 +501,19 @@ export async function POST(request: NextRequest) {
                     raw_finish_reason: effectiveRawFinishReason,
                     partial_text: fullResponseText,
                     user_message_id: userMessageId,
+                    retrieval: retrievalPlan.shouldRetrieve
+                      ? {
+                          should_retrieve: true,
+                          domains: Array.from(new Set(retrievalPlan.intents.map((i) => i.domain))),
+                          record_count: vaultEnvelope?.records.length ?? 0,
+                          ambiguity_count: vaultEnvelope?.ambiguities.length ?? 0,
+                          truncated: vaultEnvelope?.truncated ?? false,
+                          retrieval_latency_ms: retrievalLatencyMs,
+                        }
+                      : {
+                          should_retrieve: false,
+                          reason: retrievalPlan.reason,
+                        },
                     ...(isRetry && userMessageId
                       ? { is_retry: true, retry_of_message_id: userMessageId }
                       : {}),
