@@ -16,6 +16,8 @@ const EXPLICIT_VAULT_PATTERNS = [
   /\bvault\s+records?\b/i,
   /\bwhat\s+did\s+i\s+(?:work\s+on|decide|record|research|note|have|do)\b/i,
   /\bstatus\s+(?:report\s+)?(?:on|for|of)\b/i,
+  /\b(?:overview|details)\s+(?:on|for|of)\b/i,
+  /\btell\s+me\s+about\b/i,
   /\bwhich\s+(?:contacts?|tasks?|projects?|decisions?|follow[- ]?ups?)\b/i,
   /\boverdue\s+(?:tasks?|follow[- ]?ups?)\b/i,
   /\bshow\s+me\s+(?:the\s+)?(?:evidence|research|decisions?|tasks?|notes?|reviews?|metrics?|meetings?)\b/i,
@@ -67,7 +69,7 @@ export function planRetrieval(input: PlannerInput): RetrievalPlan {
   let shouldRetrieve = false
   if (hasExplicitVaultAnchor) {
     shouldRetrieve = true
-  } else if (!isGeneralQuestion && activeEntityName && /\b(?:status|update|progress|tasks?|decisions?|plan|summary|metrics?|reviews?|meetings?|evidence)\b/i.test(trimmed)) {
+  } else if (!isGeneralQuestion && activeEntityName && /\b(?:status|update|progress|tasks?|decisions?|plan|summary|metrics?|reviews?|meetings?|evidence|overview|details|tell\s+me\s+about)\b/i.test(trimmed)) {
     shouldRetrieve = true
   }
 
@@ -200,33 +202,119 @@ export function planRetrieval(input: PlannerInput): RetrievalPlan {
 }
 
 /**
- * Extracts possible project/entity names mentioned in the prompt
- * E.g. "Give me a status report on PEVRA" -> "PEVRA"
- * E.g. "What did I decide about telecom identity?" -> "telecom identity"
+ * Generic structural schema nouns that cannot, by themselves, constitute a valid entityQuery.
+ * Prevents schema terminology in prompts (e.g. "for the project", "of the task")
+ * from being mistakenly extracted as the target entity name.
+ */
+const GENERIC_SCHEMA_NOUNS = new Set([
+  'project', 'projects',
+  'task', 'tasks',
+  'decision', 'decisions',
+  'contact', 'contacts',
+  'company', 'companies',
+  'meeting', 'meetings',
+  'metric', 'metrics',
+  'review', 'reviews',
+  'evidence',
+  'research',
+  'vault',
+  'record', 'records',
+  'status',
+  'update', 'updates',
+  'overview',
+  'summary', 'summaries',
+  'detail', 'details',
+  'note', 'notes',
+  'workbench',
+  'activity', 'activities',
+  'document', 'documents',
+  'file', 'files',
+  'spreadsheet', 'spreadsheets',
+  'item', 'items',
+])
+
+const COMMON_ACRONYM_WORDS = new Set([
+  'WHAT', 'WHEN', 'WHERE', 'HOW', 'WHY', 'THE', 'AND', 'FOR', 'NOT',
+  'SHOW', 'HAVE', 'FROM', 'THIS', 'THAT', 'WITH', 'ABOUT', 'WHICH',
+  'CAN', 'WILL', 'JUST', 'SOME', 'MORE', 'GIVE',
+])
+
+/**
+ * Validates, trims, and normalizes candidate entity strings.
+ * Discards leading articles, trailing punctuation, pronouns, and schema terms.
+ */
+function cleanAndValidateCandidate(raw: string): string | null {
+  if (!raw) return null
+  let candidate = raw.trim()
+
+  // Strip leading articles and possessives
+  candidate = candidate.replace(/^(?:the|my|our|this|that|a|an)\s+/i, '').trim()
+
+  // Strip trailing punctuation
+  candidate = candidate.replace(/[?!,.]*$/, '').trim()
+
+  if (candidate.length < 2) return null
+
+  // Reject generic pronouns and quantifier words
+  if (/^(?:all|some|any|recent|past|upcoming|these|those|it|this|that|them|him|her|something|anything|everything)$/i.test(candidate)) {
+    return null
+  }
+
+  // Reject generic structural schema nouns
+  if (GENERIC_SCHEMA_NOUNS.has(candidate.toLowerCase())) {
+    return null
+  }
+
+  return candidate
+}
+
+// Recognized instructional boundaries that safely terminate entity spans in user prompts
+const INSTRUCTION_DELIMITERS = 'using|from|based|include|including|where|only|as|according|with|in|to|and'
+
+const OPERATIONAL_ANCHOR_REGEX = new RegExp(
+  `\\b(?:status\\s+(?:report\\s+)?(?:on|for|of)|overview\\s+of|update\\s+(?:on|for)|details\\s+(?:on|for|of)|tell\\s+me\\s+about)\\s+([A-Za-z0-9_\\-\\s/]{2,100}?)(?=[?!,.]|$|\\b(?:${INSTRUCTION_DELIMITERS})\\b)`,
+  'i'
+)
+
+const GENERIC_PREPOSITION_REGEX = new RegExp(
+  `\\b(?:on|about|for|regarding|into)\\s+([A-Za-z0-9_\\-\\s/]{2,100}?)(?=[?!,.]|$|\\b(?:${INSTRUCTION_DELIMITERS})\\b)`,
+  'gi'
+)
+
+/**
+ * Extracts possible project/entity names mentioned in the prompt.
+ *
+ * Deterministic precedence:
+ * 1. Explicit operational entity patterns ("status report on <entity>", "tell me about <entity>")
+ * 2. Strong uppercase acronym patterns (e.g. PEVRA, TIRMS)
+ * 3. Generic preposition extraction ("on Alpha", "about telecom identity")
+ *
+ * In all cases, candidate spans terminate at instructional boundaries and generic schema nouns
+ * (e.g. "project", "task") are rejected so they cannot override valid entities.
  */
 function extractEntityMention(prompt: string): string | null {
-  // 1. Look for uppercase acronyms / project tokens like PEVRA, TIRMS, etc.
+  // 1. Direct Operational Entity Patterns (highest precedence)
+  const opMatch = prompt.match(OPERATIONAL_ANCHOR_REGEX)
+  if (opMatch && opMatch[1]) {
+    const candidate = cleanAndValidateCandidate(opMatch[1])
+    if (candidate) return candidate
+  }
+
+  // 2. Explicit Uppercase Acronyms (e.g. PEVRA, TIRMS)
   const acronymMatches = prompt.match(/\b([A-Z]{3,10})\b/g)
   if (acronymMatches) {
-    const commonWords = new Set([
-      'WHAT', 'WHEN', 'WHERE', 'HOW', 'WHY', 'THE', 'AND', 'FOR', 'NOT',
-      'SHOW', 'HAVE', 'FROM', 'THIS', 'THAT', 'WITH', 'ABOUT', 'WHICH',
-      'CAN', 'WILL', 'JUST', 'SOME', 'MORE', 'GIVE',
-    ])
     for (const token of acronymMatches) {
-      if (!commonWords.has(token)) {
+      if (!COMMON_ACRONYM_WORDS.has(token) && !GENERIC_SCHEMA_NOUNS.has(token.toLowerCase())) {
         return token
       }
     }
   }
 
-  // 2. Look for explicit preposition phrases ("on Alpha", "about telecom identity")
-  const matchOn = prompt.match(/\b(?:on|about|for|regarding|into)\s+([A-Za-z0-9_\-\s]{2,30}?)(?=[?!,.]|$|\b(?:and|with|in|to)\b)/i)
-  if (matchOn && matchOn[1]) {
-    let candidate = matchOn[1].trim()
-    candidate = candidate.replace(/^(?:the|my|our|this|that|a|an)\s+/i, '')
-    if (candidate.length >= 2 && !/^(?:all|some|any|recent|past|upcoming|these|those|it|this|that|them|him|her|something|anything|everything)$/i.test(candidate)) {
-      return candidate
+  // 3. Generic Preposition Extraction (with semantic boundary and schema noun rejection)
+  for (const match of prompt.matchAll(GENERIC_PREPOSITION_REGEX)) {
+    if (match[1]) {
+      const candidate = cleanAndValidateCandidate(match[1])
+      if (candidate) return candidate
     }
   }
 
