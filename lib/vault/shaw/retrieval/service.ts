@@ -16,6 +16,9 @@ import {
   NotFoundItem,
   RetrievalDomain,
   EpistemicClass,
+  CollectionCompleteness,
+  ResultScope,
+  QueryMode,
 } from './types'
 
 const MAX_TOTAL_RECORDS = 40
@@ -35,6 +38,7 @@ export class VaultRetrievalService {
     const records: VaultRecord[] = []
     const ambiguities: AmbiguityItem[] = []
     const emptyStates: NotFoundItem[] = []
+    const completeness: CollectionCompleteness[] = []
     let truncated = false
 
     const domainsQueried: RetrievalDomain[] = []
@@ -51,43 +55,43 @@ export class VaultRetrievalService {
 
       switch (intent.domain) {
         case 'project':
-          await this.retrieveProjectContext(intent.entityQuery, records, ambiguities, emptyStates)
+          await this.retrieveProjectContext(intent.entityQuery, records, ambiguities, emptyStates, completeness)
           break
 
         case 'crm':
-          await this.retrieveCrmContext(intent.entityQuery, records, ambiguities, emptyStates)
+          await this.retrieveCrmContext(intent.entityQuery, records, ambiguities, emptyStates, completeness)
           break
 
         case 'task':
-          await this.retrieveTasks(intent, records, ambiguities, emptyStates)
+          await this.retrieveTasks(intent, records, ambiguities, emptyStates, completeness)
           break
 
         case 'decision':
-          await this.retrieveDecisions(intent.entityQuery, records, ambiguities, emptyStates)
+          await this.retrieveDecisions(intent.entityQuery, records, ambiguities, emptyStates, completeness)
           break
 
         case 'research':
-          await this.retrieveResearch(intent.entityQuery, records, ambiguities, emptyStates)
+          await this.retrieveResearch(intent.entityQuery, records, ambiguities, emptyStates, completeness)
           break
 
         case 'meeting':
-          await this.retrieveMeetings(intent, records, ambiguities, emptyStates)
+          await this.retrieveMeetings(intent, records, ambiguities, emptyStates, completeness)
           break
 
         case 'metric':
-          await this.retrieveMetrics(intent.entityQuery, records, ambiguities, emptyStates)
+          await this.retrieveMetrics(intent.entityQuery, records, ambiguities, emptyStates, completeness)
           break
 
         case 'review':
-          await this.retrieveReviews(intent.entityQuery, records, ambiguities, emptyStates)
+          await this.retrieveReviews(intent.entityQuery, records, ambiguities, emptyStates, completeness)
           break
 
         case 'evidence':
-          await this.retrieveWorkspaceEvidence(intent.entityQuery, records, ambiguities, emptyStates)
+          await this.retrieveWorkspaceEvidence(intent.entityQuery, records, ambiguities, emptyStates, completeness)
           break
 
         case 'activity':
-          await this.retrieveActivityDigest(plan.timeframe, records)
+          await this.retrieveActivityDigest(plan.timeframe, records, completeness)
           break
       }
     }
@@ -118,6 +122,7 @@ export class VaultRetrievalService {
       records,
       ambiguities,
       emptyStates,
+      completeness,
       truncated,
       retrievalTimestamp: new Date().toISOString(),
       provenance: {
@@ -129,50 +134,208 @@ export class VaultRetrievalService {
   }
 
   // --------------------------------------------------------------------------
-  // 1. Project Context Contract
+  // 1. Project Context Contract (Catalog & Targeted)
   // --------------------------------------------------------------------------
   private async retrieveProjectContext(
     query: string | undefined,
     records: VaultRecord[],
     ambiguities: AmbiguityItem[],
-    emptyStates: NotFoundItem[]
+    emptyStates: NotFoundItem[],
+    completeness: CollectionCompleteness[]
   ) {
-    let queryBuilder = (this.supabase as any)
-      .from('workspace_projects')
-      .select('id, title, slug, description, status, priority, start_date, target_date, completed_at, created_at, updated_at')
-      .eq('workspace_id', this.workspaceId)
+    const isCatalog = !query || !query.trim()
 
-    if (query) {
-      queryBuilder = queryBuilder.or(`slug.ilike.%${query}%,title.ilike.%${query}%`)
-    }
+    // ------------------------------------------------------------------------
+    // A. Unconstrained Project Catalog Mode
+    // ------------------------------------------------------------------------
+    if (isCatalog) {
+      let queryBuilder = (this.supabase as any)
+        .from('workspace_projects')
+        .select('id, title, slug, description, status, priority, start_date, target_date, completed_at, created_at, updated_at', { count: 'exact' })
+        .eq('workspace_id', this.workspaceId)
+        .order('created_at', { ascending: false })
+        .limit(20)
 
-    const { data: projects, error } = await queryBuilder.limit(10)
-    if (error || !projects || projects.length === 0) {
-      if (query) {
-        emptyStates.push({
+      const { data: projects, error, count } = await queryBuilder
+
+      if (error || !projects || projects.length === 0) {
+        completeness.push({
           domain: 'project',
-          query,
-          message: `No project matching "${query}" was found in this workspace.`,
+          queryMode: 'catalog',
+          resultScope: 'exhaustive',
+          returnedCount: 0,
+          totalCount: typeof count === 'number' ? count : 0,
+          appliedLimit: 20,
+          hasMore: false,
+        })
+        return
+      }
+
+      const projectIds = projects.map((p: any) => p.id)
+
+      // Bounded batched retrieval for linked open tasks across retrieved projects
+      const { data: allTasks } = await (this.supabase as any)
+        .from('tasks')
+        .select('id, project_id, title, status, priority, due_date')
+        .eq('workspace_id', this.workspaceId)
+        .in('project_id', projectIds)
+        .in('status', ['todo', 'in_progress', 'blocked'])
+        .order('due_date', { ascending: true, nullsFirst: false })
+        .limit(50)
+
+      // Bounded batched retrieval for linked decisions across retrieved projects
+      const { data: allDecisions } = await (this.supabase as any)
+        .from('decisions')
+        .select('id, project_id, title, decision, decided_at')
+        .eq('workspace_id', this.workspaceId)
+        .in('project_id', projectIds)
+        .order('decided_at', { ascending: false })
+        .limit(25)
+
+      const tasksByProject = new Map<string, any[]>()
+      for (const t of (allTasks || [])) {
+        if (t.project_id) {
+          const list = tasksByProject.get(t.project_id) || []
+          list.push(t)
+          tasksByProject.set(t.project_id, list)
+        }
+      }
+
+      const decisionsByProject = new Map<string, any[]>()
+      for (const d of (allDecisions || [])) {
+        if (d.project_id) {
+          const list = decisionsByProject.get(d.project_id) || []
+          list.push(d)
+          decisionsByProject.set(d.project_id, list)
+        }
+      }
+
+      // Normalize and push every returned project (including active, paused, null identity)
+      for (const project of projects) {
+        const projectTasks = (tasksByProject.get(project.id) || []).slice(0, 10)
+        const projectDecisions = (decisionsByProject.get(project.id) || []).slice(0, 5)
+
+        records.push({
+          entityType: 'project',
+          entityId: project.id,
+          title: project.title,
+          timestamps: {
+            created_at: project.created_at,
+            updated_at: project.updated_at,
+            start_date: project.start_date,
+            target_date: project.target_date,
+            completed_at: project.completed_at,
+          },
+          relationship: {
+            slug: project.slug,
+            hasCompanyRelationship: false, // Schema invariant: workspace_projects has no company_id
+          },
+          epistemicClass: 'WV_RECORD',
+          fields: {
+            slug: project.slug,
+            status: project.status,
+            priority: project.priority,
+            description: project.description,
+            activeTasksSummary: projectTasks.map((t: any) => ({
+              id: t.id,
+              title: t.title,
+              status: t.status,
+              priority: t.priority,
+              due_date: t.due_date,
+            })),
+            recentDecisionsSummary: projectDecisions.map((d: any) => ({
+              id: d.id,
+              title: d.title,
+              decision: d.decision,
+              decided_at: d.decided_at,
+            })),
+          },
+          provenance: {
+            table: 'workspace_projects',
+            id: project.id,
+            workspace_id: this.workspaceId,
+          },
         })
       }
+
+      const totalKnown = typeof count === 'number' ? count : undefined
+      const hasMore = totalKnown !== undefined ? totalKnown > projects.length : projects.length >= 20
+      const resultScope: ResultScope = (totalKnown !== undefined && projects.length === totalKnown)
+        ? 'exhaustive'
+        : 'bounded'
+
+      completeness.push({
+        domain: 'project',
+        queryMode: 'catalog',
+        resultScope,
+        returnedCount: projects.length,
+        totalCount: totalKnown,
+        appliedLimit: 20,
+        hasMore,
+      })
       return
     }
 
-    if (projects.length > 1 && query) {
+    // ------------------------------------------------------------------------
+    // B. Targeted Project Entity Mode
+    // ------------------------------------------------------------------------
+    const trimmedQuery = query.trim()
+    let queryBuilder = (this.supabase as any)
+      .from('workspace_projects')
+      .select('id, title, slug, description, status, priority, start_date, target_date, completed_at, created_at, updated_at', { count: 'exact' })
+      .eq('workspace_id', this.workspaceId)
+      .or(`slug.ilike.%${trimmedQuery}%,title.ilike.%${trimmedQuery}%`)
+      .order('created_at', { ascending: false })
+      .limit(10)
+
+    const { data: projects, error, count } = await queryBuilder
+
+    if (error || !projects || projects.length === 0) {
+      emptyStates.push({
+        domain: 'project',
+        query: trimmedQuery,
+        message: `No project matching "${trimmedQuery}" was found in this workspace.`,
+      })
+      completeness.push({
+        domain: 'project',
+        queryMode: 'targeted',
+        resultScope: 'exhaustive',
+        returnedCount: 0,
+        totalCount: 0,
+        appliedLimit: 10,
+        hasMore: false,
+        filterDescription: `Targeted query for "${trimmedQuery}"`,
+      })
+      return
+    }
+
+    if (projects.length > 1) {
       ambiguities.push({
         domain: 'project',
-        query,
+        query: trimmedQuery,
         candidateMatches: projects.map((p: any) => ({
           id: p.id,
           title: p.title,
           slug: p.slug,
           type: 'workspace_project',
         })),
-        message: `Multiple projects match "${query}": ${projects.map((p: any) => p.title).join(', ')}.`,
+        message: `Multiple projects match "${trimmedQuery}": ${projects.map((p: any) => p.title).join(', ')}.`,
       })
-      // Do not guess silently: include the first project but note ambiguity
+      completeness.push({
+        domain: 'project',
+        queryMode: 'targeted',
+        resultScope: 'ambiguous',
+        returnedCount: projects.length,
+        totalCount: typeof count === 'number' ? count : projects.length,
+        appliedLimit: 10,
+        hasMore: false,
+        filterDescription: `Multiple candidates matching "${trimmedQuery}"`,
+      })
+      // Ambiguous targeted lookup: do not guess silently or inject an arbitrary first match
+      return
     }
 
+    // Unambiguous single targeted match
     const project = projects[0]
 
     // Fetch linked tasks (top 10 open tasks)
@@ -207,7 +370,7 @@ export class VaultRetrievalService {
       },
       relationship: {
         slug: project.slug,
-        hasCompanyRelationship: false, // Explicit schema invariant: projects has no company_id
+        hasCompanyRelationship: false, // Schema invariant: workspace_projects has no company_id
       },
       epistemicClass: 'WV_RECORD',
       fields: {
@@ -235,6 +398,17 @@ export class VaultRetrievalService {
         workspace_id: this.workspaceId,
       },
     })
+
+    completeness.push({
+      domain: 'project',
+      queryMode: 'targeted',
+      resultScope: 'exhaustive',
+      returnedCount: 1,
+      totalCount: 1,
+      appliedLimit: 10,
+      hasMore: false,
+      filterDescription: `Targeted match for "${trimmedQuery}"`,
+    })
   }
 
   // --------------------------------------------------------------------------
@@ -244,7 +418,8 @@ export class VaultRetrievalService {
     query: string | undefined,
     records: VaultRecord[],
     ambiguities: AmbiguityItem[],
-    emptyStates: NotFoundItem[]
+    emptyStates: NotFoundItem[],
+    completeness?: CollectionCompleteness[]
   ) {
     if (!query) {
       // Return top recent contacts and pending follow-ups
@@ -255,6 +430,16 @@ export class VaultRetrievalService {
         .eq('status', 'pending')
         .order('due_date', { ascending: true })
         .limit(10)
+
+      if (completeness) {
+        completeness.push({
+          domain: 'crm',
+          queryMode: 'catalog',
+          resultScope: 'bounded',
+          returnedCount: (pendingFollowUps || []).length,
+          appliedLimit: 10,
+        })
+      }
 
       if (pendingFollowUps && pendingFollowUps.length > 0) {
         for (const f of pendingFollowUps) {
@@ -444,7 +629,8 @@ export class VaultRetrievalService {
     intent: any,
     records: VaultRecord[],
     ambiguities: AmbiguityItem[],
-    emptyStates: NotFoundItem[]
+    emptyStates: NotFoundItem[],
+    completeness?: CollectionCompleteness[]
   ) {
     let queryBuilder = (this.supabase as any)
       .from('tasks')
@@ -477,6 +663,17 @@ export class VaultRetrievalService {
       .order('due_date', { ascending: true, nullsFirst: false })
       .order('priority', { ascending: false })
       .limit(20)
+
+    if (completeness) {
+      completeness.push({
+        domain: 'task',
+        queryMode: 'catalog',
+        resultScope: intent.statusFilter || intent.entityQuery ? 'filtered' : 'bounded',
+        returnedCount: (tasks || []).length,
+        appliedLimit: 20,
+        filterDescription: intent.statusFilter ? `status: ${intent.statusFilter}` : undefined,
+      })
+    }
 
     if (error || !tasks || tasks.length === 0) {
       if (intent.entityQuery) {
@@ -522,7 +719,8 @@ export class VaultRetrievalService {
     query: string | undefined,
     records: VaultRecord[],
     ambiguities: AmbiguityItem[],
-    emptyStates: NotFoundItem[]
+    emptyStates: NotFoundItem[],
+    completeness?: CollectionCompleteness[]
   ) {
     let queryBuilder = (this.supabase as any)
       .from('decisions')
@@ -548,6 +746,17 @@ export class VaultRetrievalService {
     const { data: decisions, error } = await queryBuilder
       .order('decided_at', { ascending: false })
       .limit(10)
+
+    if (completeness) {
+      completeness.push({
+        domain: 'decision',
+        queryMode: query ? 'targeted' : 'catalog',
+        resultScope: query ? 'filtered' : 'bounded',
+        returnedCount: (decisions || []).length,
+        appliedLimit: 10,
+        filterDescription: query ? `query: ${query}` : undefined,
+      })
+    }
 
     if (error || !decisions || decisions.length === 0) {
       if (query) {
@@ -591,7 +800,8 @@ export class VaultRetrievalService {
     query: string | undefined,
     records: VaultRecord[],
     ambiguities: AmbiguityItem[],
-    emptyStates: NotFoundItem[]
+    emptyStates: NotFoundItem[],
+    completeness?: CollectionCompleteness[]
   ) {
     let queryBuilder = (this.supabase as any)
       .from('research_records')
@@ -605,6 +815,17 @@ export class VaultRetrievalService {
     const { data: researchList, error } = await queryBuilder
       .order('created_at', { ascending: false })
       .limit(5)
+
+    if (completeness) {
+      completeness.push({
+        domain: 'research',
+        queryMode: query ? 'targeted' : 'catalog',
+        resultScope: query ? 'filtered' : 'bounded',
+        returnedCount: (researchList || []).length,
+        appliedLimit: 5,
+        filterDescription: query ? `query: ${query}` : undefined,
+      })
+    }
 
     if (error || !researchList || researchList.length === 0) {
       if (query) {
@@ -700,7 +921,8 @@ export class VaultRetrievalService {
     intent: any,
     records: VaultRecord[],
     ambiguities: AmbiguityItem[],
-    emptyStates: NotFoundItem[]
+    emptyStates: NotFoundItem[],
+    completeness?: CollectionCompleteness[]
   ) {
     let queryBuilder = (this.supabase as any)
       .from('meetings')
@@ -714,6 +936,17 @@ export class VaultRetrievalService {
     }
 
     const { data: meetings } = await queryBuilder.limit(5)
+
+    if (completeness) {
+      completeness.push({
+        domain: 'meeting',
+        queryMode: 'catalog',
+        resultScope: 'bounded',
+        returnedCount: (meetings || []).length,
+        appliedLimit: 5,
+      })
+    }
+
     if (!meetings || meetings.length === 0) return
 
     for (const m of meetings) {
@@ -760,7 +993,8 @@ export class VaultRetrievalService {
     query: string | undefined,
     records: VaultRecord[],
     ambiguities: AmbiguityItem[],
-    emptyStates: NotFoundItem[]
+    emptyStates: NotFoundItem[],
+    completeness?: CollectionCompleteness[]
   ) {
     let queryBuilder = (this.supabase as any)
       .from('workspace_metrics')
@@ -772,6 +1006,18 @@ export class VaultRetrievalService {
     }
 
     const { data: metrics } = await queryBuilder.limit(5)
+
+    if (completeness) {
+      completeness.push({
+        domain: 'metric',
+        queryMode: query ? 'targeted' : 'catalog',
+        resultScope: query ? 'filtered' : 'bounded',
+        returnedCount: (metrics || []).length,
+        appliedLimit: 5,
+        filterDescription: query ? `query: ${query}` : undefined,
+      })
+    }
+
     if (!metrics || metrics.length === 0) return
 
     for (const m of metrics) {
@@ -838,7 +1084,8 @@ export class VaultRetrievalService {
     query: string | undefined,
     records: VaultRecord[],
     ambiguities: AmbiguityItem[],
-    emptyStates: NotFoundItem[]
+    emptyStates: NotFoundItem[],
+    completeness?: CollectionCompleteness[]
   ) {
     let queryBuilder = (this.supabase as any)
       .from('reviews')
@@ -850,6 +1097,18 @@ export class VaultRetrievalService {
     }
 
     const { data: reviews } = await queryBuilder.order('created_at', { ascending: false }).limit(5)
+
+    if (completeness) {
+      completeness.push({
+        domain: 'review',
+        queryMode: query ? 'targeted' : 'catalog',
+        resultScope: query ? 'filtered' : 'bounded',
+        returnedCount: (reviews || []).length,
+        appliedLimit: 5,
+        filterDescription: query ? `query: ${query}` : undefined,
+      })
+    }
+
     if (!reviews || reviews.length === 0) return
 
     for (const r of reviews) {
@@ -889,7 +1148,8 @@ export class VaultRetrievalService {
     query: string | undefined,
     records: VaultRecord[],
     ambiguities: AmbiguityItem[],
-    emptyStates: NotFoundItem[]
+    emptyStates: NotFoundItem[],
+    completeness?: CollectionCompleteness[]
   ) {
     let queryBuilder = (this.supabase as any)
       .from('workspace_evidence')
@@ -901,6 +1161,18 @@ export class VaultRetrievalService {
     }
 
     const { data: evidenceList } = await queryBuilder.limit(5)
+
+    if (completeness) {
+      completeness.push({
+        domain: 'evidence',
+        queryMode: query ? 'targeted' : 'catalog',
+        resultScope: query ? 'filtered' : 'bounded',
+        returnedCount: (evidenceList || []).length,
+        appliedLimit: 5,
+        filterDescription: query ? `query: ${query}` : undefined,
+      })
+    }
+
     if (!evidenceList || evidenceList.length === 0) return
 
     for (const ev of evidenceList) {
@@ -944,7 +1216,21 @@ export class VaultRetrievalService {
   // --------------------------------------------------------------------------
   // 10. Activity Digest Contract
   // --------------------------------------------------------------------------
-  private async retrieveActivityDigest(timeframe: any, records: VaultRecord[]) {
+  private async retrieveActivityDigest(
+    timeframe: any,
+    records: VaultRecord[],
+    completeness?: CollectionCompleteness[]
+  ) {
+    if (completeness) {
+      completeness.push({
+        domain: 'activity',
+        queryMode: 'catalog',
+        resultScope: 'bounded',
+        returnedCount: 1,
+        filterDescription: timeframe?.label || 'Recent',
+      })
+    }
+
     const startIso = timeframe?.startIso || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
     const endIso = timeframe?.endIso || new Date().toISOString()
 

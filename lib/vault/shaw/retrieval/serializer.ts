@@ -39,6 +39,40 @@ export function serializeVaultContextForPrompt(envelope: VaultContextEnvelope): 
     parts.push(`<!-- Temporal Window: ${envelope.resolvedScope.timeframe.label} -->`)
   }
 
+  parts.push('<!-- COLLECTION COMPLETENESS & SCOPE DIRECTIVES: -->')
+  parts.push('<!-- 1. EXHAUSTIVE: If a domain scope is "exhaustive", you may confirm no other matching records exist in the workspace beyond what is listed. -->')
+  parts.push('<!-- 2. BOUNDED: If a domain scope is "bounded", only a query-limited subset was retrieved. You MUST NOT claim or imply that unmentioned records do not exist in the database. State only what was retrieved. -->')
+  parts.push('<!-- 3. TARGETED: If a query is targeted to a specific entity, answer about that entity only; do not make negative claims about other workspace records. -->')
+  parts.push('<!-- 4. AMBIGUOUS: If candidates are marked ambiguous, ask the user to clarify among candidate matches. Do not guess silently. -->')
+  parts.push('<!-- 5. INTERNAL FIELD NAMES: Keys such as "recentDecisionsSummary", "activeTasksSummary", and "evidenceItems" are internal retrieval keys. Present them naturally in conversation (e.g. "recent decisions", "active tasks", "attached evidence") rather than outputting raw camelCase variable names. -->')
+
+  // Completeness metadata & scope
+  if (envelope.completeness && envelope.completeness.length > 0) {
+    parts.push('<retrieval_scope>')
+    for (const c of envelope.completeness) {
+      const attrs = [
+        `domain="${c.domain}"`,
+        `query_mode="${c.queryMode}"`,
+        `scope="${c.resultScope}"`,
+        `returned_count="${c.returnedCount}"`,
+      ]
+      if (c.totalCount !== undefined) {
+        attrs.push(`total_count="${c.totalCount}"`)
+      }
+      if (c.appliedLimit !== undefined) {
+        attrs.push(`applied_limit="${c.appliedLimit}"`)
+      }
+      if (c.hasMore !== undefined) {
+        attrs.push(`has_more="${c.hasMore}"`)
+      }
+      if (c.filterDescription) {
+        attrs.push(`filter="${escapeRecordContent(c.filterDescription)}"`)
+      }
+      parts.push(`  <scope ${attrs.join(' ')} />`)
+    }
+    parts.push('</retrieval_scope>')
+  }
+
   // 1. Ambiguities if any
   if (envelope.ambiguities.length > 0) {
     parts.push('<ambiguities>')

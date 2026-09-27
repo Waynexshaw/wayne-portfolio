@@ -86,6 +86,20 @@ export interface NotFoundItem {
   message: string
 }
 
+export type QueryMode = 'catalog' | 'targeted'
+export type ResultScope = 'exhaustive' | 'bounded' | 'filtered' | 'ambiguous'
+
+export interface CollectionCompleteness {
+  domain: RetrievalDomain
+  queryMode: QueryMode
+  resultScope: ResultScope
+  returnedCount: number
+  totalCount?: number
+  appliedLimit?: number
+  hasMore?: boolean
+  filterDescription?: string
+}
+
 export interface VaultContextEnvelope {
   retrievalQuery: string
   resolvedScope: {
@@ -109,6 +123,7 @@ export interface VaultContextEnvelope {
   records: VaultRecord[]
   ambiguities: AmbiguityItem[]
   emptyStates: NotFoundItem[]
+  completeness?: CollectionCompleteness[]
   truncated: boolean
   retrievalTimestamp: string
   provenance: {
