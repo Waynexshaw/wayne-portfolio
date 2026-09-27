@@ -11,9 +11,11 @@ import { extractTemporalExpression, resolveTemporalWindow } from './temporal'
 import { AdapterMessage } from '../gateway/adapters/types'
 
 const EXPLICIT_VAULT_PATTERNS = [
-  /\b(?:my|our)\s+(?:projects?|tasks?|decisions?|contacts?|meetings?|research|metrics?|reviews?|evidence|follow[- ]?ups?|workbench|notes?|vault)\b/i,
-  /\b(?:in|from)\s+(?:my\s+|the\s+)?vault\b/i,
-  /\bvault\s+records?\b/i,
+  /\b(?:my|our)\s+(?:projects?|tasks?|decisions?|contacts?|meetings?|research|metrics?|reviews?|evidence|follow[- ]?ups?|workbench|notes?|vault|records?)\b/i,
+  /\b(?:in|from|according\s+to|what\s+does)\s+(?:my\s+|the\s+)?vault\b/i,
+  /\b(?:vault|recorded|stored|retrieved)\s+records?\b/i,
+  /\brecorded\s+(?:information|data)\b/i,
+  /\bthe\s+records\b/i,
   /\bwhat\s+did\s+i\s+(?:work\s+on|decide|record|research|note|have|do)\b/i,
   /\bstatus\s+(?:report\s+)?(?:on|for|of)\b/i,
   /\b(?:overview|details)\s+(?:on|for|of)\b/i,
@@ -69,7 +71,7 @@ export function planRetrieval(input: PlannerInput): RetrievalPlan {
   let shouldRetrieve = false
   if (hasExplicitVaultAnchor) {
     shouldRetrieve = true
-  } else if (!isGeneralQuestion && activeEntityName && /\b(?:status|update|progress|tasks?|decisions?|plan|summary|metrics?|reviews?|meetings?|evidence|overview|details|tell\s+me\s+about)\b/i.test(trimmed)) {
+  } else if (!isGeneralQuestion && activeEntityName && /\b(?:status|update|progress|tasks?|decisions?|plan|summary|metrics?|reviews?|meetings?|evidence|overview|details|tell\s+me\s+about|focus|prioritize|happening)\b/i.test(trimmed)) {
     shouldRetrieve = true
   }
 
@@ -233,6 +235,64 @@ const GENERIC_SCHEMA_NOUNS = new Set([
   'item', 'items',
 ])
 
+/**
+ * Context and source qualifiers that specify the origin or framing of a question
+ * (e.g. "my Vault records", "recorded information", "the project") and must never
+ * be mistakenly extracted as the target operational entity.
+ */
+const CONTEXT_QUALIFIER_PHRASES = new Set([
+  'vault',
+  'the vault',
+  'my vault',
+  'our vault',
+  'vault record',
+  'vault records',
+  'my vault record',
+  'my vault records',
+  'the vault record',
+  'the vault records',
+  'record',
+  'records',
+  'my record',
+  'my records',
+  'the record',
+  'the records',
+  'recorded information',
+  'recorded data',
+  'recorded record',
+  'recorded records',
+  'stored information',
+  'stored data',
+  'stored record',
+  'stored records',
+  'retrieved record',
+  'retrieved records',
+  'retrieved information',
+  'retrieved data',
+  'available record',
+  'available records',
+  'available information',
+  'available data',
+  'workspace record',
+  'workspace records',
+  'internal record',
+  'internal records',
+  'project record',
+  'project records',
+  'the project',
+  'the task',
+  'the decision',
+  'the contact',
+  'the company',
+  'the meeting',
+  'the research',
+  'the evidence',
+  'the review',
+  'the metric',
+  'information',
+  'data',
+])
+
 const COMMON_ACRONYM_WORDS = new Set([
   'WHAT', 'WHEN', 'WHERE', 'HOW', 'WHY', 'THE', 'AND', 'FOR', 'NOT',
   'SHOW', 'HAVE', 'FROM', 'THIS', 'THAT', 'WITH', 'ABOUT', 'WHICH',
@@ -241,7 +301,7 @@ const COMMON_ACRONYM_WORDS = new Set([
 
 /**
  * Validates, trims, and normalizes candidate entity strings.
- * Discards leading articles, trailing punctuation, pronouns, and schema terms.
+ * Discards leading articles, trailing punctuation, pronouns, schema terms, and context qualifiers.
  */
 function cleanAndValidateCandidate(raw: string): string | null {
   if (!raw) return null
@@ -253,7 +313,12 @@ function cleanAndValidateCandidate(raw: string): string | null {
   // Strip trailing punctuation
   candidate = candidate.replace(/[?!,.]*$/, '').trim()
 
+  // Strip trailing conversational or temporal qualifiers
+  candidate = candidate.replace(/\s+(?:right\s+now|currently|now|today|yesterday|at\s+the\s+moment|and\s+why)$/i, '').trim()
+
   if (candidate.length < 2) return null
+
+  const lower = candidate.toLowerCase()
 
   // Reject generic pronouns and quantifier words
   if (/^(?:all|some|any|recent|past|upcoming|these|those|it|this|that|them|him|her|something|anything|everything)$/i.test(candidate)) {
@@ -261,7 +326,12 @@ function cleanAndValidateCandidate(raw: string): string | null {
   }
 
   // Reject generic structural schema nouns
-  if (GENERIC_SCHEMA_NOUNS.has(candidate.toLowerCase())) {
+  if (GENERIC_SCHEMA_NOUNS.has(lower)) {
+    return null
+  }
+
+  // Reject context and source qualifiers
+  if (CONTEXT_QUALIFIER_PHRASES.has(lower) || CONTEXT_QUALIFIER_PHRASES.has(raw.trim().toLowerCase())) {
     return null
   }
 
@@ -269,12 +339,35 @@ function cleanAndValidateCandidate(raw: string): string | null {
 }
 
 // Recognized instructional boundaries that safely terminate entity spans in user prompts
-const INSTRUCTION_DELIMITERS = 'using|from|based|include|including|where|only|as|according|with|in|to|and'
+const INSTRUCTION_DELIMITERS = 'using|from|based|include|including|where|only|as|according|with|in|to|and|right\\s+now|currently'
 
-const OPERATIONAL_ANCHOR_REGEX = new RegExp(
-  `\\b(?:status\\s+(?:report\\s+)?(?:on|for|of)|overview\\s+of|update\\s+(?:on|for)|details\\s+(?:on|for|of)|tell\\s+me\\s+about)\\s+([A-Za-z0-9_\\-\\s/]{2,100}?)(?=[?!,.]|$|\\b(?:${INSTRUCTION_DELIMITERS})\\b)`,
-  'i'
-)
+const OPERATIONAL_TARGET_PATTERNS = [
+  // 1. Status / Overview / Update / Details / Tell me about
+  new RegExp(
+    `\\b(?:status\\s+(?:report\\s+)?(?:on|for|of)|overview\\s+of|update\\s+(?:on|for)|details\\s+(?:on|for|of|about)|tell\\s+me\\s+about)\\s+([A-Za-z0-9_\\-\\s/]{2,100}?)(?=[?!,.]|$|\\b(?:${INSTRUCTION_DELIMITERS})\\b)`,
+    'i'
+  ),
+  // 2. Focus on / Focus first for / Focus for
+  new RegExp(
+    `\\b(?:focus(?:\\s+on)?(?:\\s+first)?\\s+(?:for|on))\\s+([A-Za-z0-9_\\-\\s/]{2,100}?)(?=[?!,.]|$|\\b(?:${INSTRUCTION_DELIMITERS})\\b)`,
+    'i'
+  ),
+  // 3. Prioritize / Prioritize for
+  new RegExp(
+    `\\b(?:prioritize(?:\\s+first)?(?:\\s+for)?)\\s+([A-Za-z0-9_\\-\\s/]{2,100}?)(?=[?!,.]|$|\\b(?:${INSTRUCTION_DELIMITERS})\\b)`,
+    'i'
+  ),
+  // 4. What is / what's happening with
+  new RegExp(
+    `\\b(?:what(?:\\s+is|'s)?\\s+happening\\s+with)\\s+([A-Za-z0-9_\\-\\s/]{2,100}?)(?=[?!,.]|$|\\b(?:${INSTRUCTION_DELIMITERS})\\b)`,
+    'i'
+  ),
+  // 5. What does [Vault] say about
+  new RegExp(
+    `\\b(?:what\\s+does\\s+(?:(?:my|the)\\s+)?vault\\s+say\\s+about)\\s+([A-Za-z0-9_\\-\\s/]{2,100}?)(?=[?!,.]|$|\\b(?:${INSTRUCTION_DELIMITERS})\\b)`,
+    'i'
+  ),
+]
 
 const GENERIC_PREPOSITION_REGEX = new RegExp(
   `\\b(?:on|about|for|regarding|into)\\s+([A-Za-z0-9_\\-\\s/]{2,100}?)(?=[?!,.]|$|\\b(?:${INSTRUCTION_DELIMITERS})\\b)`,
@@ -285,19 +378,21 @@ const GENERIC_PREPOSITION_REGEX = new RegExp(
  * Extracts possible project/entity names mentioned in the prompt.
  *
  * Deterministic precedence:
- * 1. Explicit operational entity patterns ("status report on <entity>", "tell me about <entity>")
+ * 1. Explicit operational target patterns ("status report on <entity>", "focus ... for <entity>", "tell me about <entity>")
  * 2. Strong uppercase acronym patterns (e.g. PEVRA, TIRMS)
- * 3. Generic preposition extraction ("on Alpha", "about telecom identity")
+ * 3. Generic preposition extraction ("on Alpha", "about telecom identity") with context qualifier rejection
  *
- * In all cases, candidate spans terminate at instructional boundaries and generic schema nouns
- * (e.g. "project", "task") are rejected so they cannot override valid entities.
+ * In all cases, candidate spans terminate at instructional boundaries, generic schema nouns
+ * (e.g. "project", "task"), and context qualifiers (e.g. "my Vault records") are rejected.
  */
 function extractEntityMention(prompt: string): string | null {
   // 1. Direct Operational Entity Patterns (highest precedence)
-  const opMatch = prompt.match(OPERATIONAL_ANCHOR_REGEX)
-  if (opMatch && opMatch[1]) {
-    const candidate = cleanAndValidateCandidate(opMatch[1])
-    if (candidate) return candidate
+  for (const pattern of OPERATIONAL_TARGET_PATTERNS) {
+    const opMatch = prompt.match(pattern)
+    if (opMatch && opMatch[1]) {
+      const candidate = cleanAndValidateCandidate(opMatch[1])
+      if (candidate) return candidate
+    }
   }
 
   // 2. Explicit Uppercase Acronyms (e.g. PEVRA, TIRMS)
@@ -310,7 +405,7 @@ function extractEntityMention(prompt: string): string | null {
     }
   }
 
-  // 3. Generic Preposition Extraction (with semantic boundary and schema noun rejection)
+  // 3. Generic Preposition Extraction (with semantic boundary and context qualifier rejection)
   for (const match of prompt.matchAll(GENERIC_PREPOSITION_REGEX)) {
     if (match[1]) {
       const candidate = cleanAndValidateCandidate(match[1])

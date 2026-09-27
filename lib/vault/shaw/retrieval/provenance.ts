@@ -164,7 +164,7 @@ export function resolveAuthoritativeProvenance(
   if (!parsed.hasTag || parsed.handles.length === 0) {
     return {
       citations: [],
-      status: sourceMap.size > 0 ? 'UNAVAILABLE' : 'COMPLETE',
+      status: 'UNAVAILABLE',
       validHandlesCount: 0,
       invalidHandlesCount: 0,
       invalidHandles: [],
@@ -232,9 +232,9 @@ export function resolveAuthoritativeProvenance(
     })
   }
 
-  let status: ProvenanceStatus = 'COMPLETE'
-  if (invalidHandles.length > 0) {
-    status = validHandles.length > 0 ? 'PARTIAL' : 'UNAVAILABLE'
+  let status: ProvenanceStatus = 'UNAVAILABLE'
+  if (citations.length > 0) {
+    status = invalidHandles.length > 0 ? 'PARTIAL' : 'COMPLETE'
   }
 
   return {
