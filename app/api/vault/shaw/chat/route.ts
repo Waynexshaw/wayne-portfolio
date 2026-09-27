@@ -38,7 +38,14 @@ export async function POST(request: NextRequest) {
       routingMode = 'auto_free_first',
       selectedModel,
       existingUserMessageId,
+      timezone: bodyTimezone,
     } = body
+
+    const userTimezone =
+      (typeof bodyTimezone === 'string' && bodyTimezone.trim()) ||
+      request.headers.get('x-timezone') ||
+      request.headers.get('x-user-timezone') ||
+      undefined
 
     if (!workspaceId || !conversationId || !message || typeof message !== 'string') {
       return NextResponse.json(
@@ -190,6 +197,7 @@ export async function POST(request: NextRequest) {
       prompt: trimmedMessage,
       capability: capability as ShawCapability,
       history,
+      timezone: userTimezone,
     })
 
     let vaultEnvelope: VaultContextEnvelope | null = null

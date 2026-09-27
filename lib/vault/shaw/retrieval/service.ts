@@ -102,12 +102,15 @@ export class VaultRetrievalService {
       resolvedScope: {
         workspaceId: this.workspaceId,
         domains: domainsQueried,
+        timezone: plan.timeframe?.timezone,
         timeframe: plan.timeframe
           ? {
               type: plan.timeframe.type,
               label: plan.timeframe.label,
               start: plan.timeframe.startIso,
               end: plan.timeframe.endIso,
+              startDateString: plan.timeframe.startDateString,
+              endDateString: plan.timeframe.endDateString,
             }
           : undefined,
       },
@@ -659,10 +662,34 @@ export class VaultRetrievalService {
             evidence_text: ev.evidence_text, // Exact verbatim quote
             claim_summary: ev.claim_summary, // Interpretation/summary
             context_location: ev.context_location, // Source location
+            epistemicClass: 'RESEARCH_EVIDENCE',
           })),
         },
         provenance: { table: 'research_records', id: r.id, workspace_id: this.workspaceId },
       })
+
+      // Emit discrete records for linked evidence items with epistemicClass: RESEARCH_EVIDENCE
+      for (const ev of (evidence || [])) {
+        records.push({
+          entityType: 'research',
+          entityId: ev.id,
+          title: `Evidence: ${ev.claim_summary || (ev.evidence_text ? ev.evidence_text.slice(0, 48) : 'Evidence Item')}`,
+          timestamps: {},
+          relationship: {
+            researchRecordId: r.id,
+            researchRecordTitle: r.title,
+            sourceId: ev.source_id,
+          },
+          epistemicClass: 'RESEARCH_EVIDENCE',
+          fields: {
+            evidence_text: ev.evidence_text,
+            claim_summary: ev.claim_summary,
+            context_location: ev.context_location,
+            source_linked: Boolean(ev.source_id),
+          },
+          provenance: { table: 'research_evidence', id: ev.id, workspace_id: this.workspaceId },
+        })
+      }
     }
   }
 
@@ -899,7 +926,7 @@ export class VaultRetrievalService {
           projectTitle: ev.workspace_projects?.title || undefined,
           isPublishedToPublicPortfolio: isPublished,
         },
-        epistemicClass: 'WV_RECORD',
+        epistemicClass: 'WORKSPACE_EVIDENCE',
         fields: {
           evidence_type: ev.evidence_type,
           internal_approval_status: ev.approval_status, // Approved = internal approval, NOT public publication

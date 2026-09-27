@@ -32,15 +32,16 @@ const GENERAL_KNOWLEDGE_EXCLUSION = [
   /\bhow\s+does\s+(?:a|an|the)\s+[a-z0-9_\-]+\s+work\b/i,
 ]
 
-interface PlannerInput {
+export interface PlannerInput {
   prompt: string
   capability?: string
   history?: AdapterMessage[]
   anchorDate?: Date
+  timezone?: string
 }
 
 export function planRetrieval(input: PlannerInput): RetrievalPlan {
-  const { prompt, history = [], anchorDate = new Date() } = input
+  const { prompt, history = [], anchorDate = new Date(), timezone } = input
   const trimmed = prompt.trim()
 
   // 1. Check for explicit Vault intent vs general question
@@ -83,7 +84,7 @@ export function planRetrieval(input: PlannerInput): RetrievalPlan {
 
   // 2. Resolve Temporal Window
   const temporalExp = extractTemporalExpression(trimmed)
-  const timeframe = temporalExp ? resolveTemporalWindow(temporalExp, anchorDate) : undefined
+  const timeframe = temporalExp ? resolveTemporalWindow(temporalExp, anchorDate, timezone) : undefined
 
   // 3. Resolve Domain Intents
   const intents: RetrievalIntent[] = []

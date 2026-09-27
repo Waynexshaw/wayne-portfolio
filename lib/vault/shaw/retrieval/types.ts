@@ -9,7 +9,8 @@
 export type EpistemicClass =
   | 'USER_SUPPLIED'
   | 'WV_RECORD'
-  | 'VERIFIED_RESEARCH_EVIDENCE'
+  | 'RESEARCH_EVIDENCE'
+  | 'WORKSPACE_EVIDENCE'
   | 'MODEL_INFERENCE'
   | 'UNKNOWN'
   | 'ILLUSTRATIVE'
@@ -90,11 +91,14 @@ export interface VaultContextEnvelope {
   resolvedScope: {
     workspaceId: string
     domains: RetrievalDomain[]
+    timezone?: string
     timeframe?: {
       type: string
       label: string
       start?: string
       end?: string
+      startDateString?: string
+      endDateString?: string
     }
   }
   resolvedEntities: Array<{
@@ -132,6 +136,7 @@ export interface TemporalWindow {
   endIso: string
   startDateString: string // YYYY-MM-DD
   endDateString: string   // YYYY-MM-DD
+  timezone?: string       // Resolved timezone (e.g. 'America/New_York' or 'UTC')
 }
 
 export interface RetrievalIntent {
