@@ -14,11 +14,12 @@ import { resolveFormatProfile } from './profiles'
  *
  * Precedence:
  * 1. Safety / system constraints
- * 2. Explicit current user instruction
- * 3. Requested format
- * 4. Requested depth
- * 5. Identity voice profile
- * 6. General stylistic defaults
+ * 2. Explicit current user task / instruction
+ * 3. Factual & evidence integrity (IMMUTABLE: depth/format/voice cannot require invention of facts)
+ * 4. Requested format
+ * 5. Requested depth
+ * 6. Identity voice profile
+ * 7. General stylistic defaults
  */
 
 /**
@@ -291,26 +292,27 @@ export function getDepthDirectives(
       break
     case 'detailed':
       depthInstruction =
-        'DEPTH: DETAILED. Develop the reasoning and explain the mechanism thoroughly. Include concrete consequences, real-world context, and operational reality. Do NOT stop after merely stating the conclusion or summarizing in a single paragraph. Give enough substance and detail to make the point properly.'
+        'DEPTH: DETAILED. Develop the reasoning and explain the mechanism thoroughly with substance. Unpack mechanisms only from supplied/retrieved facts or through clearly conditional conceptual analysis. Include concrete consequences, real-world context, and operational reality. Do NOT invent unsupplied operational mechanics to simulate detail. Do NOT stop after merely stating the conclusion or summarizing in a single paragraph. Give enough substance and detail to make the point properly.'
       break
     case 'deep':
       depthInstruction =
-        'DEPTH: DEEP. Substantially explore the subject across multiple relevant dimensions. Unpack mechanisms, root causes, trade-offs, and practical implications with depth and precision. Do not pad with fluff or repetition; every sentence must carry weight.'
+        'DEPTH: DEEP. Substantially explore the subject across multiple relevant dimensions. Unpack root causes, trade-offs, and structural implications with depth and precision. Develop mechanisms only from supplied/retrieved facts or conditional analysis. Do not invent unsupplied facts or architectures, and do not pad with fluff; every sentence must carry weight.'
       break
     case 'normal':
     default:
       depthInstruction =
-        'DEPTH: NORMAL. Develop the idea naturally and sufficiently to satisfy the prompt without artificial compression or unnecessary inflation.'
+        'DEPTH: NORMAL. Develop the idea naturally and sufficiently to satisfy the prompt without artificial compression or unnecessary inflation. Ground mechanisms strictly in supplied facts or conditional reasoning.'
       break
   }
 
   return `
-OUTPUT SHAPE & DEPTH DIRECTIVES (PRECEDENCE: CURRENT INSTRUCTION > FORMAT > DEPTH > VOICE DEFAULTS):
+OUTPUT SHAPE & DEPTH DIRECTIVES (PRECEDENCE: CURRENT USER TASK > FACTUAL / EVIDENCE INTEGRITY (IMMUTABLE) > FORMAT > DEPTH > STYLE / VOICE DEFAULTS):
 - ${formatInstruction}
 - ${depthInstruction}
+- PRECEDENCE PRINCIPLE: Factual and evidence integrity strictly outranks format, depth, and stylistic defaults. Depth can NEVER require invention of missing facts; format can NEVER require invention of missing facts; voice can NEVER require invention of missing facts. When details are unsupplied, depth is satisfied by developing deeper conditional reasoning, structural trade-offs, and critical questions, NOT by manufacturing unsupplied facts or architectures.
 - PRINCIPLE: FORMAT and DEPTH are independent dimensions. Format defines the shape; depth defines how thoroughly the reasoning is developed. Explicit depth instructions outrank general voice brevity defaults.
 - SHORT DEPTH SEMANTICS: "Short" means compact development—one focused idea, minimal supporting context, no unnecessary second example, no multi-paragraph inflation, ending immediately once the point is clear.
-- DETAILED DEPTH SEMANTICS: "Detailed" means developed reasoning—unfold the mechanism, context, and consequences with substance.
+- DETAILED DEPTH SEMANTICS: "Detailed" means developed reasoning—unfold the mechanism, context, and consequences with substance. Develop mechanisms only from supplied/retrieved facts or as clearly conditional conceptual analysis.
 - TOPIC SCOPE PRESERVATION: Preserve the user's subject scope. Broad prompts (e.g. "Web3 projects") must not be artificially narrowed to sub-domains (e.g. smart contracts, developers) unless specified. Technical prompts must retain their technical focus. Examples should support rather than redefine the user's subject.
 - BREVITY RULE CLARIFICATION: "If the content has made its point, simply end it" means ending naturally once the requested idea has been developed to the requested depth. It does NOT mean ignoring "detailed", "deep", or "comprehensive" instructions and stopping after a single paragraph. For SHORT depth, end immediately once the core point is established; do not linger.
   `.trim()

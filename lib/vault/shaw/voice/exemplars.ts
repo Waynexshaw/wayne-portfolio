@@ -340,8 +340,9 @@ A growth strategist does the same thing. Every Web3 project stands on three pill
 ]
 
 export const ANTI_COPY_DIRECTIVE = `
-ANTI-COPY DIRECTIVE:
-The following exemplar(s) demonstrate cadence, reasoning flow, degree of explanation, transitions, specificity, and natural stopping points. They are NOT templates. Do NOT reproduce distinctive openings, metaphors, signature phrases, conclusions, or sentence sequences from exemplars unless naturally required by the subject. Primary authority means more representative; it does NOT mean "copy this structure every time."
+ANTI-COPY DIRECTIVE & STRICT FACTUAL SEPARATION:
+1. CADENCE & STYLE REFERENCE ONLY: The following exemplar(s) demonstrate cadence, reasoning flow, degree of explanation, transitions, specificity, and natural stopping points. They are NOT templates. Do NOT reproduce distinctive openings, metaphors, signature phrases, conclusions, or sentence sequences from exemplars unless naturally required by the subject. Primary authority means more representative; it does NOT mean "copy this structure every time."
+2. STRICT FACTUAL BOUNDARY: EXEMPLARS ARE NOT FACTUAL CONTEXT FOR THE CURRENT TASK. Facts, entities, company names, products, events, mechanisms, numbers, or specific claims appearing inside an exemplar belong solely to that past writing. They MUST NOT be imported, assumed, or cross-contaminated into your response unless independently present in the user's current prompt or verified retrieval context.
 `.trim()
 
 /**
@@ -409,7 +410,7 @@ export function formatExemplarsForPrompt(exemplars: DeFiwayneXExemplar[]): strin
   })
 
   return `
-VOICE EXEMPLARS (CADENCE & REASONING FLOW REFERENCE):
+VOICE EXEMPLARS (CADENCE & REASONING FLOW REFERENCE ONLY — STRICTLY NON-FACTUAL FOR CURRENT TASK):
 ${ANTI_COPY_DIRECTIVE}
 
 ${formattedPieces.join('\n\n')}
