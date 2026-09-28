@@ -54,6 +54,7 @@ export function serializeVaultContextForPrompt(
   parts.push('<!-- 3. TARGETED: If a query is targeted to a specific entity, answer about that entity only; do not make negative claims about other workspace records. -->')
   parts.push('<!-- 4. AMBIGUOUS: If candidates are marked ambiguous, ask the user to clarify among candidate matches. Do not guess silently. -->')
   parts.push('<!-- 5. INTERNAL FIELD NAMES: Keys such as "recentDecisionsSummary", "activeTasksSummary", and "evidenceItems" are internal retrieval keys. Present them naturally in conversation (e.g. "recent decisions", "active tasks", "attached evidence") rather than outputting raw camelCase variable names. -->')
+  parts.push('<!-- 6. UNMODELED CONCEPT DISCIPLINE: Do not invent record types, hierarchy types, planning constructs, or schema concepts (such as subtasks, milestones, checkpoints, sprints, OKRs) and describe them as missing from the Vault. Discuss entities and fields as present or absent ONLY when represented in retrieved records, scope metadata, or empty states. -->')
 
   // Completeness metadata & scope
   if (envelope.completeness && envelope.completeness.length > 0) {
@@ -221,9 +222,23 @@ export function serializePreparedContextForPrompt(
   parts.push('<!-- REASONING SYNTHESIS DIRECTIVES: -->')
   parts.push(`<!-- Primary Intent: ${prepared.plan.primaryIntent} | Mode: ${prepared.plan.reasoningMode} -->`)
   parts.push('<!-- 1. EXHAUSTIVE: If a verified absence is recorded, you may confirm no such records exist in the Vault. -->')
-  parts.push('<!-- 2. LIMITED: If an absence is marked limited, only a filtered/bounded subset was retrieved. DO NOT claim records do not exist globally. -->')
+  parts.push('<!-- 2. LIMITED: If an absence is marked limited, only a filtered/bounded subset was retrieved. DO NOT claim records do not exist globally. State absence strictly within the query bounds (e.g. "No decision records were returned for this project within the retrieved decision scope"). -->')
   parts.push('<!-- 3. NEUTRAL FACTS: Overdue days and timestamps are calculated calendar facts. Recommendations must be separated from recorded facts. -->')
   parts.push('<!-- 4. NO SCORE: Do not invent completion percentages or project health scores. Cite descriptive counts directly. -->')
+  parts.push('<!-- 5. NEGATIVE FACTUAL CLAIMS GROUNDING (CRITICAL): Any negative factual claim stating that something is absent from the Vault must be grounded strictly in: -->')
+  parts.push('<!--    a. A directly retrieved field/value (e.g. task.due_date = null -> "No due date is recorded for this task.") -->')
+  parts.push('<!--    b. A verified absence from CollectionCompleteness (<verified_absences>) -->')
+  parts.push('<!--    c. A limited/bounded absence explicitly phrased within its query bounds (<limited_absences>) -->')
+  parts.push('<!--    d. A deterministic descriptive count produced from an authoritative retrieved collection (<descriptive_counts>) -->')
+  parts.push('<!--    If none of these applies, you MUST NOT state or imply that the concept or record is absent from the Vault. -->')
+  parts.push('<!-- 6. UNMODELED CONCEPT DISCIPLINE (CRITICAL): Do not invent record types, hierarchy types, planning constructs, or schema concepts (such as subtasks, milestones, checkpoints, sprints, OKRs, dependencies, or phases) and describe them as missing from the Vault. -->')
+  parts.push('<!--    Only discuss a Vault entity or field as present or absent when that entity or field is represented in the supplied current-turn records, domain outcomes, completeness metadata, verified absences, limited absences, or descriptive counts. -->')
+  parts.push('<!--    If a useful planning concept is not represented in the supplied Vault context, you may suggest it as a forward-looking recommendation (e.g. "You could break this objective into smaller execution tasks"), but you MUST NOT claim the Vault lacks it (e.g. NEVER say "There are no subtasks in your Vault"). -->')
+  parts.push('<!-- 7. EPISTEMIC GAP DISTINCTION (CRITICAL): When reporting what is missing, unclear, or incomplete, distinguish strictly between: -->')
+  parts.push('<!--    - AUTHORITATIVE GAP: Grounded in a retrieved record field (e.g. "No due date is recorded for October objective"). -->')
+  parts.push('<!--    - BOUNDED GAP: Grounded in limited query bounds (e.g. "No decision, review, or metric records were returned for this project within the retrieved query scope"). -->')
+  parts.push('<!--    - OBSERVATIONAL GAP: Gaps in prose descriptions of retrieved records (e.g. "The retrieved project and task descriptions do not specify a numeric member target"). Missing numeric values alone must NEVER be framed as "no metrics exist in the Vault". -->')
+  parts.push('<!--    - RECOMMENDATION: Prescriptive next steps, never stated as historical or recorded facts (e.g. "You could define specific target metrics and action items"). -->')
 
   // Reasoning Plan & Outcomes
   parts.push('<reasoning_context>')
@@ -256,7 +271,7 @@ export function serializePreparedContextForPrompt(
 
   // Descriptive Counts
   const counts = prepared.descriptiveCounts
-  parts.push(`    <descriptive_counts recorded_tasks="${counts.recordedTaskCount}" open_tasks="${counts.openRecordedTaskCount}" completed_tasks="${counts.completedRecordedTaskCount}" recorded_decisions="${counts.recordedDecisionCount}" meetings="${counts.meetingCount}" />`)
+  parts.push(`    <descriptive_counts recorded_tasks="${counts.recordedTaskCount}" open_tasks="${counts.openRecordedTaskCount}" completed_tasks="${counts.completedRecordedTaskCount}" recorded_decisions="${counts.recordedDecisionCount}" meetings="${counts.meetingCount}" recorded_metrics="${counts.recordedMetricCount ?? 0}" />`)
 
   // Neutral Temporal Facts
   if (prepared.temporalFacts.length > 0) {

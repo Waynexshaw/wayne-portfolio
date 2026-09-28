@@ -1005,11 +1005,28 @@ export class VaultRetrievalService {
       .select('id, project_id, name, key, description, category, unit_type, unit_symbol, direction, measurement_type, cadence, status, workspace_projects(title)')
       .eq('workspace_id', this.workspaceId)
 
+    let filterDesc = query ? `query: ${query}` : undefined
+
     if (query) {
-      queryBuilder = queryBuilder.or(`name.ilike.%${query}%,key.ilike.%${query}%`)
+      // Check if query matches a project name authoritatively in workspace_projects
+      const { data: prj } = await (this.supabase as any)
+        .from('workspace_projects')
+        .select('id, title')
+        .eq('workspace_id', this.workspaceId)
+        .or(`slug.ilike.%${query}%,title.ilike.%${query}%`)
+        .limit(1)
+
+      if (prj && prj.length > 0) {
+        queryBuilder = queryBuilder.eq('project_id', prj[0].id)
+        filterDesc = `project: ${prj[0].title}`
+      } else {
+        queryBuilder = queryBuilder.or(`name.ilike.%${query}%,key.ilike.%${query}%`)
+      }
     }
 
-    const { data: metrics } = await queryBuilder.limit(5)
+    const { data: metrics } = await queryBuilder
+      .order('created_at', { ascending: false })
+      .limit(10)
 
     if (completeness) {
       completeness.push({
@@ -1017,8 +1034,8 @@ export class VaultRetrievalService {
         queryMode: query ? 'targeted' : 'catalog',
         resultScope: query ? 'filtered' : 'bounded',
         returnedCount: (metrics || []).length,
-        appliedLimit: 5,
-        filterDescription: query ? `query: ${query}` : undefined,
+        appliedLimit: 10,
+        filterDescription: filterDesc,
       })
     }
 

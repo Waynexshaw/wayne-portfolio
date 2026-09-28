@@ -886,4 +886,471 @@ test('N-2. Open task with no due date remains retrievable', () => {
   assert.strictEqual(prepared.unlinkedRecords.task[0].title, 'No due date task')
 })
 
+// ============================================================================
+// PROJECT_PROGRESS Epistemic Absence Corrections (Tests PP-A to PP-V)
+// ============================================================================
+
+test('PP-A. PROJECT_PROGRESS includes metric OPTIONAL', () => {
+  const plan = planReasoning({ prompt: 'Give me a progress report on Snip3rash trading academy based only on my Vault records.' })
+  assert(plan !== null)
+  assert.strictEqual(plan.primaryIntent, 'PROJECT_PROGRESS')
+  const metricReq = plan.domainRequests.find((r) => r.domain === 'metric')
+  assert(metricReq !== undefined, 'Must request metric domain')
+  assert.strictEqual(metricReq.importance, 'OPTIONAL')
+})
+
+test('PP-B. Existing project/task/decision/review requests remain in PROJECT_PROGRESS', () => {
+  const plan = planReasoning({ prompt: 'Give me a progress report on Snip3rash trading academy.' })
+  assert(plan !== null)
+  assert(plan.domainRequests.some((r) => r.domain === 'project' && r.importance === 'REQUIRED'))
+  assert(plan.domainRequests.some((r) => r.domain === 'task' && r.importance === 'REQUIRED'))
+  assert(plan.domainRequests.some((r) => r.domain === 'decision' && r.importance === 'OPTIONAL'))
+  assert(plan.domainRequests.some((r) => r.domain === 'review' && r.importance === 'OPTIONAL'))
+})
+
+test('PP-C. Snip3rash PROJECT_PROGRESS still targets correct entity', () => {
+  const plan = planReasoning({ prompt: 'Give me a progress report on Snip3rash trading academy.' })
+  assert(plan !== null)
+  assert.strictEqual(plan.entityTarget?.name, 'Snip3rash trading academy')
+  assert.strictEqual(plan.entityTarget?.domain, 'project')
+})
+
+test('PP-D. Metric retrieval cannot invent project linkage', () => {
+  const projectRecord: VaultRecord = {
+    entityType: 'project',
+    entityId: 'p-snip3',
+    title: 'Snip3rash trading academy',
+    timestamps: {},
+    epistemicClass: 'WV_RECORD',
+    fields: { status: 'active' },
+    provenance: { table: 'workspace_projects', id: 'p-snip3', workspace_id: 'ws-1' },
+  }
+  const unlinkedMetric: VaultRecord = {
+    entityType: 'metric',
+    entityId: 'm-unlinked',
+    title: 'Arbitrary Metric',
+    timestamps: {},
+    epistemicClass: 'WV_RECORD',
+    relationship: {}, // No project relationship!
+    fields: { key: 'arb_metric', name: 'Arbitrary Metric' },
+    provenance: { table: 'workspace_metrics', id: 'm-unlinked', workspace_id: 'ws-1' },
+  }
+  const linkedMetric: VaultRecord = {
+    entityType: 'metric',
+    entityId: 'm-linked',
+    title: 'Telegram Members',
+    timestamps: {},
+    epistemicClass: 'WV_RECORD',
+    relationship: { projectId: 'p-snip3', projectTitle: 'Snip3rash trading academy' },
+    fields: { projectId: 'p-snip3', key: 'tg_members', name: 'Telegram Members' },
+    provenance: { table: 'workspace_metrics', id: 'm-linked', workspace_id: 'ws-1' },
+  }
+
+  const outcomes: DomainOutcome[] = [
+    { domain: 'project', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [projectRecord] },
+    { domain: 'metric', importance: 'OPTIONAL', status: 'AVAILABLE', returnedCount: 2, records: [unlinkedMetric, linkedMetric] },
+  ]
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  const prepared = prepareReasoningContext(mockPlan, outcomes, 5)
+  // Linked metric must cluster under project
+  assert.strictEqual(prepared.clusters[0].records.length, 1)
+  assert.strictEqual(prepared.clusters[0].records[0].entityId, 'm-linked')
+  // Unlinked metric must go to unlinkedRecords, NEVER fabricated into the project cluster
+  assert.strictEqual(prepared.unlinkedRecords.metric.length, 1)
+  assert.strictEqual(prepared.unlinkedRecords.metric[0].entityId, 'm-unlinked')
+})
+
+test('PP-E. due_date null can support: "No due date is recorded."', () => {
+  const taskRecord: VaultRecord = {
+    entityType: 'task',
+    entityId: 't-1',
+    title: 'October objective',
+    timestamps: { due_date: undefined },
+    epistemicClass: 'WV_RECORD',
+    fields: { status: 'todo', due_date: null },
+    provenance: { table: 'tasks', id: 't-1', workspace_id: 'ws-1' },
+  }
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  const prepared = prepareReasoningContext(mockPlan, [{ domain: 'task', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [taskRecord] }], 5)
+  const env = flattenPreparedContextToEnvelope(prepared, 'ws-1')
+  const prompt = serializePreparedContextForPrompt(prepared, env)
+  assert(prompt.includes('task.due_date = null -> "No due date is recorded for this task."'), 'Must authorize direct field negative claim')
+})
+
+test('PP-F. limited decision absence cannot become: "No decisions exist in the Vault."', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    entityTarget: { name: 'Snip3rash trading academy', domain: 'project' },
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  const outcomes: DomainOutcome[] = [
+    {
+      domain: 'decision',
+      importance: 'OPTIONAL',
+      status: 'LIMITED_EMPTY',
+      returnedCount: 0,
+      completeness: {
+        domain: 'decision',
+        queryMode: 'targeted',
+        resultScope: 'filtered',
+        returnedCount: 0,
+        appliedLimit: 10,
+        filterDescription: 'query: Snip3rash trading academy',
+      },
+      records: [],
+    },
+  ]
+  const prepared = prepareReasoningContext(mockPlan, outcomes, 5)
+  assert.strictEqual(prepared.verifiedAbsences.length, 0)
+  assert.strictEqual(prepared.limitedAbsences.length, 1)
+  assert.strictEqual(prepared.limitedAbsences[0].scope, 'filtered')
+  const env = flattenPreparedContextToEnvelope(prepared, 'ws-1')
+  const prompt = serializePreparedContextForPrompt(prepared, env)
+  assert(prompt.includes('DO NOT claim records do not exist globally. State absence strictly within the query bounds'), 'Must prohibit global claim')
+})
+
+test('PP-G. limited review absence cannot become: "No reviews exist in the Vault."', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    entityTarget: { name: 'Snip3rash trading academy', domain: 'project' },
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  const outcomes: DomainOutcome[] = [
+    {
+      domain: 'review',
+      importance: 'OPTIONAL',
+      status: 'LIMITED_EMPTY',
+      returnedCount: 0,
+      completeness: {
+        domain: 'review',
+        queryMode: 'targeted',
+        resultScope: 'filtered',
+        returnedCount: 0,
+        appliedLimit: 5,
+        filterDescription: 'query: Snip3rash trading academy',
+      },
+      records: [],
+    },
+  ]
+  const prepared = prepareReasoningContext(mockPlan, outcomes, 5)
+  assert.strictEqual(prepared.verifiedAbsences.length, 0)
+  assert.strictEqual(prepared.limitedAbsences.length, 1)
+  assert.strictEqual(prepared.limitedAbsences[0].domain, 'review')
+  assert.strictEqual(prepared.limitedAbsences[0].scope, 'filtered')
+})
+
+test('PP-H. missing numeric values in project/task descriptions may support observational gap', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  const prepared = prepareReasoningContext(mockPlan, [], 5)
+  const env = flattenPreparedContextToEnvelope(prepared, 'ws-1')
+  const prompt = serializePreparedContextForPrompt(prepared, env)
+  assert(prompt.includes('OBSERVATIONAL GAP: Gaps in prose descriptions of retrieved records'), 'Must support observational gap definition')
+})
+
+test('PP-I. Missing numeric values alone must NOT support: "No metrics exist."', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  const prepared = prepareReasoningContext(mockPlan, [], 5)
+  const env = flattenPreparedContextToEnvelope(prepared, 'ws-1')
+  const prompt = serializePreparedContextForPrompt(prepared, env)
+  assert(prompt.includes('Missing numeric values alone must NEVER be framed as "no metrics exist in the Vault"'), 'Must explicitly forbid turning lack of numbers into metric absence claim')
+})
+
+test('PP-J. Serializer explicitly prohibits authoritative absence claims for unmodeled concepts', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  const prepared = prepareReasoningContext(mockPlan, [], 5)
+  const env = flattenPreparedContextToEnvelope(prepared, 'ws-1')
+  const prompt = serializePreparedContextForPrompt(prepared, env)
+  assert(prompt.includes('UNMODELED CONCEPT DISCIPLINE (CRITICAL)'), 'Must contain unmodeled concept directive')
+  assert(prompt.includes('Do not invent record types, hierarchy types, planning constructs, or schema concepts'), 'Must prohibit schema concept invention')
+})
+
+test('PP-K. Unmodeled concept may still appear as recommendation: "You could break this into smaller execution tasks."', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  const prepared = prepareReasoningContext(mockPlan, [], 5)
+  const env = flattenPreparedContextToEnvelope(prepared, 'ws-1')
+  const prompt = serializePreparedContextForPrompt(prepared, env)
+  assert(prompt.includes('you may suggest it as a forward-looking recommendation'), 'Must allow forward-looking recommendations')
+})
+
+test('PP-L. No authoritative context may produce: "There are no subtasks in your Vault."', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  const prepared = prepareReasoningContext(mockPlan, [], 5)
+  const env = flattenPreparedContextToEnvelope(prepared, 'ws-1')
+  const prompt = serializePreparedContextForPrompt(prepared, env)
+  assert(prompt.includes('NEVER say "There are no subtasks in your Vault"'), 'Must explicitly forbid saying there are no subtasks in your Vault')
+})
+
+test('PP-M. No authoritative context may produce: "There are no milestones in your Vault."', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  const prepared = prepareReasoningContext(mockPlan, [], 5)
+  const env = flattenPreparedContextToEnvelope(prepared, 'ws-1')
+  const prompt = serializePreparedContextForPrompt(prepared, env)
+  assert(prompt.includes('milestones'), 'Must include milestones in unmodeled concepts')
+})
+
+test('PP-N. No authoritative context may produce: "There are no checkpoints in your Vault."', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  const prepared = prepareReasoningContext(mockPlan, [], 5)
+  const env = flattenPreparedContextToEnvelope(prepared, 'ws-1')
+  const prompt = serializePreparedContextForPrompt(prepared, env)
+  assert(prompt.includes('checkpoints'), 'Must include checkpoints in unmodeled concepts')
+})
+
+test('PP-O. Completed task count remains 0 for production-shaped Snip3rash fixture', () => {
+  const projectRecord: VaultRecord = {
+    entityType: 'project',
+    entityId: '97ac6d73-7e89-4557-9af6-d02b7c641dd9',
+    title: 'Snip3rash trading academy',
+    timestamps: {},
+    epistemicClass: 'WV_RECORD',
+    fields: { status: 'active', priority: 'urgent' },
+    provenance: { table: 'workspace_projects', id: '97ac6d73-7e89-4557-9af6-d02b7c641dd9', workspace_id: 'ws-1' },
+  }
+  const taskRecord: VaultRecord = {
+    entityType: 'task',
+    entityId: '63b9f36b-c0cf-4e15-b98e-c093ea953edf',
+    title: 'October objective',
+    timestamps: {},
+    epistemicClass: 'WV_RECORD',
+    relationship: { projectId: '97ac6d73-7e89-4557-9af6-d02b7c641dd9', projectTitle: 'Snip3rash trading academy' },
+    fields: { status: 'todo', priority: 'medium', due_date: null },
+    provenance: { table: 'tasks', id: '63b9f36b-c0cf-4e15-b98e-c093ea953edf', workspace_id: 'ws-1' },
+  }
+  const outcomes: DomainOutcome[] = [
+    { domain: 'project', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [projectRecord] },
+    { domain: 'task', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [taskRecord] },
+  ]
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  const prepared = prepareReasoningContext(mockPlan, outcomes, 5)
+  assert.strictEqual(prepared.descriptiveCounts.completedRecordedTaskCount, 0, 'Completed tasks must be 0')
+})
+
+test('PP-P. Open task count remains 1 for production-shaped Snip3rash fixture', () => {
+  const projectRecord: VaultRecord = {
+    entityType: 'project',
+    entityId: '97ac6d73-7e89-4557-9af6-d02b7c641dd9',
+    title: 'Snip3rash trading academy',
+    timestamps: {},
+    epistemicClass: 'WV_RECORD',
+    fields: { status: 'active', priority: 'urgent' },
+    provenance: { table: 'workspace_projects', id: '97ac6d73-7e89-4557-9af6-d02b7c641dd9', workspace_id: 'ws-1' },
+  }
+  const taskRecord: VaultRecord = {
+    entityType: 'task',
+    entityId: '63b9f36b-c0cf-4e15-b98e-c093ea953edf',
+    title: 'October objective',
+    timestamps: {},
+    epistemicClass: 'WV_RECORD',
+    relationship: { projectId: '97ac6d73-7e89-4557-9af6-d02b7c641dd9', projectTitle: 'Snip3rash trading academy' },
+    fields: { status: 'todo', priority: 'medium', due_date: null },
+    provenance: { table: 'tasks', id: '63b9f36b-c0cf-4e15-b98e-c093ea953edf', workspace_id: 'ws-1' },
+  }
+  const outcomes: DomainOutcome[] = [
+    { domain: 'project', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [projectRecord] },
+    { domain: 'task', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [taskRecord] },
+  ]
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  const prepared = prepareReasoningContext(mockPlan, outcomes, 5)
+  assert.strictEqual(prepared.descriptiveCounts.openRecordedTaskCount, 1, 'Open tasks must be 1')
+})
+
+test('PP-Q. Active project status is never converted into completed/progress claim', () => {
+  const projectRecord: VaultRecord = {
+    entityType: 'project',
+    entityId: 'p-1',
+    title: 'Active Project',
+    timestamps: {},
+    epistemicClass: 'WV_RECORD',
+    fields: { status: 'active' },
+    provenance: { table: 'workspace_projects', id: 'p-1', workspace_id: 'ws-1' },
+  }
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  const prepared = prepareReasoningContext(mockPlan, [{ domain: 'project', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [projectRecord] }], 5)
+  assert.strictEqual((prepared as any).completionRatio, undefined)
+  assert.strictEqual((prepared as any).progressPercentage, undefined)
+  const env = flattenPreparedContextToEnvelope(prepared, 'ws-1')
+  const prompt = serializePreparedContextForPrompt(prepared, env)
+  assert(prompt.includes('Do not invent completion percentages or project health scores. Cite descriptive counts directly.'))
+})
+
+test('PP-R. October objective clusters to Snip3rash by authoritative projectId', () => {
+  const projectRecord: VaultRecord = {
+    entityType: 'project',
+    entityId: '97ac6d73-7e89-4557-9af6-d02b7c641dd9',
+    title: 'Snip3rash trading academy',
+    timestamps: {},
+    epistemicClass: 'WV_RECORD',
+    fields: { status: 'active' },
+    provenance: { table: 'workspace_projects', id: '97ac6d73-7e89-4557-9af6-d02b7c641dd9', workspace_id: 'ws-1' },
+  }
+  const taskRecord: VaultRecord = {
+    entityType: 'task',
+    entityId: '63b9f36b-c0cf-4e15-b98e-c093ea953edf',
+    title: 'October objective',
+    timestamps: {},
+    epistemicClass: 'WV_RECORD',
+    relationship: { projectId: '97ac6d73-7e89-4557-9af6-d02b7c641dd9', projectTitle: 'Snip3rash trading academy' },
+    fields: { status: 'todo' },
+    provenance: { table: 'tasks', id: '63b9f36b-c0cf-4e15-b98e-c093ea953edf', workspace_id: 'ws-1' },
+  }
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  const prepared = prepareReasoningContext(mockPlan, [
+    { domain: 'project', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [projectRecord] },
+    { domain: 'task', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [taskRecord] },
+  ], 5)
+  assert.strictEqual(prepared.clusters.length, 1)
+  assert.strictEqual(prepared.clusters[0].records.length, 1)
+  assert.strictEqual(prepared.clusters[0].records[0].title, 'October objective')
+  assert.strictEqual(prepared.clusters[0].relationshipType, 'authoritative_fk')
+})
+
+test('PP-S. Provenance source-map behavior unchanged with metric addition', () => {
+  const projectRecord: VaultRecord = {
+    entityType: 'project',
+    entityId: 'p-1',
+    title: 'Project Alpha',
+    timestamps: {},
+    epistemicClass: 'WV_RECORD',
+    fields: {},
+    provenance: { table: 'workspace_projects', id: 'p-1', workspace_id: 'ws-1' },
+  }
+  const metricRecord: VaultRecord = {
+    entityType: 'metric',
+    entityId: 'm-1',
+    title: 'Conversion Rate',
+    timestamps: {},
+    epistemicClass: 'WV_RECORD',
+    fields: {},
+    provenance: { table: 'workspace_metrics', id: 'm-1', workspace_id: 'ws-1' },
+  }
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  const prepared = prepareReasoningContext(mockPlan, [
+    { domain: 'project', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [projectRecord] },
+    { domain: 'metric', importance: 'OPTIONAL', status: 'AVAILABLE', returnedCount: 1, records: [metricRecord] },
+  ], 5)
+  const env = flattenPreparedContextToEnvelope(prepared, 'ws-1')
+  const sourceMap = createRequestSourceMap(env)
+  assert.strictEqual(sourceMap.get('S1')?.entityId, 'p-1')
+  assert.strictEqual(sourceMap.get('S2')?.entityId, 'm-1')
+})
+
+test('PP-T. Protocol concealment unchanged', () => {
+  let clientStreamOutput = ''
+  const filter = createProvenanceStreamFilter((chunk) => {
+    clientStreamOutput += chunk
+  })
+  filter.push('Analysis of progress.\n\n[SOURCES: S1, S2 | BASIS: SYNTHESIS]')
+  filter.flush()
+  assert(!clientStreamOutput.includes('[SOURCES:'), 'Must conceal [SOURCES:]')
+  assert(!clientStreamOutput.includes('S1'), 'Must conceal S1')
+})
+
+test('PP-U. WEEKLY_FOCUS regression remains green', () => {
+  const plan = planReasoning({ prompt: 'What should I focus on this week based only on my Vault records?' })
+  assert(plan !== null)
+  assert.strictEqual(plan.primaryIntent, 'WEEKLY_FOCUS')
+  assert.strictEqual(plan.entityTarget, undefined)
+  assert(plan.domainRequests.some((r) => r.domain === 'task' && r.importance === 'REQUIRED'))
+  assert(plan.domainRequests.some((r) => r.domain === 'project' && r.importance === 'REQUIRED'))
+})
+
+test('PP-V. Temporal entity collision tests remain green', () => {
+  const weekPlan = planReasoning({ prompt: 'What are my top priorities this week?' })
+  assert.strictEqual(weekPlan?.entityTarget, undefined)
+  const monthPlan = planReasoning({ prompt: 'What should I focus on this month?' })
+  assert.strictEqual(monthPlan?.entityTarget, undefined)
+  const todayPlan = planReasoning({ prompt: 'What should I focus on today?' })
+  assert.strictEqual(todayPlan?.entityTarget, undefined)
+})
+
 console.log(`\nAll ${passedTests} deterministic verification tests PASSED!\n`)

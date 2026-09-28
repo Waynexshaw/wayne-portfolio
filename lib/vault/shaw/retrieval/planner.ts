@@ -952,6 +952,13 @@ export function planReasoning(input: PlannerInput): ReasoningPlan | null {
         entityTarget: activeEntityName || undefined,
         limit: 5,
       },
+      {
+        domain: 'metric',
+        importance: 'OPTIONAL',
+        queryMode: activeEntityName ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
+        limit: 10,
+      },
     ]
 
     return {

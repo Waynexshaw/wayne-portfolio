@@ -186,6 +186,7 @@ export function prepareReasoningContext(
   })
   const decisions = deduplicatedRecords.filter((r) => r.entityType === 'decision')
   const meetings = deduplicatedRecords.filter((r) => r.entityType === 'meeting')
+  const metrics = deduplicatedRecords.filter((r) => r.entityType === 'metric')
 
   const descriptiveCounts: PreparedDescriptiveCounts = {
     recordedTaskCount: tasks.length,
@@ -193,6 +194,7 @@ export function prepareReasoningContext(
     completedRecordedTaskCount: completedTasks.length,
     recordedDecisionCount: decisions.length,
     meetingCount: meetings.length,
+    recordedMetricCount: metrics.length,
   }
 
   // 6. Safe Absence Registry (Grounded in CollectionCompleteness)

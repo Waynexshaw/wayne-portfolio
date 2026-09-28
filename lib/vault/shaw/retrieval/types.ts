@@ -286,6 +286,7 @@ export interface PreparedDescriptiveCounts {
   completedRecordedTaskCount: number
   recordedDecisionCount: number
   meetingCount: number
+  recordedMetricCount?: number
 }
 
 export interface PreparedReasoningContext {
