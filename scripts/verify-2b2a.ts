@@ -29,6 +29,12 @@ import {
   resolveAuthoritativeProvenance,
   parseModelProvenance,
   createProvenanceStreamFilter,
+  sanitizeVisibleProse,
+  validateAndNormalizeEpistemicClaims,
+  isTechnicalOrDebugPrompt,
+  buildAnswerEpistemicPolicy,
+  buildAnswerContract,
+  AnswerEpistemicPolicy,
   VaultRecord,
   DomainOutcome,
   ReasoningPlan,
@@ -1934,6 +1940,340 @@ Counts are based on the retrieved Vault context.`,
   assert.strictEqual(result.citations[0].title, 'Snip3rash trading academy')
   assert.strictEqual(result.citations[1].title, 'October objective')
   assert(!result.invalidHandles.includes('reasoning_context'), 'reasoning_context is never treated as a source')
+})
+
+// ============================================================================
+// Phase 2B.2A Answer-Wide Epistemic Consistency & Simple Output Suite (EC-A to EC-U)
+// ============================================================================
+
+test('EC-A. BOUNDED metric absence remains bounded in body', () => {
+  const input = 'No metric records are recorded for the project within the retrieved scope.'
+  const cleaned = validateAndNormalizeEpistemicClaims(input, { isTechnicalMode: false })
+  assert(cleaned.includes('within the retrieved scope'), 'Bounded absence in body must remain bounded')
+})
+
+test('EC-B. Same metric absence remains bounded in summary', () => {
+  const input = 'Summary: All governance artifacts (decisions, reviews, metrics) are absent.'
+  const cleaned = validateAndNormalizeEpistemicClaims(input, { isTechnicalMode: false })
+  assert(!cleaned.includes('are absent'), 'Must not claim bounded governance domains are absent in summary')
+  assert(cleaned.includes('were found in the records checked'), 'Must normalize summary to bounded language')
+})
+
+test('EC-C. Summary cannot strengthen bounded absence into global absence', () => {
+  const input = 'Summary: There are no metrics tracking community growth or channel performance.'
+  const cleaned = validateAndNormalizeEpistemicClaims(input, { isTechnicalMode: false })
+  assert(!cleaned.includes('There are no metrics'), 'Must not claim global metric absence in summary')
+  assert(cleaned.includes('records checked do not track'), 'Must maintain bounded observational wording')
+})
+
+test('EC-D. Unevaluated meeting domain cannot produce meeting absence/count claim', () => {
+  const input = 'Status:\n- Meetings – the record shows zero meetings logged.\n- Tasks: open'
+  const cleaned = validateAndNormalizeEpistemicClaims(input, { isTechnicalMode: false })
+  assert(!cleaned.includes('zero meetings logged'), 'Unevaluated meeting domain false count must be eliminated')
+})
+
+test('EC-E. Unmodeled concept cannot be presented as authoritative Vault absence', () => {
+  const input = 'Task details: No progress updates, subtasks, or completion criteria are documented.'
+  const cleaned = validateAndNormalizeEpistemicClaims(input, { isTechnicalMode: false })
+  assert(!cleaned.includes('subtasks'), 'Must not present subtasks as absent Vault record')
+  assert(!cleaned.includes('completion criteria are documented'), 'Must not present completion criteria as documented record')
+  assert(cleaned.includes('how much of the work has already been completed'), 'Must ground in actual records')
+})
+
+test('EC-F. Unmodeled concept can appear as a recommendation', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  const prepared = prepareReasoningContext(mockPlan, [], 5)
+  const env = flattenPreparedContextToEnvelope(prepared, 'ws-1')
+  const prompt = serializePreparedContextForPrompt(prepared, env)
+  assert(prompt.includes('you may suggest it as a forward-looking recommendation'), 'Must allow forward recommendations')
+})
+
+test('EC-G. Observational uncertainty about task execution remains allowed', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  const taskRec: VaultRecord = {
+    entityType: 'task',
+    entityId: 't-1',
+    title: 'October objective',
+    timestamps: {},
+    fields: { status: 'todo' },
+    epistemicClass: 'WV_RECORD',
+    provenance: { table: 'tasks', id: 't-1', workspace_id: 'ws-1' },
+  }
+  const prepared = prepareReasoningContext(mockPlan, [{
+    domain: 'task',
+    importance: 'REQUIRED',
+    status: 'AVAILABLE',
+    returnedCount: 1,
+    records: [taskRec],
+  }], 5)
+  assert(prepared.answerContract?.observationalGaps.some(g => g.statement.includes('how much of the work has already been completed')), 'Must support observational uncertainty')
+})
+
+test('EC-H. Direct task count remains authoritative', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [{ domain: 'task', importance: 'REQUIRED', queryMode: 'targeted', limit: 10 }],
+    requiresPreparation: true,
+  }
+  const taskRec: VaultRecord = {
+    entityType: 'task',
+    entityId: 't-1',
+    title: 'October objective',
+    timestamps: {},
+    fields: { status: 'todo' },
+    epistemicClass: 'WV_RECORD',
+    provenance: { table: 'tasks', id: 't-1', workspace_id: 'ws-1' },
+  }
+  const prepared = prepareReasoningContext(mockPlan, [{
+    domain: 'task',
+    importance: 'REQUIRED',
+    status: 'AVAILABLE',
+    returnedCount: 1,
+    records: [taskRec],
+  }], 5)
+  assert.strictEqual(prepared.descriptiveCounts.recordedTaskCount, 1)
+  assert.strictEqual(prepared.descriptiveCounts.openRecordedTaskCount, 1)
+})
+
+test('EC-I. Completed task count zero remains authoritative when task collection is evaluated', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [{ domain: 'task', importance: 'REQUIRED', queryMode: 'targeted', limit: 10 }],
+    requiresPreparation: true,
+  }
+  const taskRec: VaultRecord = {
+    entityType: 'task',
+    entityId: 't-1',
+    title: 'October objective',
+    timestamps: {},
+    fields: { status: 'todo' },
+    epistemicClass: 'WV_RECORD',
+    provenance: { table: 'tasks', id: 't-1', workspace_id: 'ws-1' },
+  }
+  const prepared = prepareReasoningContext(mockPlan, [{
+    domain: 'task',
+    importance: 'REQUIRED',
+    status: 'AVAILABLE',
+    returnedCount: 1,
+    records: [taskRec],
+  }], 5)
+  assert.strictEqual(prepared.descriptiveCounts.completedRecordedTaskCount, 0)
+  assert(prepared.answerContract?.recordedFacts.some(f => f.statement.includes("None of the project's recorded tasks are completed")), 'Completed task count zero is recorded fact')
+})
+
+test('EC-J. Due date null remains authoritative', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  const taskRec: VaultRecord = {
+    entityType: 'task',
+    entityId: 't-1',
+    title: 'October objective',
+    timestamps: { due_date: undefined },
+    fields: { due_date: null },
+    epistemicClass: 'WV_RECORD',
+    provenance: { table: 'tasks', id: 't-1', workspace_id: 'ws-1' },
+  }
+  const prepared = prepareReasoningContext(mockPlan, [{
+    domain: 'task',
+    importance: 'REQUIRED',
+    status: 'AVAILABLE',
+    returnedCount: 1,
+    records: [taskRec],
+  }], 5)
+  assert.strictEqual(prepared.epistemicPolicy?.knownNullFields.length, 1)
+  assert.strictEqual(prepared.epistemicPolicy?.knownNullFields[0].field, 'due_date')
+})
+
+test('EC-K. active does not imply progress', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  const prjRec: VaultRecord = {
+    entityType: 'project',
+    entityId: 'p-1',
+    title: 'Snip3rash trading academy',
+    timestamps: {},
+    fields: { status: 'active', priority: 'urgent' },
+    epistemicClass: 'WV_RECORD',
+    provenance: { table: 'workspace_projects', id: 'p-1', workspace_id: 'ws-1' },
+  }
+  const prepared = prepareReasoningContext(mockPlan, [{
+    domain: 'project',
+    importance: 'REQUIRED',
+    status: 'AVAILABLE',
+    returnedCount: 1,
+    records: [prjRec],
+  }], 5)
+  const fact = prepared.answerContract?.recordedFacts.find(f => f.domain === 'project')
+  assert(fact?.statement.includes('marked active'), 'Must record status as active')
+  assert(!fact?.statement.includes('progressing'), 'Must not assert progressing')
+})
+
+test('EC-L. protocol concealment remains green', () => {
+  const text = 'Clean output [reasoning_context] with [SOURCES: S1 | BASIS: DIRECT_FACT]'
+  const cleaned = sanitizeVisibleProse(text)
+  assert(!cleaned.includes('[reasoning_context]'), 'reasoning_context must be stripped')
+  assert(!cleaned.includes('[SOURCES:'), 'SOURCES tag must be stripped')
+})
+
+test('EC-M. inline provenance recovery remains green', () => {
+  const mockEnv = {
+    records: [{ entityType: 'project', entityId: 'p-1', title: 'Proj', timestamps: {}, fields: {}, epistemicClass: 'WV_RECORD' }],
+    resolvedScope: { workspaceId: 'ws-1' },
+    ambiguities: [],
+    emptyStates: [],
+    completeness: [],
+    truncated: false,
+    retrievalTimestamp: new Date().toISOString(),
+  } as any
+  const sourceMap = createRequestSourceMap(mockEnv)
+  const raw = 'The project is active [S1].'
+  const parsed = parseModelProvenance(raw, sourceMap)
+  assert.deepStrictEqual(parsed.handles, ['S1'])
+  assert(!parsed.cleanText.includes('[S1]'))
+})
+
+test('EC-N. normal report output contains no ** Markdown bold syntax', () => {
+  const input = '**What’s recorded**\n\n- **Project** – Snip3rash is active.\n- **Task** – October objective is todo.'
+  const cleaned = sanitizeVisibleProse(input, undefined, { isTechnicalMode: false })
+  assert(!cleaned.includes('**'), 'Normal output must not contain ** bold syntax')
+  assert(cleaned.includes("What’s recorded"))
+  assert(cleaned.includes("Project – Snip3rash is active."))
+})
+
+test('EC-O. normal report output does not expose internal epistemic terminology', () => {
+  const input = 'Report shows [LIMITED_EMPTY] and [epistemic_policy] with [answer_contract].'
+  const cleaned = sanitizeVisibleProse(input, undefined, { isTechnicalMode: false })
+  assert(!cleaned.includes('LIMITED_EMPTY'))
+  assert(!cleaned.includes('epistemic_policy'))
+  assert(!cleaned.includes('answer_contract'))
+})
+
+test('EC-P. simple-English presentation contract is included for normal mode', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  const prepared = prepareReasoningContext(mockPlan, [], 5)
+  const env = flattenPreparedContextToEnvelope(prepared, 'ws-1')
+  const prompt = serializePreparedContextForPrompt(prepared, env)
+  assert(prompt.includes('CORE RULE: THINK TECHNICALLY, SPEAK SIMPLY'), 'Must include simple English directive')
+  assert(prompt.includes('Wayne explicitly does not want normal SHAW reports filled with ** or * stars'), 'Must include no bold stars directive')
+})
+
+test('EC-Q. technical/debug mode may still use technical terminology when explicitly requested', () => {
+  assert(isTechnicalOrDebugPrompt('Wayne: debug this and show technical details'))
+  assert(isTechnicalOrDebugPrompt('show provenance'))
+  assert(isTechnicalOrDebugPrompt('explain the architecture'))
+  assert(!isTechnicalOrDebugPrompt('Give me a progress report on Snip3rash trading academy'))
+})
+
+test('EC-R. WEEKLY_FOCUS remains green', () => {
+  const plan = planReasoning({
+    prompt: 'What should I focus on this week based on my Vault records?',
+    capability: 'ask',
+    history: [],
+  })
+  assert.strictEqual(plan?.primaryIntent, 'WEEKLY_FOCUS')
+  assert.strictEqual(plan?.entityTarget, undefined)
+})
+
+test('EC-S. Batch 2A remains green', () => {
+  const res = planRetrieval({
+    prompt: 'Show me my tasks for Snip3rash',
+    capability: 'ask',
+    history: [],
+  })
+  assert(res.shouldRetrieve)
+  assert(res.intents.some(i => i.domain === 'task'))
+})
+
+test('EC-T. Batch 2B.1 remains green', () => {
+  const mockEnv = {
+    records: [{ entityType: 'project', entityId: 'p-1', title: 'Proj', timestamps: {}, fields: {}, epistemicClass: 'WV_RECORD' }],
+    resolvedScope: { workspaceId: 'ws-1' },
+    ambiguities: [],
+    emptyStates: [],
+    completeness: [],
+    truncated: false,
+    retrievalTimestamp: new Date().toISOString(),
+  } as any
+  const sourceMap = createRequestSourceMap(mockEnv)
+  assert.strictEqual(sourceMap.get('S1')?.title, 'Proj')
+})
+
+test('EC-U. No Migration 018', () => {
+  const migrationsDir = path.join(__dirname, '../supabase/migrations')
+  const files = fs.readdirSync(migrationsDir)
+  const has018 = files.some(f => f.startsWith('018') || f.includes('migration_018'))
+  assert.strictEqual(has018, false, 'No Migration 018 must be created')
+})
+
+test('EC-REG. Production-shaped Snip3rash fixture regression produces clean simple English report', () => {
+  const mockRawModelOutput = `**Progress Report: Snip3rash Trading Academy**
+
+**What’s recorded**
+
+- **Project** – “Snip3rash trading academy” is active, priority urgent.
+
+- **Task** – “October objective” is todo, priority medium. No due date set.
+
+- **Counts** – Only 1 task is linked to this project, and none of the project's recorded tasks are completed.
+
+**What is missing or unclear**
+
+- **Decisions** – No decision records exist for the project within the retrieved scope. [Limited absence: no decisions returned.]
+- **Reviews** – No review records are present for the project within the retrieved scope. [Limited absence: no reviews returned.]
+- **Metrics** – No metric records are recorded for the project within the retrieved scope. [Limited absence: no metrics returned.]
+
+- **Task details** – The task lacks a due date. No progress updates, subtasks, or completion criteria are documented.
+
+- **Quantitative tracking** – There are no metrics tracking community growth, signal engagement, or channel performance.
+
+- **Completion evidence** – No completed tasks or milestones are recorded.
+
+**Summary**
+
+The project is active, but the recorded work is still limited to one open task. All governance artifacts (decisions, reviews, metrics) are absent.`
+
+  const cleaned = sanitizeVisibleProse(mockRawModelOutput, undefined, { isTechnicalMode: false })
+
+  assert(!cleaned.includes('**'), 'Must contain zero ** bold markdown syntax')
+  assert(!cleaned.includes('All governance artifacts (decisions, reviews, metrics) are absent'), 'Summary scope collapse must be normalized')
+  assert(cleaned.includes('No governance artifacts (decisions, reviews, metrics) were found in the records checked'), 'Summary must remain bounded')
+  assert(!cleaned.includes('There are no metrics tracking'), 'Global metric absence must be normalized')
+  assert(cleaned.includes('The records checked do not track'), 'Metric gap must remain observational')
+  assert(!cleaned.includes('subtasks'), 'Unmodeled subtasks claim must be normalized')
+  assert(!cleaned.includes('milestones'), 'Unmodeled milestones claim must be normalized')
+  assert(!cleaned.includes('[Limited absence:'), 'Internal bracketed machine notes must be stripped')
 })
 
 console.log(`\nAll ${passedTests} deterministic verification tests PASSED!\n`)

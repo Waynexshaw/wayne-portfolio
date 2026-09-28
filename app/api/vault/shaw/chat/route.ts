@@ -25,6 +25,7 @@ import {
   serializePreparedContextForPrompt,
   PreparedReasoningContext,
   ReasoningPlan,
+  isTechnicalOrDebugPrompt,
 } from '@/lib/vault/shaw/retrieval'
 
 export const dynamic = 'force-dynamic'
@@ -230,7 +231,9 @@ export async function POST(request: NextRequest) {
         preparedReasoningContext = prepareReasoningContext(
           reasoningPlan,
           domainOutcomes,
-          totalLatencyMs
+          totalLatencyMs,
+          new Date(),
+          trimmedMessage
         )
         vaultEnvelope = flattenPreparedContextToEnvelope(
           preparedReasoningContext,
@@ -414,13 +417,21 @@ export async function POST(request: NextRequest) {
     const outputStream = new ReadableStream({
       async pull(controller) {
         try {
-          const provenanceFilter = createProvenanceStreamFilter((cleanChunk: string) => {
-            if (cleanChunk.length > 0) {
-              controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify({ type: 'text', text: cleanChunk })}\n\n`)
-              )
+          const isTechnicalMode = isTechnicalOrDebugPrompt(trimmedMessage)
+          const provenanceFilter = createProvenanceStreamFilter(
+            (cleanChunk: string) => {
+              if (cleanChunk.length > 0) {
+                controller.enqueue(
+                  encoder.encode(`data: ${JSON.stringify({ type: 'text', text: cleanChunk })}\n\n`)
+                )
+              }
+            },
+            requestSourceMap,
+            {
+              isTechnicalMode,
+              policy: preparedReasoningContext?.epistemicPolicy,
             }
-          }, requestSourceMap)
+          )
 
           while (true) {
             const { done, value } = await reader.read()

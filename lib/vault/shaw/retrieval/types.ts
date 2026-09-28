@@ -289,6 +289,51 @@ export interface PreparedDescriptiveCounts {
   recordedMetricCount?: number
 }
 
+export interface DomainEpistemicPermission {
+  domain: RetrievalDomain
+  evaluated: boolean
+  status: DomainOutcomeStatus | 'UNEVALUATED'
+  globalAbsenceAuthorized: boolean
+  boundedScope?: string
+  allowedNegativeClaimType: 'NONE' | 'BOUNDED_ONLY' | 'VERIFIED_GLOBAL'
+  directCounts?: {
+    total?: number
+    open?: number
+    completed?: number
+    blocked?: number
+  }
+}
+
+export interface AnswerEpistemicPolicy {
+  intent: ReasoningIntent
+  evaluatedDomains: RetrievalDomain[]
+  unevaluatedDomains: RetrievalDomain[]
+  domainPermissions: Record<RetrievalDomain, DomainEpistemicPermission>
+  knownNullFields: Array<{
+    recordId: string
+    field: string
+    statement: string
+  }>
+  directFactualCounts: PreparedDescriptiveCounts
+  unmodeledConceptsAllowedAsFact: false
+  summaryMayStrengthen: false
+  isTechnicalMode: boolean
+}
+
+export interface AnswerContractItem {
+  type: 'RECORDED_FACT' | 'BOUNDED_GAP' | 'OBSERVATIONAL_GAP' | 'RECOMMENDATION'
+  domain?: RetrievalDomain
+  statement: string
+  boundary?: string
+}
+
+export interface AnswerContract {
+  recordedFacts: AnswerContractItem[]
+  boundedGaps: AnswerContractItem[]
+  observationalGaps: AnswerContractItem[]
+  recommendations: AnswerContractItem[]
+}
+
 export interface PreparedReasoningContext {
   plan: ReasoningPlan
   domainOutcomes: DomainOutcome[]
@@ -301,9 +346,26 @@ export interface PreparedReasoningContext {
   requiredDomainUnavailable: boolean
   temporalFacts: PreparedTemporalFact[]
   descriptiveCounts: PreparedDescriptiveCounts
+  epistemicPolicy?: AnswerEpistemicPolicy
+  answerContract?: AnswerContract
   retrievalSummary: {
     totalRetrievedCount: number
     domainsQueried: RetrievalDomain[]
     latencyMs: number
   }
 }
+
+export function isTechnicalOrDebugPrompt(prompt?: string): boolean {
+  if (!prompt) return false
+  const p = prompt.toLowerCase()
+  return (
+    p.includes('debug this') ||
+    p.includes('technical details') ||
+    p.includes('show provenance') ||
+    p.includes('inspect retrieval') ||
+    p.includes('explain the architecture') ||
+    p.includes('developer mode') ||
+    p.includes('technical mode')
+  )
+}
+
