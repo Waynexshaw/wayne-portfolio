@@ -52,13 +52,74 @@ console.log('\n=== SHAW Batch 2B.2A Deterministic Verification Suite ===\n')
 // A through I: Deterministic Reasoning Intent Detection & Precedence
 // ----------------------------------------------------------------------------
 
-test('A. "What should I focus on this week?" => WEEKLY_FOCUS', () => {
+test('A. "What should I focus on this week?" => WEEKLY_FOCUS, entityTarget undefined, catalog mode', () => {
   const plan = planReasoning({ prompt: 'What should I focus on this week?' })
   assert(plan !== null, 'Plan must not be null')
   assert.strictEqual(plan.primaryIntent, 'WEEKLY_FOCUS')
   assert.strictEqual(plan.reasoningMode, 'PRIORITIZATION')
-  assert(plan.domainRequests.some((r) => r.domain === 'task' && r.importance === 'REQUIRED'))
-  assert(plan.domainRequests.some((r) => r.domain === 'project' && r.importance === 'REQUIRED'))
+  assert.strictEqual(plan.entityTarget, undefined, 'Must not extract "week" as entity target')
+  const taskReq = plan.domainRequests.find((r) => r.domain === 'task')
+  const projReq = plan.domainRequests.find((r) => r.domain === 'project')
+  assert(taskReq !== undefined && taskReq.importance === 'REQUIRED')
+  assert.strictEqual(taskReq.queryMode, 'catalog')
+  assert.strictEqual(taskReq.entityTarget, undefined)
+  assert.strictEqual(taskReq.statusFilter, 'open')
+  assert(projReq !== undefined && projReq.importance === 'REQUIRED')
+  assert.strictEqual(projReq.queryMode, 'catalog')
+  assert.strictEqual(projReq.entityTarget, undefined)
+})
+
+test('B-1. "What are my priorities this week?" => entityTarget undefined', () => {
+  const plan = planReasoning({ prompt: 'What are my priorities this week?' })
+  assert(plan !== null)
+  assert.strictEqual(plan.primaryIntent, 'WEEKLY_FOCUS')
+  assert.strictEqual(plan.entityTarget, undefined, 'Must not extract "week" as entity target')
+})
+
+test('C-1. "What should I work on next week?" => temporal phrase does not become entity', () => {
+  const plan = planReasoning({ prompt: 'What should I work on next week?' })
+  assert(plan !== null)
+  assert.strictEqual(plan.primaryIntent, 'WEEKLY_FOCUS')
+  assert.strictEqual(plan.entityTarget, undefined, 'Must not extract "next week" as entity target')
+})
+
+test('D-1. "What should I focus on this month?" => "month" does not become entity', () => {
+  const plan = planReasoning({ prompt: 'What should I focus on this month?' })
+  assert(plan !== null)
+  assert.strictEqual(plan.entityTarget, undefined, 'Must not extract "month" as entity target')
+})
+
+test('E-1. "What should I focus on today?" => "today" does not become entity', () => {
+  const plan = planReasoning({ prompt: 'What should I focus on today?' })
+  assert(plan !== null)
+  assert.strictEqual(plan.entityTarget, undefined, 'Must not extract "today" as entity target')
+})
+
+test('F-1. "What should I focus on for Snip3rash this week?" => entityTarget Snip3rash', () => {
+  const plan = planReasoning({ prompt: 'What should I focus on for Snip3rash this week?' })
+  assert(plan !== null)
+  assert.strictEqual(plan.primaryIntent, 'WEEKLY_FOCUS')
+  assert.strictEqual(plan.entityTarget?.name, 'Snip3rash')
+  const taskReq = plan.domainRequests.find((r) => r.domain === 'task')
+  const projReq = plan.domainRequests.find((r) => r.domain === 'project')
+  assert.strictEqual(taskReq?.queryMode, 'targeted')
+  assert.strictEqual(taskReq?.entityTarget, 'Snip3rash')
+  assert.strictEqual(projReq?.queryMode, 'targeted')
+  assert.strictEqual(projReq?.entityTarget, 'Snip3rash')
+})
+
+test('G-1. "What should I focus on for PEVRA this week?" => entityTarget PEVRA', () => {
+  const plan = planReasoning({ prompt: 'What should I focus on for PEVRA this week?' })
+  assert(plan !== null)
+  assert.strictEqual(plan.primaryIntent, 'WEEKLY_FOCUS')
+  assert.strictEqual(plan.entityTarget?.name, 'PEVRA')
+  assert.strictEqual(plan.domainRequests.find((r) => r.domain === 'project')?.entityTarget, 'PEVRA')
+})
+
+test('O-1. Temporal candidate validation occurs before destructive qualifier stripping', () => {
+  // "this week" must be rejected BEFORE "this" is stripped into "week"
+  const plan = planReasoning({ prompt: 'What should I focus on this week?' })
+  assert.strictEqual(plan?.entityTarget, undefined)
 })
 
 test('B. "What did I accomplish last week?" => PERIOD_ACCOMPLISHMENT (outranks recap)', () => {
@@ -700,6 +761,129 @@ test('AD. Current Snip3rash retrieval behavior remains correct with context qual
   })
   assert.strictEqual(p.shouldRetrieve, true)
   assert.strictEqual(p.resolvedEntityHints[0]?.name, 'Snip3rash Trading Academy')
+})
+
+test('J-2. "Give me a progress report on Project Nightfall." => legitimate entity target, unknown entity preserved', () => {
+  const p = planReasoning({ prompt: 'Give me a progress report on Project Nightfall.' })
+  assert(p !== null)
+  assert.strictEqual(p.primaryIntent, 'PROJECT_PROGRESS')
+  assert.strictEqual(p.entityTarget?.name, 'Project Nightfall')
+})
+
+test('K-2. "Give me a status report on Snip3rash trading academy." => targeted extraction unchanged', () => {
+  const p = planRetrieval({ prompt: 'Give me a status report on Snip3rash trading academy.' })
+  assert.strictEqual(p.shouldRetrieve, true)
+  assert.strictEqual(p.intents[0].entityQuery, 'Snip3rash trading academy')
+})
+
+test('L-2. Production-shaped fixtures: active project created before current week + task with no due date', () => {
+  const plan = planReasoning({
+    prompt: 'What should I focus on this week based only on my Vault records? Separate what is recorded in my Vault from your recommendations.',
+    timezone: 'UTC',
+  })
+  assert(plan !== null)
+  assert.strictEqual(plan.primaryIntent, 'WEEKLY_FOCUS')
+  assert.strictEqual(plan.entityTarget, undefined, 'Must NOT extract "week" as entity target')
+
+  // Production-shaped records: created before this week (2026-09-26)
+  const snipProject: VaultRecord = {
+    entityType: 'project',
+    entityId: '97ac6d73-7e89-4557-9af6-d02b7c641dd9',
+    title: 'Snip3rash trading academy',
+    timestamps: { created_at: '2026-09-26T09:41:36.441235+00:00' },
+    epistemicClass: 'WV_RECORD',
+    fields: { status: 'active', priority: 'urgent' },
+    provenance: { table: 'workspace_projects', id: '97ac6d73-7e89-4557-9af6-d02b7c641dd9', workspace_id: 'ws-1' },
+  }
+
+  const octTask: VaultRecord = {
+    entityType: 'task',
+    entityId: '63b9f36b-c0cf-4e15-b98e-c093ea953edf',
+    title: 'October objective',
+    timestamps: { created_at: '2026-09-26T09:46:44.190623+00:00' },
+    relationship: { projectId: '97ac6d73-7e89-4557-9af6-d02b7c641dd9' },
+    epistemicClass: 'WV_RECORD',
+    fields: { status: 'todo', priority: 'medium', due_date: null, projectId: '97ac6d73-7e89-4557-9af6-d02b7c641dd9' },
+    provenance: { table: 'tasks', id: '63b9f36b-c0cf-4e15-b98e-c093ea953edf', workspace_id: 'ws-1' },
+  }
+
+  const outcomes: DomainOutcome[] = [
+    {
+      domain: 'project',
+      importance: 'REQUIRED',
+      status: 'AVAILABLE',
+      returnedCount: 1,
+      records: [snipProject],
+    },
+    {
+      domain: 'task',
+      importance: 'REQUIRED',
+      status: 'AVAILABLE',
+      returnedCount: 1,
+      records: [octTask],
+    },
+    {
+      domain: 'decision',
+      importance: 'OPTIONAL',
+      status: 'LIMITED_EMPTY',
+      returnedCount: 0,
+      completeness: { domain: 'decision', queryMode: 'catalog', resultScope: 'bounded', returnedCount: 0 },
+      records: [],
+    },
+    {
+      domain: 'meeting',
+      importance: 'OPTIONAL',
+      status: 'LIMITED_EMPTY',
+      returnedCount: 0,
+      completeness: { domain: 'meeting', queryMode: 'catalog', resultScope: 'bounded', returnedCount: 0 },
+      records: [],
+    },
+  ]
+
+  const prepared = prepareReasoningContext(plan, outcomes, 12, new Date('2026-09-28T12:00:00.000Z'))
+
+  assert.strictEqual(prepared.clusters.length, 1)
+  assert.strictEqual(prepared.clusters[0].primaryEntity.title, 'Snip3rash trading academy')
+  assert.strictEqual(prepared.clusters[0].records.length, 1)
+  assert.strictEqual(prepared.clusters[0].records[0].title, 'October objective')
+  assert.strictEqual(prepared.verifiedAbsences.length, 0, 'No false verified absences')
+  assert.strictEqual(prepared.descriptiveCounts.recordedTaskCount, 1)
+  assert.strictEqual(prepared.descriptiveCounts.openRecordedTaskCount, 1)
+})
+
+test('M-2. Open task created before current week remains retrievable in untargeted WEEKLY_FOCUS', () => {
+  const plan = planReasoning({ prompt: 'What should I focus on this week?' })
+  const taskReq = plan?.domainRequests.find((r) => r.domain === 'task')
+  assert.strictEqual(taskReq?.statusFilter, 'open')
+  assert.strictEqual(taskReq?.temporalFilter, undefined, 'Must NOT filter tasks by creation week')
+})
+
+test('N-2. Open task with no due date remains retrievable', () => {
+  const taskRecord: VaultRecord = {
+    entityType: 'task',
+    entityId: 't-nodue',
+    title: 'No due date task',
+    timestamps: {},
+    epistemicClass: 'WV_RECORD',
+    fields: { status: 'todo', due_date: null },
+    provenance: { table: 'tasks', id: 't-nodue', workspace_id: 'ws-1' },
+  }
+
+  const outcomes: DomainOutcome[] = [
+    { domain: 'task', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [taskRecord] },
+  ]
+
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'WEEKLY_FOCUS',
+    reasoningMode: 'PRIORITIZATION',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+
+  const prepared = prepareReasoningContext(mockPlan, outcomes, 5)
+  assert.strictEqual(prepared.descriptiveCounts.openRecordedTaskCount, 1)
+  assert.strictEqual(prepared.unlinkedRecords.task[0].title, 'No due date task')
 })
 
 console.log(`\nAll ${passedTests} deterministic verification tests PASSED!\n`)

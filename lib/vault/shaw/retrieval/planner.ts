@@ -242,6 +242,13 @@ const GENERIC_SCHEMA_NOUNS = new Set([
   'file', 'files',
   'spreadsheet', 'spreadsheets',
   'item', 'items',
+  'week', 'weeks', 'weekend', 'weekends',
+  'month', 'months',
+  'year', 'years',
+  'quarter', 'quarters',
+  'day', 'days',
+  'today', 'tomorrow', 'yesterday',
+  'tonight', 'morning', 'afternoon', 'evening',
 ])
 
 /**
@@ -300,6 +307,36 @@ const CONTEXT_QUALIFIER_PHRASES = new Set([
   'the metric',
   'information',
   'data',
+  'this week',
+  'last week',
+  'next week',
+  'past week',
+  'current week',
+  'this month',
+  'last month',
+  'next month',
+  'past month',
+  'current month',
+  'this year',
+  'last year',
+  'next year',
+  'past year',
+  'current year',
+  'this quarter',
+  'last quarter',
+  'next quarter',
+  'past quarter',
+  'current quarter',
+  'this weekend',
+  'last weekend',
+  'next weekend',
+  'today',
+  'tomorrow',
+  'yesterday',
+  'tonight',
+  'this morning',
+  'this afternoon',
+  'this evening',
 ])
 
 const COMMON_ACRONYM_WORDS = new Set([
@@ -309,12 +346,60 @@ const COMMON_ACRONYM_WORDS = new Set([
 ])
 
 /**
+ * Canonical temporal phrases and time-horizon expressions that must NEVER
+ * be extracted as entity candidates (WHO / WHAT).
+ */
+export const TEMPORAL_ENTITY_WORDS = new Set([
+  'today', 'tomorrow', 'yesterday', 'tonight', 'now', 'right now',
+  'week', 'weeks', 'weekend', 'weekends',
+  'this week', 'last week', 'next week', 'past week', 'current week',
+  'month', 'months',
+  'this month', 'last month', 'next month', 'past month', 'current month',
+  'year', 'years',
+  'this year', 'last year', 'next year', 'past year', 'current year',
+  'quarter', 'quarters',
+  'this quarter', 'last quarter', 'next quarter', 'past quarter', 'current quarter',
+  'morning', 'this morning', 'afternoon', 'this afternoon', 'evening', 'this evening',
+  'day', 'days',
+])
+
+/**
+ * Evaluates whether a raw candidate string corresponds to a recognized temporal expression.
+ */
+export function isTemporalExpression(phrase: string): boolean {
+  if (!phrase) return false
+  const p = phrase.trim().toLowerCase()
+  if (TEMPORAL_ENTITY_WORDS.has(p)) return true
+  if (
+    /^(?:this|last|next|past|current)\s+(?:week|month|year|quarter|weekend|day|morning|afternoon|evening|days|weeks|months|years|quarters)$/i.test(
+      p
+    )
+  ) {
+    return true
+  }
+  if (/^(?:today|tomorrow|yesterday|tonight|now|right\s+now)$/i.test(p)) {
+    return true
+  }
+  return false
+}
+
+/**
  * Validates, trims, and normalizes candidate entity strings.
  * Discards leading articles, trailing punctuation, pronouns, schema terms, and context qualifiers.
+ * CRITICAL: Rejects temporal expressions BEFORE and AFTER destructive qualifier stripping.
  */
 function cleanAndValidateCandidate(raw: string): string | null {
   if (!raw) return null
-  let candidate = raw.trim()
+  const rawTrimmed = raw.trim()
+
+  // 1. EARLY TEMPORAL DETECTION (BEFORE DESTRUCTIVE STRIPPING):
+  // Prevent phrases like "this week", "next month", "today" from having "this"
+  // stripped into "week" or "month" before temporal detection can evaluate them.
+  if (isTemporalExpression(rawTrimmed)) {
+    return null
+  }
+
+  let candidate = rawTrimmed
 
   // Strip leading articles and possessives
   candidate = candidate.replace(/^(?:the|my|our|this|that|a|an)\s+/i, '').trim()
@@ -323,14 +408,30 @@ function cleanAndValidateCandidate(raw: string): string | null {
   candidate = candidate.replace(/[?!,.]*$/, '').trim()
 
   // Strip trailing conversational or temporal qualifiers
-  candidate = candidate.replace(/\s+(?:right\s+now|currently|now|today|yesterday|at\s+the\s+moment|and\s+why)$/i, '').trim()
+  candidate = candidate
+    .replace(/\s+(?:right\s+now|currently|now|today|yesterday|at\s+the\s+moment|and\s+why)$/i, '')
+    .trim()
 
   if (candidate.length < 2) return null
 
   const lower = candidate.toLowerCase()
 
+  // 2. POST-STRIPPING TEMPORAL REJECTION:
+  // Even if "this" or "the" was stripped, "week" or "month" must NEVER become an entity target!
+  if (
+    isTemporalExpression(candidate) ||
+    isTemporalExpression(lower) ||
+    TEMPORAL_ENTITY_WORDS.has(lower)
+  ) {
+    return null
+  }
+
   // Reject generic pronouns and quantifier words
-  if (/^(?:all|some|any|recent|past|upcoming|these|those|it|this|that|them|him|her|something|anything|everything)$/i.test(candidate)) {
+  if (
+    /^(?:all|some|any|recent|past|upcoming|these|those|it|this|that|them|him|her|something|anything|everything)$/i.test(
+      candidate
+    )
+  ) {
     return null
   }
 
@@ -340,7 +441,10 @@ function cleanAndValidateCandidate(raw: string): string | null {
   }
 
   // Reject context and source qualifiers
-  if (CONTEXT_QUALIFIER_PHRASES.has(lower) || CONTEXT_QUALIFIER_PHRASES.has(raw.trim().toLowerCase())) {
+  if (
+    CONTEXT_QUALIFIER_PHRASES.has(lower) ||
+    CONTEXT_QUALIFIER_PHRASES.has(rawTrimmed.toLowerCase())
+  ) {
     return null
   }
 
@@ -348,7 +452,9 @@ function cleanAndValidateCandidate(raw: string): string | null {
 }
 
 // Recognized instructional boundaries that safely terminate entity spans in user prompts
-const INSTRUCTION_DELIMITERS = 'using|from|based|include|including|where|only|as|according|with|in|to|and|right\\s+now|currently'
+const TEMPORAL_DELIMITERS =
+  'this\\s+(?:week|month|year|quarter|weekend|day|morning|afternoon|evening)|next\\s+(?:week|month|year|quarter|weekend|day)|last\\s+(?:week|month|year|quarter|weekend|day)|today|tomorrow|yesterday|tonight'
+const INSTRUCTION_DELIMITERS = `using|from|based|include|including|where|only|as|according|with|in|to|and|right\\s+now|currently|${TEMPORAL_DELIMITERS}`
 
 const OPERATIONAL_TARGET_PATTERNS = [
   // 1. Status / Overview / Update / Details / Tell me about
@@ -515,7 +621,9 @@ export function detectProjectProgress(trimmed: string, activeEntityName: string 
 }
 
 export function detectWeeklyFocus(trimmed: string): boolean {
-  return /\b(?:what\s+should\s+i\s+focus\s+on|focus\s+(?:on\s+)?this\s+week|what\s+to\s+focus\s+on|priorit(?:y|ize|ies)\s+this\s+week|what\s+are\s+my\s+priorities)\b/i.test(trimmed)
+  return /\b(?:what\s+should\s+i\s+(?:focus|work)\s+on|(?:focus|work)\s+(?:on\s+)?(?:this|next)\s+week|what\s+to\s+(?:focus|work)\s+on|priorit(?:y|ize|ies)(?:\s+(?:this|next)\s+week)?|what\s+are\s+my\s+priorities)\b/i.test(
+    trimmed
+  )
 }
 
 export function detectCrossDomainRecap(trimmed: string): boolean {
@@ -533,7 +641,16 @@ export function planReasoning(input: PlannerInput): ReasoningPlan | null {
 
   const extractedEntity = extractEntityMention(trimmed)
   const contextEntity = resolveContextEntity(trimmed, history)
-  const activeEntityName = extractedEntity || contextEntity?.name || null
+  const candidateEntity = extractedEntity || contextEntity?.name || null
+
+  // Defense in depth: An entity target represents WHO / WHAT, never WHEN.
+  // Reject any candidate that matches recognized temporal expressions.
+  const activeEntityName =
+    candidateEntity &&
+    !isTemporalExpression(candidateEntity) &&
+    !TEMPORAL_ENTITY_WORDS.has(candidateEntity.toLowerCase())
+      ? candidateEntity
+      : null
 
   const temporalExp = extractTemporalExpression(trimmed)
   const timeframe = temporalExp ? resolveTemporalWindow(temporalExp, anchorDate, timezone) : undefined
