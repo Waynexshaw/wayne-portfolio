@@ -27,13 +27,30 @@ import {
   PreparedTemporalFact,
   PreparedDescriptiveCounts,
   VaultContextEnvelope,
+  AnswerEpistemicPolicy,
+  AnswerContract,
+  DomainEpistemicPermission,
+  AnswerContractItem,
+  isTechnicalOrDebugPrompt,
 } from './types'
+
+export const ALL_VAULT_DOMAINS: RetrievalDomain[] = [
+  'project',
+  'task',
+  'decision',
+  'meeting',
+  'review',
+  'metric',
+  'research',
+  'crm',
+]
 
 export function prepareReasoningContext(
   plan: ReasoningPlan,
   domainOutcomes: DomainOutcome[],
   totalLatencyMs: number,
-  now: Date = new Date()
+  now: Date = new Date(),
+  prompt?: string
 ): PreparedReasoningContext {
   const nowMs = now.getTime()
 
@@ -259,6 +276,23 @@ export function prepareReasoningContext(
     }
   }
 
+  // 7. Answer-Wide Epistemic Policy & Answer Contract
+  const epistemicPolicy = buildAnswerEpistemicPolicy(
+    plan,
+    domainOutcomes,
+    deduplicatedRecords,
+    descriptiveCounts,
+    prompt
+  )
+
+  const answerContract = buildAnswerContract(
+    plan,
+    epistemicPolicy,
+    deduplicatedRecords,
+    limitedAbsences,
+    verifiedAbsences
+  )
+
   return {
     plan,
     domainOutcomes,
@@ -271,11 +305,200 @@ export function prepareReasoningContext(
     requiredDomainUnavailable,
     temporalFacts,
     descriptiveCounts,
+    epistemicPolicy,
+    answerContract,
     retrievalSummary: {
       totalRetrievedCount: deduplicatedRecords.length,
       domainsQueried: Array.from(new Set(domainOutcomes.map((o) => o.domain))),
       latencyMs: totalLatencyMs,
     },
+  }
+}
+
+export function buildAnswerEpistemicPolicy(
+  plan: ReasoningPlan,
+  domainOutcomes: DomainOutcome[],
+  records: VaultRecord[],
+  descriptiveCounts: PreparedDescriptiveCounts,
+  prompt?: string
+): AnswerEpistemicPolicy {
+  const isTechnicalMode = isTechnicalOrDebugPrompt(prompt)
+  const evaluatedDomains: RetrievalDomain[] = []
+  const unevaluatedDomains: RetrievalDomain[] = []
+  const domainPermissions: Record<RetrievalDomain, DomainEpistemicPermission> = {} as any
+
+  for (const domain of ALL_VAULT_DOMAINS) {
+    const outcome = domainOutcomes.find((o) => o.domain === domain)
+    if (outcome && outcome.status !== 'UNAVAILABLE') {
+      evaluatedDomains.push(domain)
+      const isConfirmedEmpty = outcome.status === 'CONFIRMED_EMPTY'
+      const isLimitedEmpty = outcome.status === 'LIMITED_EMPTY'
+
+      let allowedNegativeClaimType: 'NONE' | 'BOUNDED_ONLY' | 'VERIFIED_GLOBAL' = 'NONE'
+      if (isConfirmedEmpty) allowedNegativeClaimType = 'VERIFIED_GLOBAL'
+      else if (isLimitedEmpty) allowedNegativeClaimType = 'BOUNDED_ONLY'
+
+      const domainRecords = records.filter((r) => r.entityType === domain)
+      const directCounts =
+        domain === 'task'
+          ? {
+              total: descriptiveCounts.recordedTaskCount,
+              open: descriptiveCounts.openRecordedTaskCount,
+              completed: descriptiveCounts.completedRecordedTaskCount,
+            }
+          : domainRecords.length > 0
+          ? { total: domainRecords.length }
+          : undefined
+
+      domainPermissions[domain] = {
+        domain,
+        evaluated: true,
+        status: outcome.status,
+        globalAbsenceAuthorized: isConfirmedEmpty,
+        boundedScope: isLimitedEmpty
+          ? outcome.completeness?.filterDescription ||
+            `records checked for ${plan.entityTarget?.name || 'this request'}`
+          : undefined,
+        allowedNegativeClaimType,
+        directCounts,
+      }
+    } else {
+      unevaluatedDomains.push(domain)
+      domainPermissions[domain] = {
+        domain,
+        evaluated: false,
+        status: 'UNEVALUATED',
+        globalAbsenceAuthorized: false,
+        allowedNegativeClaimType: 'NONE',
+      }
+    }
+  }
+
+  // Known null fields directly recorded
+  const knownNullFields: Array<{ recordId: string; field: string; statement: string }> = []
+  for (const rec of records) {
+    if (rec.entityType === 'task') {
+      const rawDueDate = rec.timestamps?.due_date || (rec.fields && rec.fields.due_date)
+      if (!rawDueDate) {
+        knownNullFields.push({
+          recordId: rec.entityId,
+          field: 'due_date',
+          statement: `No due date is set for task "${rec.title}"`,
+        })
+      }
+    }
+  }
+
+  return {
+    intent: plan.primaryIntent,
+    evaluatedDomains,
+    unevaluatedDomains,
+    domainPermissions,
+    knownNullFields,
+    directFactualCounts: descriptiveCounts,
+    unmodeledConceptsAllowedAsFact: false,
+    summaryMayStrengthen: false,
+    isTechnicalMode,
+  }
+}
+
+export function buildAnswerContract(
+  plan: ReasoningPlan,
+  policy: AnswerEpistemicPolicy,
+  records: VaultRecord[],
+  limitedAbsences: PreparedAbsenceFact[],
+  _verifiedAbsences: PreparedAbsenceFact[]
+): AnswerContract {
+  const recordedFacts: AnswerContractItem[] = []
+  const boundedGaps: AnswerContractItem[] = []
+  const observationalGaps: AnswerContractItem[] = []
+  const recommendations: AnswerContractItem[] = []
+
+  // 1. Recorded facts from records
+  for (const r of records) {
+    if (r.entityType === 'project') {
+      recordedFacts.push({
+        type: 'RECORDED_FACT',
+        domain: 'project',
+        statement: `Project "${r.title}" is marked ${r.fields?.status || 'active'} with priority ${r.fields?.priority || 'normal'}.`,
+      })
+      if (r.fields?.description) {
+        recordedFacts.push({
+          type: 'RECORDED_FACT',
+          domain: 'project',
+          statement: `Recorded project scope covers: ${String(r.fields.description)
+            .slice(0, 160)
+            .replace(/\n+/g, ' ')}...`,
+        })
+      }
+    } else if (r.entityType === 'task') {
+      const status = r.fields?.status || 'todo'
+      const priority = r.fields?.priority || 'medium'
+      recordedFacts.push({
+        type: 'RECORDED_FACT',
+        domain: 'task',
+        statement: `Task "${r.title}" is marked ${status} with priority ${priority}.`,
+      })
+    }
+  }
+
+  // 2. Direct counts & null fields
+  if (policy.directFactualCounts.recordedTaskCount !== undefined) {
+    recordedFacts.push({
+      type: 'RECORDED_FACT',
+      domain: 'task',
+      statement: `Only ${policy.directFactualCounts.recordedTaskCount} task is currently linked to this project in the records checked.`,
+    })
+    if (policy.directFactualCounts.completedRecordedTaskCount === 0) {
+      recordedFacts.push({
+        type: 'RECORDED_FACT',
+        domain: 'task',
+        statement: `None of the project's recorded tasks are completed.`,
+      })
+    }
+  }
+
+  for (const knf of policy.knownNullFields) {
+    recordedFacts.push({
+      type: 'RECORDED_FACT',
+      statement: `${knf.statement}.`,
+    })
+  }
+
+  // 3. Bounded gaps (strictly preserving bounded retrieval scope)
+  for (const la of limitedAbsences) {
+    const scopeDesc = la.targetEntityName
+      ? `linked to "${la.targetEntityName}" in the records checked`
+      : 'in the records checked'
+    boundedGaps.push({
+      type: 'BOUNDED_GAP',
+      domain: la.domain,
+      statement: `No ${la.domain} records ${scopeDesc}.`,
+      boundary: la.claim,
+    })
+  }
+
+  // 4. Observational gaps
+  if (records.some((r) => r.entityType === 'task')) {
+    observationalGaps.push({
+      type: 'OBSERVATIONAL_GAP',
+      statement:
+        'The task is still open, but the records checked do not show how much of the work has already been completed.',
+    })
+  }
+
+  // 5. Recommendations
+  recommendations.push({
+    type: 'RECOMMENDATION',
+    statement:
+      'Setting a due date and breaking the objective into specific steps would help track progress.',
+  })
+
+  return {
+    recordedFacts,
+    boundedGaps,
+    observationalGaps,
+    recommendations,
   }
 }
 

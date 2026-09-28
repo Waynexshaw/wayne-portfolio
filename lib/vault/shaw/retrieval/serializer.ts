@@ -237,12 +237,15 @@ export function serializePreparedContextForPrompt(
   parts.push('<!-- 6. UNMODELED CONCEPT DISCIPLINE (CRITICAL): Do not invent record types, hierarchy types, planning constructs, or schema concepts (such as subtasks, milestones, checkpoints, sprints, OKRs, dependencies, or phases) and describe them as missing from the Vault. -->')
   parts.push('<!--    Only discuss a Vault entity or field as present or absent when that entity or field is represented in the supplied current-turn records, domain outcomes, completeness metadata, verified absences, limited absences, or descriptive counts. -->')
   parts.push('<!--    If a useful planning concept is not represented in the supplied Vault context, you may suggest it as a forward-looking recommendation (e.g. "You could break this objective into smaller execution tasks"), but you MUST NOT claim the Vault lacks it (e.g. NEVER say "There are no subtasks in your Vault"). -->')
+  parts.push('<!--    If execution detail is unknown, describe uncertainty using actual records: e.g. "The task is still marked todo, so the records checked do not show how much of the work has already been completed." -->')
   parts.push('<!-- 7. EPISTEMIC GAP DISTINCTION (CRITICAL): When reporting what is missing, unclear, or incomplete, distinguish strictly between: -->')
   parts.push('<!--    - AUTHORITATIVE GAP: Grounded in a retrieved record field (e.g. "No due date is recorded for October objective"). -->')
   parts.push('<!--    - BOUNDED GAP: Grounded in limited query bounds (e.g. "No decision, review, or metric records were returned for this project within the retrieved query scope"). -->')
   parts.push('<!--    - OBSERVATIONAL GAP: Gaps in prose descriptions of retrieved records (e.g. "The retrieved project and task descriptions do not specify a numeric member target"). Missing numeric values alone must NEVER be framed as "no metrics exist in the Vault". -->')
   parts.push('<!--    - RECOMMENDATION: Prescriptive next steps, never stated as historical or recorded facts (e.g. "You could define specific target metrics and action items"). -->')
   parts.push('<!-- 8. INTERNAL ARTIFACT CONCEALMENT (CRITICAL): Internal source handles (e.g. S1, S2) and internal context/schema identifiers are machine protocol only. NEVER cite or mention them in visible prose. Do not write [S1], [S2], [reasoning_context], XML/context tag names, or other internal identifiers in the answer. Source handles may appear ONLY inside the required trailing [SOURCES: S1, S2 | BASIS: ...] provenance protocol at the very end. -->')
+  parts.push('<!-- 9. SUMMARY INVARIANT (CRITICAL): A summary may compress information, but it may NOT strengthen information. If body evidence states: "No matching metric records were found in the checked project records", the summary CANNOT become "There are no metrics" or "All governance artifacts are absent". If a domain is BOUNDED, every paraphrase across headings, bullets, explanations, conclusions, and summaries MUST remain bounded. -->')
+  parts.push('<!-- 10. SIMPLE ENGLISH & NO MARKDOWN BOLD STARS: CORE RULE: THINK TECHNICALLY, SPEAK SIMPLY. Normal user-facing answers must speak simply to Wayne. Do not expose terms such as: LIMITED_EMPTY, epistemic class, claim strength, global absence authorized, retrieval scope, provenance, ReasoningPlan, reasoning context, or source map in visible prose. Instead of "No metric records exist within the retrieved scope", say: "I couldn\'t find any metrics linked to the project in the records I checked." Do not write bracketed machine notes like [Limited absence: ...]. Wayne explicitly does not want normal SHAW reports filled with ** or * stars. Do NOT use Markdown bold syntax (**text**) in normal reports. Use clean plain headings and normal bullets (-) instead. (Exception: If Wayne explicitly asks for technical/debug information, technical terminology and formatting are permitted.) -->')
 
   // Reasoning Plan & Outcomes
   parts.push('<reasoning_context>')
@@ -302,6 +305,45 @@ export function serializePreparedContextForPrompt(
   }
 
   parts.push('  </plan>')
+
+  // Answer Planning Contract (pre-generation contract)
+  if (prepared.answerContract) {
+    const ac = prepared.answerContract
+    parts.push('  <answer_contract>')
+    if (ac.recordedFacts.length > 0) {
+      parts.push('    <recorded_facts>')
+      for (const rf of ac.recordedFacts) {
+        const domAttr = rf.domain ? ` domain="${rf.domain}"` : ''
+        parts.push(`      <fact${domAttr}>${escapeRecordContent(rf.statement)}</fact>`)
+      }
+      parts.push('    </recorded_facts>')
+    }
+    if (ac.boundedGaps.length > 0) {
+      parts.push('    <bounded_gaps>')
+      for (const bg of ac.boundedGaps) {
+        const domAttr = bg.domain ? ` domain="${bg.domain}"` : ''
+        const bndAttr = bg.boundary ? ` boundary="${escapeRecordContent(bg.boundary)}"` : ''
+        parts.push(`      <gap${domAttr}${bndAttr}>${escapeRecordContent(bg.statement)}</gap>`)
+      }
+      parts.push('    </bounded_gaps>')
+    }
+    if (ac.observationalGaps.length > 0) {
+      parts.push('    <observational_gaps>')
+      for (const og of ac.observationalGaps) {
+        parts.push(`      <gap>${escapeRecordContent(og.statement)}</gap>`)
+      }
+      parts.push('    </observational_gaps>')
+    }
+    if (ac.recommendations.length > 0) {
+      parts.push('    <recommendations>')
+      for (const rec of ac.recommendations) {
+        parts.push(`      <recommendation>${escapeRecordContent(rec.statement)}</recommendation>`)
+      }
+      parts.push('    </recommendations>')
+    }
+    parts.push('  </answer_contract>')
+  }
+
   parts.push('</reasoning_context>')
 
   // Ambiguities if any
