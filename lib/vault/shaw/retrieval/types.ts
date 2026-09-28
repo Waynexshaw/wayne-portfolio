@@ -176,3 +176,133 @@ export interface RetrievalPlan {
   ambiguityPolicy: 'clarify_if_ambiguous' | 'return_first'
   reason?: string
 }
+
+// ============================================================================
+// Phase 2B.2A: Multi-Domain Reasoning & Preparation Types
+// ============================================================================
+
+export type ReasoningIntent =
+  | 'PROJECT_PROGRESS'
+  | 'WEEKLY_FOCUS'
+  | 'BLOCKER_ASSESSMENT'
+  | 'CROSS_DOMAIN_RECAP'
+  | 'PERIOD_ACCOMPLISHMENT'
+  | 'MEETING_PREP'
+  | 'RESEARCH_IMPACT'
+  | 'PLAN_VS_ACTUAL'
+  | 'DECISION_GAP_ANALYSIS'
+
+export type DomainImportance = 'REQUIRED' | 'OPTIONAL'
+
+export type DomainOutcomeStatus =
+  | 'AVAILABLE'
+  | 'CONFIRMED_EMPTY'
+  | 'LIMITED_EMPTY'
+  | 'UNAVAILABLE'
+  | 'AMBIGUOUS'
+
+export interface DomainOutcome {
+  domain: RetrievalDomain
+  importance: DomainImportance
+  status: DomainOutcomeStatus
+  returnedCount: number
+  completeness?: CollectionCompleteness
+  ambiguity?: AmbiguityItem
+  error?: string
+  records: VaultRecord[]
+}
+
+export interface ReasoningDomainRequest {
+  domain: RetrievalDomain
+  importance: DomainImportance
+  queryMode: QueryMode
+  entityTarget?: string
+  temporalFilter?: TemporalExpression
+  statusFilter?: string
+  limit: number
+}
+
+export type ReasoningMode =
+  | 'PROGRESS'
+  | 'PRIORITIZATION'
+  | 'RISK_ASSESSMENT'
+  | 'RECAP'
+  | 'ACCOMPLISHMENT'
+  | 'PREPARATION'
+  | 'IMPACT'
+  | 'VARIANCE'
+  | 'GAP_ANALYSIS'
+
+export interface ReasoningPlan {
+  isReasoningPlan: true
+  primaryIntent: ReasoningIntent
+  entityTarget?: {
+    name: string
+    domain?: RetrievalDomain
+    id?: string
+  }
+  temporalWindow?: TemporalWindow
+  domainRequests: ReasoningDomainRequest[]
+  reasoningMode: ReasoningMode
+  requiresPreparation: boolean
+  reason?: string
+}
+
+export interface PreparedEntityCluster {
+  primaryEntity: {
+    id: string
+    domain: RetrievalDomain
+    title: string
+  }
+  records: VaultRecord[]
+  relationshipType: 'authoritative_fk'
+}
+
+export interface PreparedAbsenceFact {
+  domain: RetrievalDomain
+  scope: 'exhaustive' | 'filtered' | 'bounded'
+  targetEntityName?: string
+  timeframeLabel?: string
+  claim: string
+}
+
+export interface PreparedTemporalFact {
+  recordId: string
+  entityType: RetrievalDomain
+  title: string
+  due_date?: string
+  isOverdue?: boolean
+  daysOverdue?: number
+  daysUntilDue?: number
+  fallsWithinRequestedPeriod?: boolean
+  lastRecordedActivityAt?: string
+  daysSinceLastRecordedActivity?: number
+  explicitlyBlocked?: boolean
+}
+
+export interface PreparedDescriptiveCounts {
+  recordedTaskCount: number
+  openRecordedTaskCount: number
+  completedRecordedTaskCount: number
+  recordedDecisionCount: number
+  meetingCount: number
+}
+
+export interface PreparedReasoningContext {
+  plan: ReasoningPlan
+  domainOutcomes: DomainOutcome[]
+  clusters: PreparedEntityCluster[]
+  unlinkedRecords: Record<RetrievalDomain, VaultRecord[]>
+  verifiedAbsences: PreparedAbsenceFact[]
+  limitedAbsences: PreparedAbsenceFact[]
+  unavailableDomains: RetrievalDomain[]
+  ambiguousDomains: RetrievalDomain[]
+  requiredDomainUnavailable: boolean
+  temporalFacts: PreparedTemporalFact[]
+  descriptiveCounts: PreparedDescriptiveCounts
+  retrievalSummary: {
+    totalRetrievedCount: number
+    domainsQueried: RetrievalDomain[]
+    latencyMs: number
+  }
+}

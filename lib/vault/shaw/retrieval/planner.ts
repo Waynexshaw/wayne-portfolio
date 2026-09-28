@@ -6,7 +6,16 @@
  * Produces an inspectable, typed RetrievalPlan.
  */
 
-import { RetrievalPlan, RetrievalIntent, RetrievalDomain, TemporalExpression } from './types'
+import {
+  RetrievalPlan,
+  RetrievalIntent,
+  RetrievalDomain,
+  TemporalExpression,
+  ReasoningPlan,
+  ReasoningIntent,
+  ReasoningDomainRequest,
+  ReasoningMode,
+} from './types'
 import { extractTemporalExpression, resolveTemporalWindow } from './temporal'
 import { AdapterMessage } from '../gateway/adapters/types'
 
@@ -367,6 +376,21 @@ const OPERATIONAL_TARGET_PATTERNS = [
     `\\b(?:what\\s+does\\s+(?:(?:my|the)\\s+)?vault\\s+say\\s+about)\\s+([A-Za-z0-9_\\-\\s/]{2,100}?)(?=[?!,.]|$|\\b(?:${INSTRUCTION_DELIMITERS})\\b)`,
     'i'
   ),
+  // 6. Meeting with / Discussion with
+  new RegExp(
+    `\\b(?:meeting|discussion|call)\\s+with\\s+([A-Za-z0-9_\\-\\s/]{2,100}?)(?=[?!,.]|$|\\b(?:using|from|based|include|where|only|as|according|in|to|and)\\b)`,
+    'i'
+  ),
+  // 7. Progress report on / progress on
+  new RegExp(
+    `\\b(?:progress\\s+(?:report\\s+)?(?:on|for|of))\\s+([A-Za-z0-9_\\-\\s/]{2,100}?)(?=[?!,.]|$|\\b(?:${INSTRUCTION_DELIMITERS})\\b)`,
+    'i'
+  ),
+  // 8. Research say that could affect / affect / impact
+  new RegExp(
+    `\\b(?:could\\s+affect|affect|impact)\\s+([A-Za-z0-9_\\-\\s/]{2,100}?)(?=[?!,.]|$|\\b(?:${INSTRUCTION_DELIMITERS})\\b)`,
+    'i'
+  ),
 ]
 
 const GENERIC_PREPOSITION_REGEX = new RegExp(
@@ -442,5 +466,480 @@ function resolveContextEntity(
     }
   }
 
+  return null
+}
+
+// ============================================================================
+// Phase 2B.2A: Layered Deterministic Reasoning Intent Detectors
+// Precedence Order:
+// 1. PERIOD_ACCOMPLISHMENT (Specific accomplishment outranks general recap)
+// 2. BLOCKER_ASSESSMENT (Blocker analysis outranks general focus/planning)
+// 3. PLAN_VS_ACTUAL (Comparative variance outranks standard progress)
+// 4. DECISION_GAP_ANALYSIS (Structural gap query outranks general decisions)
+// 5. RESEARCH_IMPACT (Research implications outranks standard research)
+// 6. MEETING_PREP (Action-oriented meeting prep outranks meeting catalog)
+// 7. PROJECT_PROGRESS (Progress report on specific entity)
+// 8. WEEKLY_FOCUS (Prioritization and focus planning)
+// 9. CROSS_DOMAIN_RECAP (Broad operational recap across domains)
+// ============================================================================
+
+export function detectPeriodAccomplishment(trimmed: string): boolean {
+  return /\b(?:what\s+did\s+i\s+(?:accomplish|achieve|get\s+done)|what\s+have\s+i\s+(?:accomplished|achieved)|key\s+accomplishments?|period\s+accomplishments?|my\s+accomplishments?)\b/i.test(trimmed)
+}
+
+export function detectBlockerAssessment(trimmed: string): boolean {
+  return /\b(?:what(?:\s+is|'s)?\s+blocking|block(?:ers?|ed)|roadblocks?|stuck\s+tasks?|impediments?|what\s+is\s+stuck)\b/i.test(trimmed)
+}
+
+export function detectPlanVsActual(trimmed: string): boolean {
+  return /\b(?:compare\s+what\s+i\s+planned|plan\s+vs\s+actual|planned\s+vs\s+(?:actual|completed|done)|compare\s+plans?\s+(?:with|to)|what\s+i\s+planned\s+with\s+what\s+i\s+completed)\b/i.test(trimmed)
+}
+
+export function detectDecisionGapAnalysis(trimmed: string): boolean {
+  return /\b(?:activity\s+but\s+no\s+(?:recorded\s+)?decisions?|decision\s+gaps?|projects?\s+(?:with(?:out| no)|lacking)\s+(?:recorded\s+)?decisions?|no\s+decisions?\s+recorded\s+for\s+active\s+projects?)\b/i.test(trimmed)
+}
+
+export function detectResearchImpact(trimmed: string): boolean {
+  return /\b(?:(?:what\s+does\s+)?(?:my\s+)?research\s+say\s+that\s+could\s+affect|research\s+impact\s+(?:on|for)|how\s+does\s+research\s+affect|implications?\s+of\s+(?:our\s+|the\s+)?research)\b/i.test(trimmed)
+}
+
+export function detectMeetingPrep(trimmed: string): boolean {
+  return /\b(?:prepare\s+me\s+for\s+(?:my\s+)?meeting|prep\s+(?:me\s+)?for\s+(?:my\s+)?meeting|meeting\s+prep\b)/i.test(trimmed)
+}
+
+export function detectProjectProgress(trimmed: string, activeEntityName: string | null): boolean {
+  return (
+    /\b(?:progress\s+report|progress\s+(?:on|for|of)|how\s+is\s+.+\s+progressing)\b/i.test(trimmed) ||
+    Boolean(activeEntityName && /\bprogress\b/i.test(trimmed))
+  )
+}
+
+export function detectWeeklyFocus(trimmed: string): boolean {
+  return /\b(?:what\s+should\s+i\s+focus\s+on|focus\s+(?:on\s+)?this\s+week|what\s+to\s+focus\s+on|priorit(?:y|ize|ies)\s+this\s+week|what\s+are\s+my\s+priorities)\b/i.test(trimmed)
+}
+
+export function detectCrossDomainRecap(trimmed: string): boolean {
+  return /\b(?:what\s+happened(?:\s+last\s+week|\s+this\s+week|\s+recently)?|weekly\s+recap|cross[- ]domain\s+recap|recap\s+of\s+(?:the\s+)?week|operational\s+recap|catch\s+me\s+up\s+on\s+recent\s+activity)\b/i.test(trimmed)
+}
+
+/**
+ * Deterministically constructs a ReasoningPlan if the prompt expresses a composite
+ * multi-domain reasoning intent. Returns null if standard single-domain retrieval
+ * or fallback planner should handle the request.
+ */
+export function planReasoning(input: PlannerInput): ReasoningPlan | null {
+  const { prompt, history = [], anchorDate = new Date(), timezone } = input
+  const trimmed = prompt.trim()
+
+  const extractedEntity = extractEntityMention(trimmed)
+  const contextEntity = resolveContextEntity(trimmed, history)
+  const activeEntityName = extractedEntity || contextEntity?.name || null
+
+  const temporalExp = extractTemporalExpression(trimmed)
+  const timeframe = temporalExp ? resolveTemporalWindow(temporalExp, anchorDate, timezone) : undefined
+
+  // 1. PERIOD_ACCOMPLISHMENT (Precedence 1: Outranks general recap)
+  if (detectPeriodAccomplishment(trimmed)) {
+    const domainRequests: ReasoningDomainRequest[] = [
+      {
+        domain: 'activity',
+        importance: 'REQUIRED',
+        queryMode: 'catalog',
+        temporalFilter: temporalExp || 'last_week',
+        limit: 10,
+      },
+      {
+        domain: 'task',
+        importance: 'REQUIRED',
+        queryMode: activeEntityName ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
+        statusFilter: 'completed',
+        temporalFilter: temporalExp || 'last_week',
+        limit: 20,
+      },
+      {
+        domain: 'decision',
+        importance: 'OPTIONAL',
+        queryMode: activeEntityName ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
+        temporalFilter: temporalExp || 'last_week',
+        limit: 10,
+      },
+      {
+        domain: 'review',
+        importance: 'OPTIONAL',
+        queryMode: 'catalog',
+        limit: 5,
+      },
+    ]
+
+    return {
+      isReasoningPlan: true,
+      primaryIntent: 'PERIOD_ACCOMPLISHMENT',
+      reasoningMode: 'ACCOMPLISHMENT',
+      entityTarget: activeEntityName ? { name: activeEntityName, domain: 'project' } : undefined,
+      temporalWindow: timeframe,
+      domainRequests,
+      requiresPreparation: true,
+      reason: 'Detected period accomplishment intent (outranks recap)',
+    }
+  }
+
+  // 2. BLOCKER_ASSESSMENT (Precedence 2: Outranks weekly focus and progress)
+  if (detectBlockerAssessment(trimmed)) {
+    const domainRequests: ReasoningDomainRequest[] = [
+      {
+        domain: 'task',
+        importance: 'REQUIRED',
+        queryMode: activeEntityName ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
+        statusFilter: 'open',
+        limit: 25,
+      },
+      {
+        domain: 'project',
+        importance: 'REQUIRED',
+        queryMode: activeEntityName ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
+        limit: 10,
+      },
+      {
+        domain: 'decision',
+        importance: 'OPTIONAL',
+        queryMode: activeEntityName ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
+        limit: 5,
+      },
+      {
+        domain: 'meeting',
+        importance: 'OPTIONAL',
+        queryMode: 'catalog',
+        limit: 5,
+      },
+    ]
+
+    return {
+      isReasoningPlan: true,
+      primaryIntent: 'BLOCKER_ASSESSMENT',
+      reasoningMode: 'RISK_ASSESSMENT',
+      entityTarget: activeEntityName ? { name: activeEntityName, domain: 'project' } : undefined,
+      temporalWindow: timeframe,
+      domainRequests,
+      requiresPreparation: true,
+      reason: 'Detected blocker and impediment assessment intent',
+    }
+  }
+
+  // 3. PLAN_VS_ACTUAL (Precedence 3)
+  if (detectPlanVsActual(trimmed)) {
+    const domainRequests: ReasoningDomainRequest[] = [
+      {
+        domain: 'project',
+        importance: 'REQUIRED',
+        queryMode: activeEntityName ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
+        limit: 10,
+      },
+      {
+        domain: 'task',
+        importance: 'REQUIRED',
+        queryMode: activeEntityName ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
+        limit: 25,
+      },
+      {
+        domain: 'review',
+        importance: 'OPTIONAL',
+        queryMode: 'catalog',
+        limit: 5,
+      },
+      {
+        domain: 'metric',
+        importance: 'OPTIONAL',
+        queryMode: activeEntityName ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
+        limit: 5,
+      },
+    ]
+
+    return {
+      isReasoningPlan: true,
+      primaryIntent: 'PLAN_VS_ACTUAL',
+      reasoningMode: 'VARIANCE',
+      entityTarget: activeEntityName ? { name: activeEntityName, domain: 'project' } : undefined,
+      temporalWindow: timeframe,
+      domainRequests,
+      requiresPreparation: true,
+      reason: 'Detected planned vs actual variance comparison intent',
+    }
+  }
+
+  // 4. DECISION_GAP_ANALYSIS (Precedence 4)
+  if (detectDecisionGapAnalysis(trimmed)) {
+    const domainRequests: ReasoningDomainRequest[] = [
+      {
+        domain: 'project',
+        importance: 'REQUIRED',
+        queryMode: 'catalog',
+        limit: 20,
+      },
+      {
+        domain: 'decision',
+        importance: 'REQUIRED',
+        queryMode: 'catalog',
+        limit: 25,
+      },
+      {
+        domain: 'activity',
+        importance: 'REQUIRED',
+        queryMode: 'catalog',
+        limit: 10,
+      },
+      {
+        domain: 'task',
+        importance: 'OPTIONAL',
+        queryMode: 'catalog',
+        limit: 25,
+      },
+    ]
+
+    return {
+      isReasoningPlan: true,
+      primaryIntent: 'DECISION_GAP_ANALYSIS',
+      reasoningMode: 'GAP_ANALYSIS',
+      entityTarget: activeEntityName ? { name: activeEntityName, domain: 'project' } : undefined,
+      temporalWindow: timeframe,
+      domainRequests,
+      requiresPreparation: true,
+      reason: 'Detected decision gap analysis across active projects',
+    }
+  }
+
+  // 5. RESEARCH_IMPACT (Precedence 5)
+  if (detectResearchImpact(trimmed)) {
+    const domainRequests: ReasoningDomainRequest[] = [
+      {
+        domain: 'research',
+        importance: 'REQUIRED',
+        queryMode: activeEntityName ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
+        limit: 5,
+      },
+      {
+        domain: 'evidence',
+        importance: 'REQUIRED',
+        queryMode: 'catalog',
+        limit: 10,
+      },
+      {
+        domain: 'project',
+        importance: activeEntityName ? 'REQUIRED' : 'OPTIONAL',
+        queryMode: activeEntityName ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
+        limit: 5,
+      },
+      {
+        domain: 'decision',
+        importance: 'OPTIONAL',
+        queryMode: activeEntityName ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
+        limit: 5,
+      },
+    ]
+
+    return {
+      isReasoningPlan: true,
+      primaryIntent: 'RESEARCH_IMPACT',
+      reasoningMode: 'IMPACT',
+      entityTarget: activeEntityName ? { name: activeEntityName, domain: 'project' } : undefined,
+      temporalWindow: timeframe,
+      domainRequests,
+      requiresPreparation: true,
+      reason: 'Detected research impact and implications intent',
+    }
+  }
+
+  // 6. MEETING_PREP (Precedence 6)
+  if (detectMeetingPrep(trimmed)) {
+    const domainRequests: ReasoningDomainRequest[] = [
+      {
+        domain: 'meeting',
+        importance: 'REQUIRED',
+        queryMode: activeEntityName ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
+        limit: 5,
+      },
+      {
+        domain: 'crm',
+        importance: activeEntityName ? 'REQUIRED' : 'OPTIONAL',
+        queryMode: activeEntityName ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
+        limit: 5,
+      },
+      {
+        domain: 'task',
+        importance: 'OPTIONAL',
+        queryMode: activeEntityName ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
+        limit: 10,
+      },
+      {
+        domain: 'decision',
+        importance: 'OPTIONAL',
+        queryMode: activeEntityName ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
+        limit: 5,
+      },
+    ]
+
+    return {
+      isReasoningPlan: true,
+      primaryIntent: 'MEETING_PREP',
+      reasoningMode: 'PREPARATION',
+      entityTarget: activeEntityName ? { name: activeEntityName, domain: 'crm' } : undefined,
+      temporalWindow: timeframe,
+      domainRequests,
+      requiresPreparation: true,
+      reason: 'Detected meeting preparation and alignment intent',
+    }
+  }
+
+  // 7. PROJECT_PROGRESS (Precedence 7)
+  if (detectProjectProgress(trimmed, activeEntityName)) {
+    const domainRequests: ReasoningDomainRequest[] = [
+      {
+        domain: 'project',
+        importance: 'REQUIRED',
+        queryMode: activeEntityName ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
+        limit: 5,
+      },
+      {
+        domain: 'task',
+        importance: 'REQUIRED',
+        queryMode: activeEntityName ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
+        limit: 25,
+      },
+      {
+        domain: 'decision',
+        importance: 'OPTIONAL',
+        queryMode: activeEntityName ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
+        limit: 10,
+      },
+      {
+        domain: 'review',
+        importance: 'OPTIONAL',
+        queryMode: activeEntityName ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
+        limit: 5,
+      },
+    ]
+
+    return {
+      isReasoningPlan: true,
+      primaryIntent: 'PROJECT_PROGRESS',
+      reasoningMode: 'PROGRESS',
+      entityTarget: activeEntityName ? { name: activeEntityName, domain: 'project' } : undefined,
+      temporalWindow: timeframe,
+      domainRequests,
+      requiresPreparation: true,
+      reason: 'Detected project progress report intent',
+    }
+  }
+
+  // 8. WEEKLY_FOCUS (Precedence 8)
+  if (detectWeeklyFocus(trimmed)) {
+    const domainRequests: ReasoningDomainRequest[] = [
+      {
+        domain: 'task',
+        importance: 'REQUIRED',
+        queryMode: activeEntityName ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
+        statusFilter: 'open',
+        limit: 25,
+      },
+      {
+        domain: 'project',
+        importance: 'REQUIRED',
+        queryMode: activeEntityName ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
+        limit: 10,
+      },
+      {
+        domain: 'decision',
+        importance: 'OPTIONAL',
+        queryMode: activeEntityName ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
+        limit: 5,
+      },
+      {
+        domain: 'meeting',
+        importance: 'OPTIONAL',
+        queryMode: 'catalog',
+        limit: 5,
+      },
+    ]
+
+    return {
+      isReasoningPlan: true,
+      primaryIntent: 'WEEKLY_FOCUS',
+      reasoningMode: 'PRIORITIZATION',
+      entityTarget: activeEntityName ? { name: activeEntityName, domain: 'project' } : undefined,
+      temporalWindow: timeframe,
+      domainRequests,
+      requiresPreparation: true,
+      reason: 'Detected weekly focus and operational prioritization intent',
+    }
+  }
+
+  // 9. CROSS_DOMAIN_RECAP (Precedence 9)
+  if (detectCrossDomainRecap(trimmed)) {
+    const domainRequests: ReasoningDomainRequest[] = [
+      {
+        domain: 'activity',
+        importance: 'REQUIRED',
+        queryMode: 'catalog',
+        temporalFilter: temporalExp || 'last_week',
+        limit: 10,
+      },
+      {
+        domain: 'decision',
+        importance: 'REQUIRED',
+        queryMode: 'catalog',
+        temporalFilter: temporalExp || 'last_week',
+        limit: 10,
+      },
+      {
+        domain: 'meeting',
+        importance: 'OPTIONAL',
+        queryMode: 'catalog',
+        temporalFilter: temporalExp || 'last_week',
+        limit: 5,
+      },
+      {
+        domain: 'task',
+        importance: 'OPTIONAL',
+        queryMode: 'catalog',
+        statusFilter: 'completed',
+        temporalFilter: temporalExp || 'last_week',
+        limit: 10,
+      },
+    ]
+
+    return {
+      isReasoningPlan: true,
+      primaryIntent: 'CROSS_DOMAIN_RECAP',
+      reasoningMode: 'RECAP',
+      entityTarget: activeEntityName ? { name: activeEntityName, domain: 'project' } : undefined,
+      temporalWindow: timeframe,
+      domainRequests,
+      requiresPreparation: true,
+      reason: 'Detected cross-domain operational recap intent',
+    }
+  }
+
+  // No composite multi-domain reasoning intent matched
   return null
 }

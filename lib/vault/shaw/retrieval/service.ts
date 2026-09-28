@@ -19,6 +19,10 @@ import {
   CollectionCompleteness,
   ResultScope,
   QueryMode,
+  ReasoningPlan,
+  DomainOutcome,
+  DomainOutcomeStatus,
+  ReasoningDomainRequest,
 } from './types'
 
 const MAX_TOTAL_RECORDS = 40
@@ -1306,6 +1310,175 @@ export class VaultRetrievalService {
       provenance: { table: 'activity_aggregate', id: 'composite', workspace_id: this.workspaceId },
     })
   }
+
+  // --------------------------------------------------------------------------
+  // Phase 2B.2A: Reasoning Plan Execution & Per-Domain Outcome Assembly
+  // --------------------------------------------------------------------------
+  async executeDomainRequest(
+    req: ReasoningDomainRequest,
+    temporalWindow?: any
+  ): Promise<DomainOutcome> {
+    const domainRecords: VaultRecord[] = []
+    const domainAmbiguities: AmbiguityItem[] = []
+    const domainEmptyStates: NotFoundItem[] = []
+    const domainCompleteness: CollectionCompleteness[] = []
+    let domainError: string | undefined = undefined
+
+    try {
+      switch (req.domain) {
+        case 'project':
+          await this.retrieveProjectContext(
+            req.entityTarget,
+            domainRecords,
+            domainAmbiguities,
+            domainEmptyStates,
+            domainCompleteness
+          )
+          break
+
+        case 'crm':
+          await this.retrieveCrmContext(
+            req.entityTarget,
+            domainRecords,
+            domainAmbiguities,
+            domainEmptyStates,
+            domainCompleteness
+          )
+          break
+
+        case 'task':
+          await this.retrieveTasks(
+            {
+              entityQuery: req.entityTarget,
+              statusFilter: req.statusFilter,
+              timeframe: req.temporalFilter,
+            },
+            domainRecords,
+            domainAmbiguities,
+            domainEmptyStates,
+            domainCompleteness
+          )
+          break
+
+        case 'decision':
+          await this.retrieveDecisions(
+            req.entityTarget,
+            domainRecords,
+            domainAmbiguities,
+            domainEmptyStates,
+            domainCompleteness
+          )
+          break
+
+        case 'research':
+          await this.retrieveResearch(
+            req.entityTarget,
+            domainRecords,
+            domainAmbiguities,
+            domainEmptyStates,
+            domainCompleteness
+          )
+          break
+
+        case 'meeting':
+          await this.retrieveMeetings(
+            { timeframe: req.temporalFilter, entityQuery: req.entityTarget },
+            domainRecords,
+            domainAmbiguities,
+            domainEmptyStates,
+            domainCompleteness
+          )
+          break
+
+        case 'metric':
+          await this.retrieveMetrics(
+            req.entityTarget,
+            domainRecords,
+            domainAmbiguities,
+            domainEmptyStates,
+            domainCompleteness
+          )
+          break
+
+        case 'review':
+          await this.retrieveReviews(
+            req.entityTarget,
+            domainRecords,
+            domainAmbiguities,
+            domainEmptyStates,
+            domainCompleteness
+          )
+          break
+
+        case 'evidence':
+          await this.retrieveWorkspaceEvidence(
+            req.entityTarget,
+            domainRecords,
+            domainAmbiguities,
+            domainEmptyStates,
+            domainCompleteness
+          )
+          break
+
+        case 'activity':
+          await this.retrieveActivityDigest(temporalWindow, domainRecords, domainCompleteness)
+          break
+      }
+    } catch (err: any) {
+      domainError = err?.message || 'Domain retrieval error'
+    }
+
+    // Determine domain outcome status
+    let status: DomainOutcomeStatus
+    if (domainError) {
+      status = 'UNAVAILABLE'
+    } else if (domainAmbiguities.length > 0) {
+      status = 'AMBIGUOUS'
+    } else if (domainRecords.length === 0) {
+      const comp = domainCompleteness.find((c) => c.domain === req.domain)
+      if (comp?.resultScope === 'exhaustive') {
+        status = 'CONFIRMED_EMPTY'
+      } else {
+        status = 'LIMITED_EMPTY'
+      }
+    } else {
+      status = 'AVAILABLE'
+    }
+
+    // Enforce request limit if specified and truncate safely
+    let records = domainRecords
+    if (req.limit && records.length > req.limit) {
+      records = records.slice(0, req.limit)
+    }
+
+    return {
+      domain: req.domain,
+      importance: req.importance,
+      status,
+      returnedCount: records.length,
+      completeness: domainCompleteness.find((c) => c.domain === req.domain),
+      ambiguity: domainAmbiguities[0],
+      error: domainError,
+      records,
+    }
+  }
+
+  async executeReasoningPlan(
+    plan: ReasoningPlan
+  ): Promise<{ domainOutcomes: DomainOutcome[]; totalLatencyMs: number }> {
+    const startTime = Date.now()
+
+    // Execute independent domains concurrently safely
+    const promises = plan.domainRequests.map((req) =>
+      this.executeDomainRequest(req, plan.temporalWindow)
+    )
+    const domainOutcomes = await Promise.all(promises)
+
+    return {
+      domainOutcomes,
+      totalLatencyMs: Date.now() - startTime,
+    }
+  }
 }
 
 export async function executeVaultRetrieval(
@@ -1315,4 +1488,13 @@ export async function executeVaultRetrieval(
 ): Promise<VaultContextEnvelope> {
   const service = new VaultRetrievalService(supabase, workspaceId)
   return service.executePlan(plan)
+}
+
+export async function executeVaultReasoningPlan(
+  supabase: SupabaseClient<any, any, any> | any,
+  workspaceId: string,
+  plan: ReasoningPlan
+): Promise<{ domainOutcomes: DomainOutcome[]; totalLatencyMs: number }> {
+  const service = new VaultRetrievalService(supabase, workspaceId)
+  return service.executeReasoningPlan(plan)
 }

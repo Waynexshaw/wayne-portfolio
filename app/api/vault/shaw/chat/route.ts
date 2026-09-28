@@ -18,6 +18,13 @@ import {
   createProvenanceStreamFilter,
   RequestSourceMap,
   VaultContextEnvelope,
+  planReasoning,
+  executeVaultReasoningPlan,
+  prepareReasoningContext,
+  flattenPreparedContextToEnvelope,
+  serializePreparedContextForPrompt,
+  PreparedReasoningContext,
+  ReasoningPlan,
 } from '@/lib/vault/shaw/retrieval'
 
 export const dynamic = 'force-dynamic'
@@ -196,8 +203,8 @@ export async function POST(request: NextRequest) {
     const depth = resolveDepthIntent(trimmedMessage)
     const ctaIntent = resolveCtaIntent(trimmedMessage)
 
-    // Batch 2A: Deterministic Retrieval Planner & Execution
-    const retrievalPlan = planRetrieval({
+    // Phase 2B.2A: Check for composite reasoning intent first
+    const reasoningPlan = planReasoning({
       prompt: trimmedMessage,
       capability: capability as ShawCapability,
       history,
@@ -205,23 +212,96 @@ export async function POST(request: NextRequest) {
     })
 
     let vaultEnvelope: VaultContextEnvelope | null = null
+    let preparedReasoningContext: PreparedReasoningContext | null = null
     let vaultContextPrompt: string | undefined = undefined
     let retrievalLatencyMs = 0
     let requestSourceMap: RequestSourceMap = new Map()
+    let retrievalPlan: any = null
 
-    if (retrievalPlan.shouldRetrieve) {
+    if (reasoningPlan) {
       const retrievalStart = Date.now()
       try {
-        vaultEnvelope = await executeVaultRetrieval(supabase, workspaceId, retrievalPlan)
-      } catch (retrievalErr) {
-        console.error('Vault retrieval failed, continuing with unaugmented prompt:', retrievalErr)
-      }
-      retrievalLatencyMs = Date.now() - retrievalStart
-      if (vaultEnvelope) {
+        const { domainOutcomes, totalLatencyMs } = await executeVaultReasoningPlan(
+          supabase,
+          workspaceId,
+          reasoningPlan
+        )
+        retrievalLatencyMs = totalLatencyMs
+        preparedReasoningContext = prepareReasoningContext(
+          reasoningPlan,
+          domainOutcomes,
+          totalLatencyMs
+        )
+        vaultEnvelope = flattenPreparedContextToEnvelope(
+          preparedReasoningContext,
+          workspaceId
+        )
         requestSourceMap = createRequestSourceMap(vaultEnvelope)
-        vaultContextPrompt = serializeVaultContextForPrompt(vaultEnvelope, requestSourceMap)
+        vaultContextPrompt = serializePreparedContextForPrompt(
+          preparedReasoningContext,
+          vaultEnvelope,
+          requestSourceMap
+        )
+      } catch (reasoningErr) {
+        console.error('Vault reasoning retrieval failed:', reasoningErr)
+      }
+    } else {
+      // Fallback: Existing Batch 2A / 2B.1 Retrieval Planner & Execution
+      retrievalPlan = planRetrieval({
+        prompt: trimmedMessage,
+        capability: capability as ShawCapability,
+        history,
+        timezone: userTimezone,
+      })
+
+      if (retrievalPlan.shouldRetrieve) {
+        const retrievalStart = Date.now()
+        try {
+          vaultEnvelope = await executeVaultRetrieval(supabase, workspaceId, retrievalPlan)
+        } catch (retrievalErr) {
+          console.error('Vault retrieval failed, continuing with unaugmented prompt:', retrievalErr)
+        }
+        retrievalLatencyMs = Date.now() - retrievalStart
+        if (vaultEnvelope) {
+          requestSourceMap = createRequestSourceMap(vaultEnvelope)
+          vaultContextPrompt = serializeVaultContextForPrompt(vaultEnvelope, requestSourceMap)
+        }
       }
     }
+
+    const retrievalMetadata = reasoningPlan
+      ? {
+          should_retrieve: true,
+          reasoning_intent: reasoningPlan.primaryIntent,
+          reasoning_mode: reasoningPlan.reasoningMode,
+          reasoning_domains: reasoningPlan.domainRequests.map((r) => r.domain),
+          required_domains: reasoningPlan.domainRequests
+            .filter((r) => r.importance === 'REQUIRED')
+            .map((r) => r.domain),
+          optional_domains: reasoningPlan.domainRequests
+            .filter((r) => r.importance === 'OPTIONAL')
+            .map((r) => r.domain),
+          unavailable_domains: preparedReasoningContext?.unavailableDomains || [],
+          required_domain_unavailable:
+            preparedReasoningContext?.requiredDomainUnavailable || false,
+          prepared_record_count: vaultEnvelope?.records.length ?? 0,
+          ambiguity_count: vaultEnvelope?.ambiguities.length ?? 0,
+          truncated: vaultEnvelope?.truncated ?? false,
+          retrieval_latency_ms: retrievalLatencyMs,
+        }
+      : retrievalPlan?.shouldRetrieve
+      ? {
+          should_retrieve: true,
+          domains: Array.from(new Set(retrievalPlan.intents.map((i: any) => i.domain))),
+          record_count: vaultEnvelope?.records.length ?? 0,
+          ambiguity_count: vaultEnvelope?.ambiguities.length ?? 0,
+          truncated: vaultEnvelope?.truncated ?? false,
+          retrieval_latency_ms: retrievalLatencyMs,
+        }
+      : {
+          should_retrieve: false,
+          reason: retrievalPlan?.reason || 'No retrieval required',
+        }
 
     const systemPrompt = getSystemPromptForIdentity(identity, capability as ShawCapability, {
       format,
@@ -257,19 +337,7 @@ export async function POST(request: NextRequest) {
           depth,
           cta_intent: ctaIntent,
           user_message_id: userMessageId,
-          retrieval: retrievalPlan.shouldRetrieve
-            ? {
-                should_retrieve: true,
-                domains: Array.from(new Set(retrievalPlan.intents.map((i) => i.domain))),
-                record_count: vaultEnvelope?.records.length ?? 0,
-                ambiguity_count: vaultEnvelope?.ambiguities.length ?? 0,
-                truncated: vaultEnvelope?.truncated ?? false,
-                retrieval_latency_ms: retrievalLatencyMs,
-              }
-            : {
-                should_retrieve: false,
-                reason: retrievalPlan.reason,
-              },
+          retrieval: retrievalMetadata,
           ...(isRetry && userMessageId
             ? { is_retry: true, retry_of_message_id: userMessageId }
             : {}),
@@ -462,19 +530,7 @@ export async function POST(request: NextRequest) {
                     user_message_id: userMessageId,
                     finish_reason: 'stop',
                     raw_finish_reason: effectiveRawFinishReason || 'stop',
-                    retrieval: retrievalPlan.shouldRetrieve
-                      ? {
-                          should_retrieve: true,
-                          domains: Array.from(new Set(retrievalPlan.intents.map((i) => i.domain))),
-                          record_count: vaultEnvelope?.records.length ?? 0,
-                          ambiguity_count: vaultEnvelope?.ambiguities.length ?? 0,
-                          truncated: vaultEnvelope?.truncated ?? false,
-                          retrieval_latency_ms: retrievalLatencyMs,
-                        }
-                      : {
-                          should_retrieve: false,
-                          reason: retrievalPlan.reason,
-                        },
+                    retrieval: retrievalMetadata,
                     provenance: {
                       status: provenanceResult.status,
                       basis: provenanceResult.basis || null,
@@ -551,19 +607,7 @@ export async function POST(request: NextRequest) {
                     raw_finish_reason: effectiveRawFinishReason,
                     partial_text: fullResponseText,
                     user_message_id: userMessageId,
-                    retrieval: retrievalPlan.shouldRetrieve
-                      ? {
-                          should_retrieve: true,
-                          domains: Array.from(new Set(retrievalPlan.intents.map((i) => i.domain))),
-                          record_count: vaultEnvelope?.records.length ?? 0,
-                          ambiguity_count: vaultEnvelope?.ambiguities.length ?? 0,
-                          truncated: vaultEnvelope?.truncated ?? false,
-                          retrieval_latency_ms: retrievalLatencyMs,
-                        }
-                      : {
-                          should_retrieve: false,
-                          reason: retrievalPlan.reason,
-                        },
+                    retrieval: retrievalMetadata,
                     ...(isRetry && userMessageId
                       ? { is_retry: true, retry_of_message_id: userMessageId }
                       : {}),

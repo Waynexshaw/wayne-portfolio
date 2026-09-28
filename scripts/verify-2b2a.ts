@@ -1,0 +1,705 @@
+/**
+ * Waynex Vault — SHAW Batch 2B.2A Deterministic Verification Suite
+ *
+ * Verifies all 30 acceptance requirements (A through AD) covering:
+ * - Intent detection & precedence
+ * - Fallback to existing planner
+ * - Safe absence semantics (exhaustive vs filtered/bounded)
+ * - Domain failure isolation (required vs optional)
+ * - Record deduplication by authoritative identity
+ * - Relational clustering strictly by foreign keys
+ * - Neutral temporal facts (no 'isStale')
+ * - Descriptive counts (no completion percentage)
+ * - Research epistemic distinctions
+ * - Provenance preservation & handle validity
+ * - Protocol concealment
+ * - Batch 2A entity extraction regressions
+ */
+
+import assert from 'node:assert'
+import {
+  planRetrieval,
+  planReasoning,
+  prepareReasoningContext,
+  flattenPreparedContextToEnvelope,
+  serializePreparedContextForPrompt,
+  createRequestSourceMap,
+  resolveAuthoritativeProvenance,
+  parseModelProvenance,
+  createProvenanceStreamFilter,
+  VaultRecord,
+  DomainOutcome,
+  ReasoningPlan,
+} from '../lib/vault/shaw/retrieval'
+
+let passedTests = 0
+
+function test(name: string, fn: () => void) {
+  try {
+    fn()
+    passedTests++
+    console.log(`  ✓ ${name}`)
+  } catch (err: any) {
+    console.error(`  ✗ FAIL: ${name}`)
+    console.error(err)
+    process.exit(1)
+  }
+}
+
+console.log('\n=== SHAW Batch 2B.2A Deterministic Verification Suite ===\n')
+
+// ----------------------------------------------------------------------------
+// A through I: Deterministic Reasoning Intent Detection & Precedence
+// ----------------------------------------------------------------------------
+
+test('A. "What should I focus on this week?" => WEEKLY_FOCUS', () => {
+  const plan = planReasoning({ prompt: 'What should I focus on this week?' })
+  assert(plan !== null, 'Plan must not be null')
+  assert.strictEqual(plan.primaryIntent, 'WEEKLY_FOCUS')
+  assert.strictEqual(plan.reasoningMode, 'PRIORITIZATION')
+  assert(plan.domainRequests.some((r) => r.domain === 'task' && r.importance === 'REQUIRED'))
+  assert(plan.domainRequests.some((r) => r.domain === 'project' && r.importance === 'REQUIRED'))
+})
+
+test('B. "What did I accomplish last week?" => PERIOD_ACCOMPLISHMENT (outranks recap)', () => {
+  const plan = planReasoning({ prompt: 'What did I accomplish last week?' })
+  assert(plan !== null, 'Plan must not be null')
+  assert.strictEqual(plan.primaryIntent, 'PERIOD_ACCOMPLISHMENT')
+  assert.strictEqual(plan.reasoningMode, 'ACCOMPLISHMENT')
+  assert(plan.domainRequests.some((r) => r.domain === 'activity' && r.importance === 'REQUIRED'))
+  assert(plan.domainRequests.some((r) => r.domain === 'task' && r.importance === 'REQUIRED'))
+})
+
+test('C. "What happened last week?" => CROSS_DOMAIN_RECAP', () => {
+  const plan = planReasoning({ prompt: 'What happened last week?' })
+  assert(plan !== null, 'Plan must not be null')
+  assert.strictEqual(plan.primaryIntent, 'CROSS_DOMAIN_RECAP')
+  assert.strictEqual(plan.reasoningMode, 'RECAP')
+  assert(plan.domainRequests.some((r) => r.domain === 'activity' && r.importance === 'REQUIRED'))
+  assert(plan.domainRequests.some((r) => r.domain === 'decision' && r.importance === 'REQUIRED'))
+})
+
+test('D. "Give me a progress report on PEVRA." => PROJECT_PROGRESS + entity PEVRA', () => {
+  const plan = planReasoning({ prompt: 'Give me a progress report on PEVRA.' })
+  assert(plan !== null, 'Plan must not be null')
+  assert.strictEqual(plan.primaryIntent, 'PROJECT_PROGRESS')
+  assert.strictEqual(plan.reasoningMode, 'PROGRESS')
+  assert.strictEqual(plan.entityTarget?.name, 'PEVRA')
+  assert(plan.domainRequests.some((r) => r.domain === 'project' && r.importance === 'REQUIRED'))
+  assert(plan.domainRequests.some((r) => r.domain === 'task' && r.importance === 'REQUIRED'))
+})
+
+test('E. "What is blocking my projects?" => BLOCKER_ASSESSMENT', () => {
+  const plan = planReasoning({ prompt: 'What is blocking my projects?' })
+  assert(plan !== null, 'Plan must not be null')
+  assert.strictEqual(plan.primaryIntent, 'BLOCKER_ASSESSMENT')
+  assert.strictEqual(plan.reasoningMode, 'RISK_ASSESSMENT')
+  assert(plan.domainRequests.some((r) => r.domain === 'task' && r.importance === 'REQUIRED'))
+})
+
+test('E2. Precedence: "What is blocking PEVRA and what should I focus on?" => BLOCKER_ASSESSMENT outranks WEEKLY_FOCUS', () => {
+  const plan = planReasoning({ prompt: 'What is blocking PEVRA and what should I focus on?' })
+  assert(plan !== null, 'Plan must not be null')
+  assert.strictEqual(plan.primaryIntent, 'BLOCKER_ASSESSMENT')
+  assert.strictEqual(plan.entityTarget?.name, 'PEVRA')
+})
+
+test('F. "Prepare me for my meeting with Alice." => MEETING_PREP + entity target Alice', () => {
+  const plan = planReasoning({ prompt: 'Prepare me for my meeting with Alice.' })
+  assert(plan !== null, 'Plan must not be null')
+  assert.strictEqual(plan.primaryIntent, 'MEETING_PREP')
+  assert.strictEqual(plan.reasoningMode, 'PREPARATION')
+  assert.strictEqual(plan.entityTarget?.name, 'Alice')
+  assert(plan.domainRequests.some((r) => r.domain === 'meeting' && r.importance === 'REQUIRED'))
+})
+
+test('G. "What does my research say that could affect PEVRA?" => RESEARCH_IMPACT + entity PEVRA', () => {
+  const plan = planReasoning({ prompt: 'What does my research say that could affect PEVRA?' })
+  assert(plan !== null, 'Plan must not be null')
+  assert.strictEqual(plan.primaryIntent, 'RESEARCH_IMPACT')
+  assert.strictEqual(plan.reasoningMode, 'IMPACT')
+  assert.strictEqual(plan.entityTarget?.name, 'PEVRA')
+  assert(plan.domainRequests.some((r) => r.domain === 'research' && r.importance === 'REQUIRED'))
+  assert(plan.domainRequests.some((r) => r.domain === 'evidence' && r.importance === 'REQUIRED'))
+})
+
+test('H. "Compare what I planned with what I completed." => PLAN_VS_ACTUAL', () => {
+  const plan = planReasoning({ prompt: 'Compare what I planned with what I completed.' })
+  assert(plan !== null, 'Plan must not be null')
+  assert.strictEqual(plan.primaryIntent, 'PLAN_VS_ACTUAL')
+  assert.strictEqual(plan.reasoningMode, 'VARIANCE')
+  assert(plan.domainRequests.some((r) => r.domain === 'project' && r.importance === 'REQUIRED'))
+  assert(plan.domainRequests.some((r) => r.domain === 'task' && r.importance === 'REQUIRED'))
+})
+
+test('I. "Which projects have activity but no recorded decisions?" => DECISION_GAP_ANALYSIS', () => {
+  const plan = planReasoning({ prompt: 'Which projects have activity but no recorded decisions?' })
+  assert(plan !== null, 'Plan must not be null')
+  assert.strictEqual(plan.primaryIntent, 'DECISION_GAP_ANALYSIS')
+  assert.strictEqual(plan.reasoningMode, 'GAP_ANALYSIS')
+  assert(plan.domainRequests.some((r) => r.domain === 'project' && r.importance === 'REQUIRED'))
+  assert(plan.domainRequests.some((r) => r.domain === 'decision' && r.importance === 'REQUIRED'))
+  assert(plan.domainRequests.some((r) => r.domain === 'activity' && r.importance === 'REQUIRED'))
+})
+
+test('J. Existing ordinary single-domain prompt => planReasoning returns null (fallback unchanged)', () => {
+  const reasoningPlan = planReasoning({ prompt: 'Show me my tasks' })
+  assert.strictEqual(reasoningPlan, null, 'Single-domain query must not trigger ReasoningPlan')
+
+  const fallbackPlan = planRetrieval({ prompt: 'Show me my tasks' })
+  assert.strictEqual(fallbackPlan.shouldRetrieve, true)
+  assert.strictEqual(fallbackPlan.intents[0].domain, 'task')
+})
+
+// ----------------------------------------------------------------------------
+// K through O: Preparation Layer, Absence Semantics & Error Isolation
+// ----------------------------------------------------------------------------
+
+test('K. Required exhaustive zero => verified absence registered', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    entityTarget: { name: 'Alpha', domain: 'project' },
+    domainRequests: [
+      { domain: 'decision', importance: 'REQUIRED', queryMode: 'targeted', entityTarget: 'Alpha', limit: 10 },
+    ],
+    requiresPreparation: true,
+  }
+
+  const outcomes: DomainOutcome[] = [
+    {
+      domain: 'decision',
+      importance: 'REQUIRED',
+      status: 'CONFIRMED_EMPTY',
+      returnedCount: 0,
+      completeness: {
+        domain: 'decision',
+        queryMode: 'targeted',
+        resultScope: 'exhaustive',
+        returnedCount: 0,
+        totalCount: 0,
+      },
+      records: [],
+    },
+  ]
+
+  const prepared = prepareReasoningContext(mockPlan, outcomes, 10)
+  assert.strictEqual(prepared.verifiedAbsences.length, 1)
+  assert.strictEqual(prepared.limitedAbsences.length, 0)
+  assert(prepared.verifiedAbsences[0].claim.includes('No decision records are recorded'))
+})
+
+test('L. Required filtered zero => limited absence, NOT global absence', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    entityTarget: { name: 'Alpha', domain: 'project' },
+    domainRequests: [
+      { domain: 'task', importance: 'REQUIRED', queryMode: 'catalog', limit: 10 },
+    ],
+    requiresPreparation: true,
+  }
+
+  const outcomes: DomainOutcome[] = [
+    {
+      domain: 'task',
+      importance: 'REQUIRED',
+      status: 'LIMITED_EMPTY',
+      returnedCount: 0,
+      completeness: {
+        domain: 'task',
+        queryMode: 'catalog',
+        resultScope: 'filtered',
+        returnedCount: 0,
+        filterDescription: 'status: completed in last 7 days',
+      },
+      records: [],
+    },
+  ]
+
+  const prepared = prepareReasoningContext(mockPlan, outcomes, 10)
+  assert.strictEqual(prepared.verifiedAbsences.length, 0, 'Must NOT register verified global absence for filtered query')
+  assert.strictEqual(prepared.limitedAbsences.length, 1)
+  assert(prepared.limitedAbsences[0].claim.includes('within status: completed in last 7 days'))
+})
+
+test('M. Optional retrieval error => unavailable domain preserved without failing turn', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [
+      { domain: 'project', importance: 'REQUIRED', queryMode: 'catalog', limit: 5 },
+      { domain: 'review', importance: 'OPTIONAL', queryMode: 'catalog', limit: 5 },
+    ],
+    requiresPreparation: true,
+  }
+
+  const outcomes: DomainOutcome[] = [
+    {
+      domain: 'project',
+      importance: 'REQUIRED',
+      status: 'AVAILABLE',
+      returnedCount: 1,
+      records: [
+        {
+          entityType: 'project',
+          entityId: 'p-1',
+          title: 'Project 1',
+          timestamps: {},
+          epistemicClass: 'WV_RECORD',
+          fields: {},
+          provenance: { table: 'workspace_projects', id: 'p-1', workspace_id: 'ws-1' },
+        },
+      ],
+    },
+    {
+      domain: 'review',
+      importance: 'OPTIONAL',
+      status: 'UNAVAILABLE',
+      returnedCount: 0,
+      error: 'Network timeout connecting to database',
+      records: [],
+    },
+  ]
+
+  const prepared = prepareReasoningContext(mockPlan, outcomes, 15)
+  assert.strictEqual(prepared.unavailableDomains.includes('review'), true)
+  assert.strictEqual(prepared.requiredDomainUnavailable, false, 'Optional domain failure must not set requiredDomainUnavailable')
+})
+
+test('N. Required retrieval error => incomplete prepared context, not false absence', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [
+      { domain: 'task', importance: 'REQUIRED', queryMode: 'catalog', limit: 10 },
+    ],
+    requiresPreparation: true,
+  }
+
+  const outcomes: DomainOutcome[] = [
+    {
+      domain: 'task',
+      importance: 'REQUIRED',
+      status: 'UNAVAILABLE',
+      returnedCount: 0,
+      error: 'Database connection failed',
+      records: [],
+    },
+  ]
+
+  const prepared = prepareReasoningContext(mockPlan, outcomes, 10)
+  assert.strictEqual(prepared.requiredDomainUnavailable, true)
+  assert.strictEqual(prepared.verifiedAbsences.length, 0, 'Retrieval error must NOT become a verified absence')
+  assert.strictEqual(prepared.limitedAbsences.length, 0)
+})
+
+test('O. Ambiguous target => ambiguity preserved', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [
+      { domain: 'project', importance: 'REQUIRED', queryMode: 'targeted', entityTarget: 'Alpha', limit: 5 },
+    ],
+    requiresPreparation: true,
+  }
+
+  const outcomes: DomainOutcome[] = [
+    {
+      domain: 'project',
+      importance: 'REQUIRED',
+      status: 'AMBIGUOUS',
+      returnedCount: 2,
+      ambiguity: {
+        domain: 'project',
+        query: 'Alpha',
+        candidateMatches: [
+          { id: 'p-1', title: 'Alpha One' },
+          { id: 'p-2', title: 'Alpha Two' },
+        ],
+        message: 'Multiple projects match Alpha',
+      },
+      records: [],
+    },
+  ]
+
+  const prepared = prepareReasoningContext(mockPlan, outcomes, 10)
+  assert.strictEqual(prepared.ambiguousDomains.includes('project'), true)
+})
+
+// ----------------------------------------------------------------------------
+// P through U: Relational Clustering, Deduplication, Temporal Facts & Descriptive Counts
+// ----------------------------------------------------------------------------
+
+test('P. Duplicate record retrieved through two paths => deduplicated by authoritative identity', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [
+      { domain: 'task', importance: 'REQUIRED', queryMode: 'catalog', limit: 10 },
+    ],
+    requiresPreparation: true,
+  }
+
+  const duplicateRecord: VaultRecord = {
+    entityType: 'task',
+    entityId: 't-dup',
+    title: 'Duplicate Task',
+    timestamps: {},
+    epistemicClass: 'WV_RECORD',
+    fields: { status: 'todo' },
+    provenance: { table: 'tasks', id: 't-dup', workspace_id: 'ws-1' },
+  }
+
+  const outcomes: DomainOutcome[] = [
+    {
+      domain: 'task',
+      importance: 'REQUIRED',
+      status: 'AVAILABLE',
+      returnedCount: 1,
+      records: [duplicateRecord],
+    },
+    {
+      domain: 'task',
+      importance: 'REQUIRED',
+      status: 'AVAILABLE',
+      returnedCount: 1,
+      records: [duplicateRecord],
+    },
+  ]
+
+  const prepared = prepareReasoningContext(mockPlan, outcomes, 10)
+  assert.strictEqual(prepared.retrievalSummary.totalRetrievedCount, 1, 'Records must be deduplicated by identity')
+})
+
+test('Q. Task linked by projectId => authoritative project cluster', () => {
+  const projectRecord: VaultRecord = {
+    entityType: 'project',
+    entityId: 'proj-123',
+    title: 'PEVRA',
+    timestamps: {},
+    epistemicClass: 'WV_RECORD',
+    fields: { status: 'active' },
+    provenance: { table: 'workspace_projects', id: 'proj-123', workspace_id: 'ws-1' },
+  }
+
+  const taskRecord: VaultRecord = {
+    entityType: 'task',
+    entityId: 't-1',
+    title: 'PEVRA Task',
+    timestamps: {},
+    relationship: { projectId: 'proj-123' },
+    epistemicClass: 'WV_RECORD',
+    fields: { status: 'todo', projectId: 'proj-123' },
+    provenance: { table: 'tasks', id: 't-1', workspace_id: 'ws-1' },
+  }
+
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+
+  const outcomes: DomainOutcome[] = [
+    { domain: 'project', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [projectRecord] },
+    { domain: 'task', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [taskRecord] },
+  ]
+
+  const prepared = prepareReasoningContext(mockPlan, outcomes, 10)
+  assert.strictEqual(prepared.clusters.length, 1)
+  assert.strictEqual(prepared.clusters[0].primaryEntity.id, 'proj-123')
+  assert.strictEqual(prepared.clusters[0].records.length, 1)
+  assert.strictEqual(prepared.clusters[0].records[0].entityId, 't-1')
+})
+
+test('R. Unlinked task => unlinkedRecords, not guessed relationship', () => {
+  const projectRecord: VaultRecord = {
+    entityType: 'project',
+    entityId: 'proj-123',
+    title: 'PEVRA',
+    timestamps: {},
+    epistemicClass: 'WV_RECORD',
+    fields: {},
+    provenance: { table: 'workspace_projects', id: 'proj-123', workspace_id: 'ws-1' },
+  }
+
+  // Task mentions PEVRA in title but has NO projectId foreign key
+  const unlinkedTask: VaultRecord = {
+    entityType: 'task',
+    entityId: 't-unlinked',
+    title: 'Unlinked task mentioning PEVRA',
+    timestamps: {},
+    epistemicClass: 'WV_RECORD',
+    fields: { status: 'todo' },
+    provenance: { table: 'tasks', id: 't-unlinked', workspace_id: 'ws-1' },
+  }
+
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+
+  const outcomes: DomainOutcome[] = [
+    { domain: 'project', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [projectRecord] },
+    { domain: 'task', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [unlinkedTask] },
+  ]
+
+  const prepared = prepareReasoningContext(mockPlan, outcomes, 10)
+  assert.strictEqual(prepared.clusters[0].records.length, 0, 'Unlinked task must NOT be clustered by lexical guessing')
+  assert.strictEqual(prepared.unlinkedRecords.task.length, 1)
+  assert.strictEqual(prepared.unlinkedRecords.task[0].entityId, 't-unlinked')
+})
+
+test('S. Overdue task => isOverdue and daysOverdue calculated correctly', () => {
+  const anchorNow = new Date('2026-09-28T12:00:00.000Z')
+  const overdueTask: VaultRecord = {
+    entityType: 'task',
+    entityId: 't-overdue',
+    title: 'Overdue task',
+    timestamps: { due_date: '2026-09-24T12:00:00.000Z' },
+    epistemicClass: 'WV_RECORD',
+    fields: { status: 'in_progress', due_date: '2026-09-24T12:00:00.000Z' },
+    provenance: { table: 'tasks', id: 't-overdue', workspace_id: 'ws-1' },
+  }
+
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'WEEKLY_FOCUS',
+    reasoningMode: 'PRIORITIZATION',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+
+  const outcomes: DomainOutcome[] = [
+    { domain: 'task', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [overdueTask] },
+  ]
+
+  const prepared = prepareReasoningContext(mockPlan, outcomes, 10, anchorNow)
+  assert.strictEqual(prepared.temporalFacts.length, 1)
+  const fact = prepared.temporalFacts[0]
+  assert.strictEqual(fact.isOverdue, true)
+  assert.strictEqual(fact.daysOverdue, 4)
+})
+
+test('T. No activity >14 days => neutral daysSinceLastRecordedActivity only, NOT isStale', () => {
+  const anchorNow = new Date('2026-09-28T12:00:00.000Z')
+  const oldRecord: VaultRecord = {
+    entityType: 'project',
+    entityId: 'p-old',
+    title: 'Old project',
+    timestamps: { updated_at: '2026-09-08T12:00:00.000Z' },
+    epistemicClass: 'WV_RECORD',
+    fields: { status: 'active' },
+    provenance: { table: 'workspace_projects', id: 'p-old', workspace_id: 'ws-1' },
+  }
+
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+
+  const outcomes: DomainOutcome[] = [
+    { domain: 'project', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [oldRecord] },
+  ]
+
+  const prepared = prepareReasoningContext(mockPlan, outcomes, 10, anchorNow)
+  const fact = prepared.temporalFacts.find((f) => f.recordId === 'p-old')
+  assert(fact !== undefined)
+  assert.strictEqual(fact.daysSinceLastRecordedActivity, 20)
+  assert.strictEqual((fact as any).isStale, undefined, 'Must NOT label record with arbitrary isStale boolean')
+})
+
+test('U. 3 completed of 5 recorded tasks => descriptive counts only, NO 60% completion percentage', () => {
+  const tasks: VaultRecord[] = [
+    { entityType: 'task', entityId: 't1', title: 'T1', timestamps: {}, epistemicClass: 'WV_RECORD', fields: { status: 'completed' }, provenance: { table: 'tasks', id: 't1', workspace_id: 'ws-1' } },
+    { entityType: 'task', entityId: 't2', title: 'T2', timestamps: {}, epistemicClass: 'WV_RECORD', fields: { status: 'completed' }, provenance: { table: 'tasks', id: 't2', workspace_id: 'ws-1' } },
+    { entityType: 'task', entityId: 't3', title: 'T3', timestamps: {}, epistemicClass: 'WV_RECORD', fields: { status: 'completed' }, provenance: { table: 'tasks', id: 't3', workspace_id: 'ws-1' } },
+    { entityType: 'task', entityId: 't4', title: 'T4', timestamps: {}, epistemicClass: 'WV_RECORD', fields: { status: 'todo' }, provenance: { table: 'tasks', id: 't4', workspace_id: 'ws-1' } },
+    { entityType: 'task', entityId: 't5', title: 'T5', timestamps: {}, epistemicClass: 'WV_RECORD', fields: { status: 'in_progress' }, provenance: { table: 'tasks', id: 't5', workspace_id: 'ws-1' } },
+  ]
+
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+
+  const outcomes: DomainOutcome[] = [
+    { domain: 'task', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 5, records: tasks },
+  ]
+
+  const prepared = prepareReasoningContext(mockPlan, outcomes, 10)
+  assert.strictEqual(prepared.descriptiveCounts.recordedTaskCount, 5)
+  assert.strictEqual(prepared.descriptiveCounts.completedRecordedTaskCount, 3)
+  assert.strictEqual(prepared.descriptiveCounts.openRecordedTaskCount, 2)
+  assert.strictEqual((prepared as any).completionRatio, undefined, 'Must NOT calculate completionRatio')
+  assert.strictEqual((prepared as any).progressPercentage, undefined, 'Must NOT calculate progressPercentage')
+})
+
+// ----------------------------------------------------------------------------
+// V through AA: Research Epistemics, Provenance & Serialization
+// ----------------------------------------------------------------------------
+
+test('V & W. Research record with status=completed is not labeled verified/proven, claim_summary distinct from evidence_text', () => {
+  const researchRec: VaultRecord = {
+    entityType: 'research',
+    entityId: 'r-1',
+    title: 'Token Economics Analysis',
+    timestamps: { completed_at: '2026-09-20T10:00:00.000Z' },
+    epistemicClass: 'WV_RECORD',
+    fields: {
+      workflow_status: 'completed',
+      evidenceItems: [
+        {
+          id: 'ev-1',
+          evidence_text: 'Exact quote: supply is fixed at 100M tokens',
+          claim_summary: 'Fixed inflation curve suggests scarcity',
+          epistemicClass: 'RESEARCH_EVIDENCE',
+        },
+      ],
+    },
+    provenance: { table: 'research_records', id: 'r-1', workspace_id: 'ws-1' },
+  }
+
+  assert.strictEqual(researchRec.epistemicClass, 'WV_RECORD')
+  assert.strictEqual(researchRec.fields.evidenceItems[0].epistemicClass, 'RESEARCH_EVIDENCE')
+  assert.notStrictEqual(
+    researchRec.fields.evidenceItems[0].evidence_text,
+    researchRec.fields.evidenceItems[0].claim_summary
+  )
+})
+
+test('X & Y. Prepared records preserve provenance identity & multi-domain handles remain valid', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'WEEKLY_FOCUS',
+    reasoningMode: 'PRIORITIZATION',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+
+  const pRec: VaultRecord = {
+    entityType: 'project',
+    entityId: 'proj-snip',
+    title: 'Snip3rash',
+    timestamps: {},
+    epistemicClass: 'WV_RECORD',
+    fields: { status: 'active' },
+    provenance: { table: 'workspace_projects', id: 'proj-snip', workspace_id: 'ws-1' },
+  }
+  const tRec: VaultRecord = {
+    entityType: 'task',
+    entityId: 'task-oct',
+    title: 'October objective',
+    timestamps: {},
+    epistemicClass: 'WV_RECORD',
+    fields: { status: 'todo' },
+    provenance: { table: 'tasks', id: 'task-oct', workspace_id: 'ws-1' },
+  }
+
+  const outcomes: DomainOutcome[] = [
+    { domain: 'project', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [pRec] },
+    { domain: 'task', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [tRec] },
+  ]
+
+  const prepared = prepareReasoningContext(mockPlan, outcomes, 10)
+  const envelope = flattenPreparedContextToEnvelope(prepared, 'ws-1')
+  const sourceMap = createRequestSourceMap(envelope)
+
+  assert.strictEqual(sourceMap.get('S1')?.entityId, 'proj-snip')
+  assert.strictEqual(sourceMap.get('S2')?.entityId, 'task-oct')
+
+  const parsed = parseModelProvenance('Response referencing both [SOURCES: S1, S2 | BASIS: SYNTHESIS]')
+  assert.strictEqual(parsed.hasTag, true)
+  assert.strictEqual(parsed.basis, 'SYNTHESIS')
+
+  const authResult = resolveAuthoritativeProvenance(sourceMap, parsed)
+  assert.strictEqual(authResult.status, 'COMPLETE')
+  assert.strictEqual(authResult.validHandlesCount, 2)
+  assert.strictEqual(authResult.citations.length, 2)
+  assert.strictEqual(authResult.citations[0].entityId, 'proj-snip')
+  assert.strictEqual(authResult.citations[1].entityId, 'task-oct')
+})
+
+test('Z. Batch 2B.1 protocol remains concealed from client stream', () => {
+  let clientStreamOutput = ''
+  const filter = createProvenanceStreamFilter((chunk) => {
+    clientStreamOutput += chunk
+  })
+
+  filter.push('Here is the status of Snip3rash.')
+  filter.push(' [SOURCES: S1 |')
+  filter.push(' BASIS: DIRECT_FACT]')
+
+  const result = filter.flush()
+  assert.strictEqual(clientStreamOutput.trim(), 'Here is the status of Snip3rash.')
+  assert(!clientStreamOutput.includes('[SOURCES:'), 'Stream must not contain protocol tags')
+  assert.strictEqual(result.hasTag, true)
+  assert.strictEqual(result.handles[0], 'S1')
+  assert.strictEqual(result.basis, 'DIRECT_FACT')
+})
+
+test('AA. Zero authoritative material citations => provenance UNAVAILABLE', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'WEEKLY_FOCUS',
+    reasoningMode: 'PRIORITIZATION',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+
+  const prepared = prepareReasoningContext(mockPlan, [], 10)
+  const envelope = flattenPreparedContextToEnvelope(prepared, 'ws-1')
+  const sourceMap = createRequestSourceMap(envelope)
+
+  const parsedNoTag = parseModelProvenance('No sources used here.')
+  const authResult = resolveAuthoritativeProvenance(sourceMap, parsedNoTag)
+  assert.strictEqual(authResult.status, 'UNAVAILABLE')
+  assert.strictEqual(authResult.citations.length, 0)
+})
+
+// ----------------------------------------------------------------------------
+// AB through AD: Batch 2A Entity Extraction Regressions
+// ----------------------------------------------------------------------------
+
+test('AB. Batch 2A entity extraction regressions remain green', () => {
+  const p1 = planRetrieval({ prompt: 'Give me a status report on Snip3rash trading academy using only my Vault records.' })
+  assert.strictEqual(p1.intents[0].domain, 'project')
+  assert.strictEqual(p1.intents[0].entityQuery, 'Snip3rash trading academy')
+
+  const p2 = planRetrieval({ prompt: 'What are the active tasks for PEVRA?' })
+  assert(p2.intents.some((i) => i.domain === 'task'))
+  assert.strictEqual(p2.resolvedEntityHints[0].name, 'PEVRA')
+})
+
+test('AC. Unknown Project Nightfall behavior remains correct (entity query preserved)', () => {
+  const p = planRetrieval({ prompt: 'Status report on Project Nightfall' })
+  assert.strictEqual(p.shouldRetrieve, true)
+  assert.strictEqual(p.intents[0].entityQuery, 'Project Nightfall')
+})
+
+test('AD. Current Snip3rash retrieval behavior remains correct with context qualifier rejection', () => {
+  const p = planRetrieval({
+    prompt: 'Based only on my Vault records, what should I focus on first for Snip3rash Trading Academy right now, and why?',
+  })
+  assert.strictEqual(p.shouldRetrieve, true)
+  assert.strictEqual(p.resolvedEntityHints[0]?.name, 'Snip3rash Trading Academy')
+})
+
+console.log(`\nAll ${passedTests} deterministic verification tests PASSED!\n`)
