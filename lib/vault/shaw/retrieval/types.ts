@@ -281,11 +281,11 @@ export interface PreparedTemporalFact {
 }
 
 export interface PreparedDescriptiveCounts {
-  recordedTaskCount: number
-  openRecordedTaskCount: number
-  completedRecordedTaskCount: number
-  recordedDecisionCount: number
-  meetingCount: number
+  recordedTaskCount?: number
+  openRecordedTaskCount?: number
+  completedRecordedTaskCount?: number
+  recordedDecisionCount?: number
+  meetingCount?: number
   recordedMetricCount?: number
 }
 

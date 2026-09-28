@@ -17,6 +17,8 @@
  */
 
 import assert from 'node:assert'
+import fs from 'node:fs'
+import path from 'node:path'
 import {
   planRetrieval,
   planReasoning,
@@ -1351,6 +1353,587 @@ test('PP-V. Temporal entity collision tests remain green', () => {
   assert.strictEqual(monthPlan?.entityTarget, undefined)
   const todayPlan = planReasoning({ prompt: 'What should I focus on today?' })
   assert.strictEqual(todayPlan?.entityTarget, undefined)
+})
+
+
+// ============================================================================
+// Epistemic & Protocol Hardening Suite (HD-A through HD-AE + Live Fixture)
+// ============================================================================
+
+test('HD-A. meeting NOT requested => meetingCount undefined', () => {
+  const plan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [{ domain: 'task', importance: 'REQUIRED', queryMode: 'targeted', limit: 5 }],
+    requiresPreparation: true,
+  }
+  const outcomes: DomainOutcome[] = [
+    { domain: 'task', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [
+      { entityType: 'task', entityId: 't-1', title: 'Task 1', timestamps: {}, epistemicClass: 'WV_RECORD', fields: { status: 'todo' }, provenance: { table: 'tasks', id: 't-1', workspace_id: 'ws-1' } }
+    ] }
+  ]
+  const prepared = prepareReasoningContext(plan, outcomes, 5)
+  assert.strictEqual(prepared.descriptiveCounts.meetingCount, undefined, 'meetingCount must be undefined when meeting not requested')
+})
+
+test('HD-B. meeting NOT requested => serializer does not emit meetings="0"', () => {
+  const plan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [{ domain: 'task', importance: 'REQUIRED', queryMode: 'targeted', limit: 5 }],
+    requiresPreparation: true,
+  }
+  const outcomes: DomainOutcome[] = [
+    { domain: 'task', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [
+      { entityType: 'task', entityId: 't-1', title: 'Task 1', timestamps: {}, epistemicClass: 'WV_RECORD', fields: { status: 'todo' }, provenance: { table: 'tasks', id: 't-1', workspace_id: 'ws-1' } }
+    ] }
+  ]
+  const prepared = prepareReasoningContext(plan, outcomes, 5)
+  const env = flattenPreparedContextToEnvelope(prepared, 'ws-1')
+  const prompt = serializePreparedContextForPrompt(prepared, env)
+  assert(!prompt.includes('meetings='), 'Must not emit meetings attribute when unrequested')
+})
+
+test('HD-C. metric NOT requested => recordedMetricCount undefined', () => {
+  const plan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [{ domain: 'task', importance: 'REQUIRED', queryMode: 'targeted', limit: 5 }],
+    requiresPreparation: true,
+  }
+  const outcomes: DomainOutcome[] = [
+    { domain: 'task', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [
+      { entityType: 'task', entityId: 't-1', title: 'Task 1', timestamps: {}, epistemicClass: 'WV_RECORD', fields: { status: 'todo' }, provenance: { table: 'tasks', id: 't-1', workspace_id: 'ws-1' } }
+    ] }
+  ]
+  const prepared = prepareReasoningContext(plan, outcomes, 5)
+  assert.strictEqual(prepared.descriptiveCounts.recordedMetricCount, undefined, 'recordedMetricCount must be undefined when metric not requested')
+  const env = flattenPreparedContextToEnvelope(prepared, 'ws-1')
+  const prompt = serializePreparedContextForPrompt(prepared, env)
+  assert(!prompt.includes('recorded_metrics='), 'Must not emit recorded_metrics when unrequested')
+})
+
+test('HD-D. decision NOT requested => recordedDecisionCount undefined', () => {
+  const plan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [{ domain: 'task', importance: 'REQUIRED', queryMode: 'targeted', limit: 5 }],
+    requiresPreparation: true,
+  }
+  const outcomes: DomainOutcome[] = [
+    { domain: 'task', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [
+      { entityType: 'task', entityId: 't-1', title: 'Task 1', timestamps: {}, epistemicClass: 'WV_RECORD', fields: { status: 'todo' }, provenance: { table: 'tasks', id: 't-1', workspace_id: 'ws-1' } }
+    ] }
+  ]
+  const prepared = prepareReasoningContext(plan, outcomes, 5)
+  assert.strictEqual(prepared.descriptiveCounts.recordedDecisionCount, undefined, 'recordedDecisionCount must be undefined when decision not requested')
+  const env = flattenPreparedContextToEnvelope(prepared, 'ws-1')
+  const prompt = serializePreparedContextForPrompt(prepared, env)
+  assert(!prompt.includes('recorded_decisions='), 'Must not emit recorded_decisions when unrequested')
+})
+
+test('HD-E. task requested with one todo task => recorded=1, open=1, completed=0', () => {
+  const plan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [{ domain: 'task', importance: 'REQUIRED', queryMode: 'targeted', limit: 5 }],
+    requiresPreparation: true,
+  }
+  const outcomes: DomainOutcome[] = [
+    { domain: 'task', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [
+      { entityType: 'task', entityId: 't-1', title: 'Task 1', timestamps: {}, epistemicClass: 'WV_RECORD', fields: { status: 'todo' }, provenance: { table: 'tasks', id: 't-1', workspace_id: 'ws-1' } }
+    ] }
+  ]
+  const prepared = prepareReasoningContext(plan, outcomes, 5)
+  assert.strictEqual(prepared.descriptiveCounts.recordedTaskCount, 1)
+  assert.strictEqual(prepared.descriptiveCounts.openRecordedTaskCount, 1)
+  assert.strictEqual(prepared.descriptiveCounts.completedRecordedTaskCount, 0)
+})
+
+test('HD-F. requested/evaluated domain with zero may represent numeric zero only within its supported completeness semantics', () => {
+  const plan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [
+      { domain: 'task', importance: 'REQUIRED', queryMode: 'targeted', limit: 5 },
+      { domain: 'decision', importance: 'OPTIONAL', queryMode: 'targeted', limit: 5 },
+    ],
+    requiresPreparation: true,
+  }
+  const outcomes: DomainOutcome[] = [
+    { domain: 'task', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [
+      { entityType: 'task', entityId: 't-1', title: 'Task 1', timestamps: {}, epistemicClass: 'WV_RECORD', fields: { status: 'todo' }, provenance: { table: 'tasks', id: 't-1', workspace_id: 'ws-1' } }
+    ] },
+    { domain: 'decision', importance: 'OPTIONAL', status: 'LIMITED_EMPTY', returnedCount: 0, records: [] }
+  ]
+  const prepared = prepareReasoningContext(plan, outcomes, 5)
+  assert.strictEqual(prepared.descriptiveCounts.recordedDecisionCount, 0, 'Evaluated decision domain with 0 records is numeric 0')
+  const env = flattenPreparedContextToEnvelope(prepared, 'ws-1')
+  const prompt = serializePreparedContextForPrompt(prepared, env)
+  assert(prompt.includes('recorded_decisions="0"'), 'Emits recorded_decisions="0" when requested and evaluated')
+})
+
+test('HD-G. valid trailing [SOURCES: ...] remains hidden', () => {
+  let clientStreamOutput = ''
+  const filter = createProvenanceStreamFilter((chunk) => {
+    clientStreamOutput += chunk
+  })
+  filter.push('Analysis of progress.\n\n[SOURCES: S1, S2 | BASIS: SYNTHESIS]')
+  filter.flush()
+  assert(!clientStreamOutput.includes('[SOURCES:'), 'Must conceal [SOURCES:]')
+  assert(!clientStreamOutput.includes('S1'), 'Must conceal S1')
+  assert(!clientStreamOutput.includes('S2'), 'Must conceal S2')
+  assert(clientStreamOutput.includes('Analysis of progress.'), 'Must preserve natural prose')
+})
+
+test('HD-H. inline [S1] is hidden from client stream', () => {
+  const mockEnv = {
+    records: [{ entityType: 'project', entityId: 'p-1', title: 'Snip3rash', timestamps: {}, fields: {}, epistemicClass: 'WV_RECORD' }],
+    resolvedScope: { workspaceId: 'ws-1' },
+    ambiguities: [],
+    emptyStates: [],
+    completeness: [],
+    truncated: false,
+    retrievalTimestamp: new Date().toISOString(),
+  } as any
+  const sourceMap = createRequestSourceMap(mockEnv)
+  let streamed = ''
+  const filter = createProvenanceStreamFilter((chunk) => {
+    streamed += chunk
+  }, sourceMap)
+  filter.push('Project is active [S1].')
+  filter.flush()
+  assert.strictEqual(streamed.trim(), 'Project is active.')
+})
+
+test('HD-I. inline [S2] split across stream chunks is hidden', () => {
+  const mockEnv = {
+    records: [
+      { entityType: 'project', entityId: 'p-1', title: 'Snip3rash', timestamps: {}, fields: {}, epistemicClass: 'WV_RECORD' },
+      { entityType: 'task', entityId: 't-1', title: 'Objective', timestamps: {}, fields: {}, epistemicClass: 'WV_RECORD' }
+    ],
+    resolvedScope: { workspaceId: 'ws-1' },
+    ambiguities: [],
+    emptyStates: [],
+    completeness: [],
+    truncated: false,
+    retrievalTimestamp: new Date().toISOString(),
+  } as any
+  const sourceMap = createRequestSourceMap(mockEnv)
+  let streamed = ''
+  const filter = createProvenanceStreamFilter((chunk) => {
+    streamed += chunk
+  }, sourceMap)
+  filter.push('Objective is todo [')
+  filter.push('S')
+  filter.push('2')
+  filter.push('].')
+  filter.flush()
+  assert.strictEqual(streamed.trim(), 'Objective is todo.')
+})
+
+test('HD-J. inline current-turn valid handles are absent from persisted visible content', () => {
+  const mockEnv = {
+    records: [{ entityType: 'project', entityId: 'p-1', title: 'Snip3rash', timestamps: {}, fields: {}, epistemicClass: 'WV_RECORD' }],
+    resolvedScope: { workspaceId: 'ws-1' },
+    ambiguities: [],
+    emptyStates: [],
+    completeness: [],
+    truncated: false,
+    retrievalTimestamp: new Date().toISOString(),
+  } as any
+  const sourceMap = createRequestSourceMap(mockEnv)
+  const parsed = parseModelProvenance('Project is active [S1].', sourceMap)
+  assert.strictEqual(parsed.cleanText, 'Project is active.')
+  assert(!parsed.cleanText.includes('S1'))
+})
+
+test('HD-K. [reasoning_context] is hidden', () => {
+  const parsed = parseModelProvenance('Counts are verified [reasoning_context].')
+  assert.strictEqual(parsed.cleanText, 'Counts are verified.')
+  assert(!parsed.cleanText.includes('reasoning_context'))
+})
+
+test('HD-L. internal identifier split across chunks remains hidden', () => {
+  let streamed = ''
+  const filter = createProvenanceStreamFilter((chunk) => {
+    streamed += chunk
+  })
+  filter.push('Counts are based on [')
+  filter.push('reason')
+  filter.push('ing_context].')
+  filter.flush()
+  assert.strictEqual(streamed.trim(), 'Counts are based on the retrieved Vault context.')
+})
+
+test('HD-M. legitimate bracketed prose that is NOT an internal artifact remains untouched', () => {
+  const text = 'Note: [urgent] priority and [1] footnote [see details].'
+  const parsed = parseModelProvenance(text)
+  assert.strictEqual(parsed.cleanText, text, 'Legitimate prose in brackets must remain untouched')
+})
+
+test('HD-N. raw UUID concealment behavior remains unchanged', () => {
+  const mockEnv = {
+    records: [{ entityType: 'project', entityId: '97ac6d73-7e89-4557-9af6-d02b7c641dd9', title: 'Snip3rash', timestamps: {}, fields: {}, epistemicClass: 'WV_RECORD' }],
+    resolvedScope: { workspaceId: 'ws-1' },
+    ambiguities: [],
+    emptyStates: [],
+    completeness: [],
+    truncated: false,
+    retrievalTimestamp: new Date().toISOString(),
+  } as any
+  const sourceMap = createRequestSourceMap(mockEnv)
+  assert.strictEqual(sourceMap.has('S1'), true)
+  assert.strictEqual(sourceMap.has('97ac6d73-7e89-4557-9af6-d02b7c641dd9'), false, 'Source map only indexes server handles, never raw UUIDs')
+})
+
+test('HD-O. no trailing tag + inline valid [S1] [S2] => handles recovered before sanitization', () => {
+  const mockEnv = {
+    records: [
+      { entityType: 'project', entityId: 'p-1', title: 'Snip3rash', timestamps: {}, fields: {}, epistemicClass: 'WV_RECORD' },
+      { entityType: 'task', entityId: 't-1', title: 'Objective', timestamps: {}, fields: {}, epistemicClass: 'WV_RECORD' }
+    ],
+    resolvedScope: { workspaceId: 'ws-1' },
+    ambiguities: [],
+    emptyStates: [],
+    completeness: [],
+    truncated: false,
+    retrievalTimestamp: new Date().toISOString(),
+  } as any
+  const sourceMap = createRequestSourceMap(mockEnv)
+  const parsed = parseModelProvenance('Project is active [S1]. Objective is todo [S2].', sourceMap)
+  assert.strictEqual(parsed.hasTag, true)
+  assert.deepStrictEqual(parsed.handles, ['S1', 'S2'])
+  assert.strictEqual(parsed.basis, 'SYNTHESIS')
+  assert.strictEqual(parsed.cleanText, 'Project is active. Objective is todo.')
+})
+
+test('HD-P. recovered inline handles are validated against RequestSourceMap', () => {
+  const mockEnv = {
+    records: [
+      { entityType: 'project', entityId: 'p-1', title: 'Snip3rash', timestamps: {}, fields: {}, epistemicClass: 'WV_RECORD' },
+      { entityType: 'task', entityId: 't-1', title: 'Objective', timestamps: {}, fields: {}, epistemicClass: 'WV_RECORD' }
+    ],
+    resolvedScope: { workspaceId: 'ws-1' },
+    ambiguities: [],
+    emptyStates: [],
+    completeness: [],
+    truncated: false,
+    retrievalTimestamp: new Date().toISOString(),
+  } as any
+  const sourceMap = createRequestSourceMap(mockEnv)
+  const parsed = parseModelProvenance('Project is active [S1]. Objective is todo [S2].', sourceMap)
+  const result = resolveAuthoritativeProvenance(sourceMap, parsed)
+  assert.strictEqual(result.status, 'COMPLETE')
+  assert.strictEqual(result.validHandlesCount, 2)
+  assert.strictEqual(result.citations.length, 2)
+})
+
+test('HD-Q. invalid [S999] is never accepted as authoritative provenance', () => {
+  const mockEnv = {
+    records: [{ entityType: 'project', entityId: 'p-1', title: 'Snip3rash', timestamps: {}, fields: {}, epistemicClass: 'WV_RECORD' }],
+    resolvedScope: { workspaceId: 'ws-1' },
+    ambiguities: [],
+    emptyStates: [],
+    completeness: [],
+    truncated: false,
+    retrievalTimestamp: new Date().toISOString(),
+  } as any
+  const sourceMap = createRequestSourceMap(mockEnv)
+  const parsed = parseModelProvenance('Project is active [S999].', sourceMap)
+  assert.strictEqual(parsed.hasTag, false)
+  assert.strictEqual(parsed.handles.length, 0)
+  const result = resolveAuthoritativeProvenance(sourceMap, parsed)
+  assert.strictEqual(result.status, 'UNAVAILABLE')
+  assert.strictEqual(result.validHandlesCount, 0)
+})
+
+test('HD-R. valid trailing protocol remains preferred when present', () => {
+  const mockEnv = {
+    records: [
+      { entityType: 'project', entityId: 'p-1', title: 'Snip3rash', timestamps: {}, fields: {}, epistemicClass: 'WV_RECORD' },
+      { entityType: 'task', entityId: 't-1', title: 'Objective', timestamps: {}, fields: {}, epistemicClass: 'WV_RECORD' }
+    ],
+    resolvedScope: { workspaceId: 'ws-1' },
+    ambiguities: [],
+    emptyStates: [],
+    completeness: [],
+    truncated: false,
+    retrievalTimestamp: new Date().toISOString(),
+  } as any
+  const sourceMap = createRequestSourceMap(mockEnv)
+  const raw = 'Active [S1] prose.\n\n[SOURCES: S2 | BASIS: DIRECT_FACT]'
+  const parsed = parseModelProvenance(raw, sourceMap)
+  assert.strictEqual(parsed.hasTag, true)
+  assert.deepStrictEqual(parsed.handles, ['S2'], 'Trailing protocol handles must be preferred over inline')
+  assert.strictEqual(parsed.basis, 'DIRECT_FACT')
+})
+
+test('HD-S. malformed inline handles do not create fake citations', () => {
+  const mockEnv = {
+    records: [{ entityType: 'project', entityId: 'p-1', title: 'Snip3rash', timestamps: {}, fields: {}, epistemicClass: 'WV_RECORD' }],
+    resolvedScope: { workspaceId: 'ws-1' },
+    ambiguities: [],
+    emptyStates: [],
+    completeness: [],
+    truncated: false,
+    retrievalTimestamp: new Date().toISOString(),
+  } as any
+  const sourceMap = createRequestSourceMap(mockEnv)
+  const parsed = parseModelProvenance('Active [S] and [SABC] and [task1].', sourceMap)
+  assert.strictEqual(parsed.hasTag, false)
+  assert.strictEqual(parsed.handles.length, 0)
+})
+
+test('HD-T. LIMITED_EMPTY serializes explicit bounded semantics', () => {
+  const plan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [{ domain: 'metric', importance: 'OPTIONAL', queryMode: 'targeted', limit: 5 }],
+    requiresPreparation: true,
+  }
+  const outcomes: DomainOutcome[] = [
+    {
+      domain: 'metric',
+      importance: 'OPTIONAL',
+      status: 'LIMITED_EMPTY',
+      returnedCount: 0,
+      completeness: { domain: 'metric', queryMode: 'targeted', resultScope: 'filtered', returnedCount: 0, appliedLimit: 5, filterDescription: 'project: Snip3rash' },
+      records: []
+    }
+  ]
+  const prepared = prepareReasoningContext(plan, outcomes, 5)
+  const env = flattenPreparedContextToEnvelope(prepared, 'ws-1')
+  const prompt = serializePreparedContextForPrompt(prepared, env)
+  assert(prompt.includes('absence_kind="BOUNDED"'), 'Must serialize absence_kind="BOUNDED"')
+  assert(prompt.includes('claim_strength="NO_MATCH_WITHIN_RETRIEVED_SCOPE"'), 'Must serialize claim_strength')
+})
+
+test('HD-U. LIMITED_EMPTY sets global absence authorization false', () => {
+  const plan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [{ domain: 'decision', importance: 'OPTIONAL', queryMode: 'targeted', limit: 5 }],
+    requiresPreparation: true,
+  }
+  const outcomes: DomainOutcome[] = [
+    {
+      domain: 'decision',
+      importance: 'OPTIONAL',
+      status: 'LIMITED_EMPTY',
+      returnedCount: 0,
+      completeness: { domain: 'decision', queryMode: 'targeted', resultScope: 'filtered', returnedCount: 0, appliedLimit: 5, filterDescription: 'query: Snip3rash' },
+      records: []
+    }
+  ]
+  const prepared = prepareReasoningContext(plan, outcomes, 5)
+  const env = flattenPreparedContextToEnvelope(prepared, 'ws-1')
+  const prompt = serializePreparedContextForPrompt(prepared, env)
+  assert(prompt.includes('global_absence_authorized="false"'), 'Must set global_absence_authorized="false" on limited absence')
+})
+
+test('HD-V. verified absence remains distinguishable from limited absence', () => {
+  const plan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [{ domain: 'task', importance: 'REQUIRED', queryMode: 'targeted', limit: 5 }],
+    requiresPreparation: true,
+  }
+  const outcomes: DomainOutcome[] = [
+    {
+      domain: 'task',
+      importance: 'REQUIRED',
+      status: 'CONFIRMED_EMPTY',
+      returnedCount: 0,
+      completeness: { domain: 'task', queryMode: 'targeted', resultScope: 'exhaustive', returnedCount: 0 },
+      records: []
+    }
+  ]
+  const prepared = prepareReasoningContext(plan, outcomes, 5)
+  const env = flattenPreparedContextToEnvelope(prepared, 'ws-1')
+  const prompt = serializePreparedContextForPrompt(prepared, env)
+  assert(prompt.includes('absence_kind="VERIFIED"'), 'Must serialize absence_kind="VERIFIED"')
+  assert(prompt.includes('global_absence_authorized="true"'), 'Must set global_absence_authorized="true" on verified absence')
+})
+
+test('HD-W. model-facing instructions explicitly prohibit converting bounded absence to global absence', () => {
+  const plan = planReasoning({ prompt: 'Give me a progress report on Snip3rash trading academy.' })!
+  const outcomes: DomainOutcome[] = [
+    { domain: 'project', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [] }
+  ]
+  const prepared = prepareReasoningContext(plan, outcomes, 5)
+  const env = flattenPreparedContextToEnvelope(prepared, 'ws-1')
+  const prompt = serializePreparedContextForPrompt(prepared, env)
+  assert(prompt.includes('STRICTLY FORBIDDEN: "No metrics have been logged.", "The project has no decisions.", "No reviews exist.", or any phrasing that converts NO MATCH RETURNED into DOES NOT EXIST.'))
+  assert(prompt.includes('Internal source handles (e.g. S1, S2) and internal context/schema identifiers are machine protocol only. NEVER cite or mention them in visible prose.'))
+})
+
+test('HD-X. PROJECT_PROGRESS still requests: project/task/decision/review/metric', () => {
+  const plan = planReasoning({ prompt: 'Give me a progress report on Snip3rash trading academy.' })!
+  assert.strictEqual(plan.primaryIntent, 'PROJECT_PROGRESS')
+  const domains = plan.domainRequests.map((r) => r.domain)
+  assert(domains.includes('project'))
+  assert(domains.includes('task'))
+  assert(domains.includes('decision'))
+  assert(domains.includes('review'))
+  assert(domains.includes('metric'))
+})
+
+test('HD-Y. WEEKLY_FOCUS remains green', () => {
+  const plan = planReasoning({ prompt: 'What should I focus on this week based only on my Vault records?' })
+  assert.strictEqual(plan?.primaryIntent, 'WEEKLY_FOCUS')
+  assert.strictEqual(plan?.entityTarget, undefined)
+})
+
+test('HD-Z. temporal entity collision remains green', () => {
+  const weekPlan = planReasoning({ prompt: 'What should I work on this week?' })
+  assert.strictEqual(weekPlan?.entityTarget, undefined)
+  const monthPlan = planReasoning({ prompt: 'What should I focus on this month?' })
+  assert.strictEqual(monthPlan?.entityTarget, undefined)
+})
+
+test('HD-AA. project status active does not imply progress', () => {
+  const rec: VaultRecord = {
+    entityType: 'project',
+    entityId: 'p-1',
+    title: 'Snip3rash',
+    timestamps: {},
+    fields: { status: 'active' },
+    epistemicClass: 'WV_RECORD',
+    provenance: { table: 'projects', id: 'p-1', workspace_id: 'ws-1' },
+  }
+  const plan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [{ domain: 'project', importance: 'REQUIRED', queryMode: 'targeted', limit: 5 }],
+    requiresPreparation: true,
+  }
+  const prepared = prepareReasoningContext(plan, [{ domain: 'project', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [rec] }], 5)
+  assert.strictEqual((prepared as any).isProgressing, undefined)
+  assert.strictEqual((prepared as any).isOnTrack, undefined)
+})
+
+test('HD-AB. due_date null remains authoritative', () => {
+  const taskRec: VaultRecord = {
+    entityType: 'task',
+    entityId: 't-1',
+    title: 'October objective',
+    timestamps: {},
+    fields: { status: 'todo', due_date: null },
+    epistemicClass: 'WV_RECORD',
+    provenance: { table: 'tasks', id: 't-1', workspace_id: 'ws-1' },
+  }
+  const plan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [{ domain: 'task', importance: 'REQUIRED', queryMode: 'targeted', limit: 5 }],
+    requiresPreparation: true,
+  }
+  const prepared = prepareReasoningContext(plan, [{ domain: 'task', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [taskRec] }], 5)
+  const tf = prepared.temporalFacts.find((f) => f.recordId === 't-1')
+  assert.strictEqual(tf?.due_date, null)
+  assert.strictEqual(tf?.isOverdue, undefined)
+})
+
+test('HD-AC. task counts remain 1/1/0 for production-shaped Snip3rash fixture', () => {
+  const taskRec: VaultRecord = {
+    entityType: 'task',
+    entityId: 't-snip',
+    title: 'October objective',
+    timestamps: { created_at: '2026-09-26T09:46:44Z' },
+    fields: { status: 'todo', due_date: null, priority: 'medium' },
+    epistemicClass: 'WV_RECORD',
+    provenance: { table: 'tasks', id: 't-snip', workspace_id: 'ws-1' },
+  }
+  const plan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [{ domain: 'task', importance: 'REQUIRED', queryMode: 'targeted', limit: 5 }],
+    requiresPreparation: true,
+  }
+  const prepared = prepareReasoningContext(plan, [{ domain: 'task', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [taskRec] }], 5)
+  assert.strictEqual(prepared.descriptiveCounts.recordedTaskCount, 1)
+  assert.strictEqual(prepared.descriptiveCounts.openRecordedTaskCount, 1)
+  assert.strictEqual(prepared.descriptiveCounts.completedRecordedTaskCount, 0)
+})
+
+test('HD-AD. source-map provenance behavior remains authoritative', () => {
+  const mockEnv = {
+    records: [
+      { entityType: 'project', entityId: 'p-1', title: 'Snip3rash', timestamps: {}, fields: {}, epistemicClass: 'WV_RECORD' }
+    ],
+    resolvedScope: { workspaceId: 'ws-1' },
+    ambiguities: [],
+    emptyStates: [],
+    completeness: [],
+    truncated: false,
+    retrievalTimestamp: new Date().toISOString(),
+  } as any
+  const sourceMap = createRequestSourceMap(mockEnv)
+  assert.strictEqual(sourceMap.get('S1')?.title, 'Snip3rash')
+})
+
+test('HD-AE. no Migration 018', () => {
+  const migrationsDir = path.join(process.cwd(), 'supabase', 'migrations')
+  if (fs.existsSync(migrationsDir)) {
+    const files = fs.readdirSync(migrationsDir)
+    assert(!files.some((f) => f.startsWith('018')), 'No Migration 018 must be created')
+  }
+})
+
+test('HD-FIX. Live Groq fixture verification', () => {
+  const mockEnv = {
+    records: [
+      { entityType: 'project', entityId: '97ac6d73-7e89-4557-9af6-d02b7c641dd9', title: 'Snip3rash trading academy', timestamps: {}, fields: {}, epistemicClass: 'WV_RECORD' },
+      { entityType: 'task', entityId: '63b9f36b-c0cf-4e15-b98e-c093ea953edf', title: 'October objective', timestamps: {}, fields: {}, epistemicClass: 'WV_RECORD' }
+    ],
+    resolvedScope: { workspaceId: 'ws-1' },
+    ambiguities: [],
+    emptyStates: [],
+    completeness: [],
+    truncated: false,
+    retrievalTimestamp: new Date().toISOString(),
+  } as any
+  const sourceMap = createRequestSourceMap(mockEnv)
+
+  const rawGroqOutput = `Project is active [S1].
+October objective is todo [S2].
+Counts are based on [reasoning_context].`
+
+  const parsed = parseModelProvenance(rawGroqOutput, sourceMap)
+
+  // Expected visible/persisted text
+  assert.strictEqual(
+    parsed.cleanText,
+    `Project is active.
+October objective is todo.
+Counts are based on the retrieved Vault context.`,
+    'Visible text must be grammatical with no leaked handles or broken punctuation'
+  )
+
+  // Provenance resolution
+  assert.deepStrictEqual(parsed.handles, ['S1', 'S2'])
+  assert.strictEqual(parsed.hasTag, true)
+
+  const result = resolveAuthoritativeProvenance(sourceMap, parsed)
+  assert.strictEqual(result.status, 'COMPLETE')
+  assert.strictEqual(result.validHandlesCount, 2)
+  assert.strictEqual(result.citations.length, 2)
+  assert.strictEqual(result.citations[0].title, 'Snip3rash trading academy')
+  assert.strictEqual(result.citations[1].title, 'October objective')
+  assert(!result.invalidHandles.includes('reasoning_context'), 'reasoning_context is never treated as a source')
 })
 
 console.log(`\nAll ${passedTests} deterministic verification tests PASSED!\n`)

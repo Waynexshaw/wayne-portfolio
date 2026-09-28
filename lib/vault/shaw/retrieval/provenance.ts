@@ -86,6 +86,72 @@ export function resolveProvenanceRoute(source: {
 
 export const PROVENANCE_TAG_REGEX = /(?:\[SOURCES:\s*([^|\]]+?)(?:\s*\|\s*BASIS:\s*([A-Za-z_]+))?\s*\]|<!--\s*SOURCES:\s*([^|>-]+?)(?:\s*\|\s*BASIS:\s*([A-Za-z_]+))?\s*-->)/i
 
+export const INTERNAL_CONTEXT_IDENTIFIERS: ReadonlySet<string> = new Set([
+  'reasoning_context',
+  'retrieved_records',
+  'limited_absences',
+  'verified_absences',
+  'temporal_facts',
+  'descriptive_counts',
+  'domain_outcomes',
+  'vault_context',
+  'retrieval_scope',
+  'ambiguities',
+  'empty_states',
+  'records',
+  'plan',
+])
+
+export function isInternalContextIdentifier(str: string): boolean {
+  return INTERNAL_CONTEXT_IDENTIFIERS.has(str.toLowerCase())
+}
+
+/**
+ * Canonical sanitization policy for client-visible and persisted assistant prose.
+ * Strips trailing provenance protocol tags, inline current-turn source handles ([S1], [S2]...),
+ * and known internal context/schema identifiers without damaging legitimate user-facing bracketed prose
+ * or leaving broken punctuation or doubled spaces.
+ */
+export function sanitizeVisibleProse(text: string, sourceMap?: RequestSourceMap): string {
+  if (!text) return ''
+
+  // 1. Strip trailing provenance tags
+  let res = text.replace(PROVENANCE_TAG_REGEX, '')
+
+  // 2. Rewrite internal tag references in narrative prose (e.g. "based on [reasoning_context]")
+  res = res.replace(
+    /\b(based\s+on|in|from)[ \t\u202F]+\[(reasoning_context|retrieved_records|limited_absences|verified_absences|temporal_facts|descriptive_counts|domain_outcomes|vault_context|retrieval_scope|ambiguities|empty_states|records|plan)\]/gi,
+    '$1 the retrieved Vault context'
+  )
+
+  // 3. Remove internal context identifiers: [reasoning_context], etc.
+  res = res.replace(/([ \t\u202F]*)\[([a-z_]+)\]([ \t\u202F]*)([.,!?;:]?)/gi, (match, leadingSpace, tag, trailingSpace, punct) => {
+    if (isInternalContextIdentifier(tag)) {
+      if (punct) return punct
+      return (leadingSpace || trailingSpace) ? ' ' : ''
+    }
+    return match
+  })
+
+  // 4. Remove inline source handles: [S1], [S2], etc.
+  res = res.replace(/([ \t\u202F]*)\[(S\d+)\]([ \t\u202F]*)([.,!?;:]?)/gi, (match, leadingSpace, handle, trailingSpace, punct) => {
+    const upper = handle.toUpperCase()
+    const isTarget = sourceMap ? sourceMap.has(upper) : true
+    if (isTarget) {
+      if (punct) return punct
+      return (leadingSpace || trailingSpace) ? ' ' : ''
+    }
+    return match
+  })
+
+  // 5. Clean up spaces before punctuation on the same line and collapse horizontal whitespace
+  res = res.replace(/[ \t]+([.,!?;:])/g, '$1')
+  res = res.replace(/[ \t]{2,}/g, ' ')
+  res = res.replace(/[ \t]+$/gm, '')
+
+  return res.trim()
+}
+
 export interface ParsedModelProvenance {
   cleanText: string
   handles: string[]
@@ -97,48 +163,81 @@ export interface ParsedModelProvenance {
 /**
  * Parses structured provenance tags (e.g. [SOURCES: S1, S2 | BASIS: DIRECT_FACT])
  * from model output and returns clean response prose.
+ * Also performs resilient fallback recovery of valid inline handles matching RequestSourceMap.
  */
-export function parseModelProvenance(text: string): ParsedModelProvenance {
+export function parseModelProvenance(
+  text: string,
+  sourceMap?: RequestSourceMap
+): ParsedModelProvenance {
   if (!text) {
     return { cleanText: '', handles: [], hasTag: false }
   }
 
   const match = text.match(PROVENANCE_TAG_REGEX)
-  if (!match) {
-    return {
-      cleanText: text.trim(),
-      handles: [],
-      hasTag: false,
+  let rawHandles = ''
+  let rawBasis = ''
+  let hasTag = false
+  let rawTag: string | undefined = undefined
+
+  if (match) {
+    hasTag = true
+    rawTag = match[0]
+    rawHandles = (match[1] || match[3] || '').trim()
+    rawBasis = (match[2] || match[4] || '').trim().toUpperCase()
+  }
+
+  let handles: string[] = []
+  let basis: AnswerBasis | undefined = undefined
+
+  if (hasTag) {
+    handles = rawHandles
+      .split(/[,\s]+/)
+      .map((h) => h.trim().toUpperCase())
+      .filter((h) => /^S\d+$/.test(h))
+
+    const validBases: Set<AnswerBasis> = new Set([
+      'DIRECT_FACT',
+      'SYNTHESIS',
+      'INFERENCE',
+      'UNKNOWN',
+      'CONFLICT',
+    ])
+    basis = validBases.has(rawBasis as AnswerBasis)
+      ? (rawBasis as AnswerBasis)
+      : undefined
+  } else {
+    // Resilient Provenance Recovery:
+    // If no valid trailing tag exists, recover inline bracketed handles [S1], [S2]
+    // matching handles in the current RequestSourceMap BEFORE sanitizing.
+    const inlineMatches = text.matchAll(/\[(S\d+)\]/gi)
+    const recovered: string[] = []
+    const seen = new Set<string>()
+
+    for (const m of inlineMatches) {
+      const handle = m[1].toUpperCase()
+      if (!seen.has(handle)) {
+        seen.add(handle)
+        if (!sourceMap || sourceMap.has(handle)) {
+          recovered.push(handle)
+        }
+      }
+    }
+
+    if (recovered.length > 0) {
+      handles = recovered
+      hasTag = true
+      basis = 'SYNTHESIS' // Default basis for synthesized multi-domain answers
     }
   }
 
-  const rawHandles = (match[1] || match[3] || '').trim()
-  const rawBasis = (match[2] || match[4] || '').trim().toUpperCase()
-
-  const handles = rawHandles
-    .split(/[,\s]+/)
-    .map((h) => h.trim().toUpperCase())
-    .filter((h) => /^S\d+$/.test(h))
-
-  const validBases: Set<AnswerBasis> = new Set([
-    'DIRECT_FACT',
-    'SYNTHESIS',
-    'INFERENCE',
-    'UNKNOWN',
-    'CONFLICT',
-  ])
-  const basis: AnswerBasis | undefined = validBases.has(rawBasis as AnswerBasis)
-    ? (rawBasis as AnswerBasis)
-    : undefined
-
-  const cleanText = text.replace(match[0], '').trim()
+  const cleanText = sanitizeVisibleProse(text, sourceMap)
 
   return {
     cleanText,
     handles,
     basis,
-    hasTag: true,
-    rawTag: match[0],
+    hasTag,
+    rawTag,
   }
 }
 
@@ -249,58 +348,56 @@ export function resolveAuthoritativeProvenance(
 
 /**
  * Creates a stream filter that forwards natural prose tokens immediately to the client
- * while buffering potential trailing provenance protocol tags (e.g. [SOURCES: S1...])
- * so they are never emitted into visible client text.
+ * while buffering potential trailing provenance protocol tags and concealing inline internal artifacts.
  */
-export function createProvenanceStreamFilter(onTextChunk: (text: string) => void) {
+export function createProvenanceStreamFilter(
+  onTextChunk: (text: string) => void,
+  sourceMap?: RequestSourceMap
+) {
   let fullRawText = ''
-  let pendingBuffer = ''
-  const TRIGGER_PREFIX = '[SOURCES:'
+  let emittedText = ''
 
   return {
     push(text: string) {
       fullRawText += text
-      pendingBuffer += text
+      const currentClean = sanitizeVisibleProse(fullRawText, sourceMap)
 
-      // Check if pendingBuffer contains TRIGGER_PREFIX
-      const idx = pendingBuffer.indexOf(TRIGGER_PREFIX)
-      if (idx !== -1) {
-        const before = pendingBuffer.slice(0, idx)
-        if (before.length > 0) {
-          onTextChunk(before)
-        }
-        pendingBuffer = pendingBuffer.slice(idx)
-        return
+      // Hold emission if fullRawText currently ends with an unclosed bracket or HTML comment tag
+      let safeLength = currentClean.length
+      const lastOpen = fullRawText.lastIndexOf('[')
+      const lastClose = fullRawText.lastIndexOf(']')
+      const lastOpenHtml = fullRawText.lastIndexOf('<!--')
+      const lastCloseHtml = fullRawText.lastIndexOf('-->')
+
+      const inBracket = lastOpen !== -1 && lastOpen > lastClose
+      const inHtml = lastOpenHtml !== -1 && lastOpenHtml > lastCloseHtml
+
+      if (inBracket || inHtml) {
+        const unclosedIdx = inBracket ? lastOpen : lastOpenHtml
+        const textBeforeTag = fullRawText.slice(0, unclosedIdx)
+        const cleanBeforeTag = sanitizeVisibleProse(textBeforeTag, sourceMap)
+        safeLength = Math.min(safeLength, cleanBeforeTag.length)
       }
 
-      // If buffer might end with a partial prefix (e.g. "[", "[S", "[SOUR")
-      let longestPrefixMatch = 0
-      for (let i = 1; i <= Math.min(pendingBuffer.length, TRIGGER_PREFIX.length - 1); i++) {
-        const slice = pendingBuffer.slice(-i)
-        if (TRIGGER_PREFIX.startsWith(slice)) {
-          longestPrefixMatch = i
+      if (safeLength > emittedText.length) {
+        const delta = currentClean.slice(emittedText.length, safeLength)
+        if (delta.length > 0) {
+          onTextChunk(delta)
+          emittedText += delta
         }
-      }
-
-      if (longestPrefixMatch > 0) {
-        const safe = pendingBuffer.slice(0, -longestPrefixMatch)
-        if (safe.length > 0) {
-          onTextChunk(safe)
-        }
-        pendingBuffer = pendingBuffer.slice(-longestPrefixMatch)
-      } else {
-        onTextChunk(pendingBuffer)
-        pendingBuffer = ''
       }
     },
     flush(): ParsedModelProvenance {
-      const parsed = parseModelProvenance(fullRawText)
-      if (!parsed.hasTag && pendingBuffer.length > 0) {
-        // False alarm bracket, flush pending buffer
-        onTextChunk(pendingBuffer)
+      const finalClean = sanitizeVisibleProse(fullRawText, sourceMap)
+      if (finalClean.length > emittedText.length) {
+        const delta = finalClean.slice(emittedText.length)
+        if (delta.length > 0) {
+          onTextChunk(delta)
+          emittedText += delta
+        }
       }
-      pendingBuffer = ''
-      return parsed
+
+      return parseModelProvenance(fullRawText, sourceMap)
     },
   }
 }

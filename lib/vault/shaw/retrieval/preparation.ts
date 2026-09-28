@@ -175,26 +175,46 @@ export function prepareReasoningContext(
   }
 
   // 5. Descriptive Counts (Strictly descriptive, NO completion ratio or percentage)
-  const tasks = deduplicatedRecords.filter((r) => r.entityType === 'task')
-  const completedTasks = tasks.filter((t) => {
-    const s = (t.fields?.status || '').toLowerCase()
-    return s === 'completed' || s === 'done'
-  })
-  const openTasks = tasks.filter((t) => {
-    const s = (t.fields?.status || '').toLowerCase()
-    return s === 'todo' || s === 'in_progress' || s === 'blocked'
-  })
-  const decisions = deduplicatedRecords.filter((r) => r.entityType === 'decision')
-  const meetings = deduplicatedRecords.filter((r) => r.entityType === 'meeting')
-  const metrics = deduplicatedRecords.filter((r) => r.entityType === 'metric')
+  // Domain-aware: counts are populated ONLY for domains actually requested and evaluated.
+  const isDomainEvaluated = (domain: RetrievalDomain): boolean => {
+    const isRequested =
+      plan.domainRequests.some((r) => r.domain === domain) ||
+      domainOutcomes.some((o) => o.domain === domain)
+    if (!isRequested) return false
+    const outcome = domainOutcomes.find((o) => o.domain === domain)
+    return Boolean(outcome && outcome.status !== 'UNAVAILABLE')
+  }
 
-  const descriptiveCounts: PreparedDescriptiveCounts = {
-    recordedTaskCount: tasks.length,
-    openRecordedTaskCount: openTasks.length,
-    completedRecordedTaskCount: completedTasks.length,
-    recordedDecisionCount: decisions.length,
-    meetingCount: meetings.length,
-    recordedMetricCount: metrics.length,
+  const descriptiveCounts: PreparedDescriptiveCounts = {}
+
+  if (isDomainEvaluated('task')) {
+    const tasks = deduplicatedRecords.filter((r) => r.entityType === 'task')
+    const completedTasks = tasks.filter((t) => {
+      const s = (t.fields?.status || '').toLowerCase()
+      return s === 'completed' || s === 'done'
+    })
+    const openTasks = tasks.filter((t) => {
+      const s = (t.fields?.status || '').toLowerCase()
+      return s === 'todo' || s === 'in_progress' || s === 'blocked'
+    })
+    descriptiveCounts.recordedTaskCount = tasks.length
+    descriptiveCounts.openRecordedTaskCount = openTasks.length
+    descriptiveCounts.completedRecordedTaskCount = completedTasks.length
+  }
+
+  if (isDomainEvaluated('decision')) {
+    const decisions = deduplicatedRecords.filter((r) => r.entityType === 'decision')
+    descriptiveCounts.recordedDecisionCount = decisions.length
+  }
+
+  if (isDomainEvaluated('meeting')) {
+    const meetings = deduplicatedRecords.filter((r) => r.entityType === 'meeting')
+    descriptiveCounts.meetingCount = meetings.length
+  }
+
+  if (isDomainEvaluated('metric')) {
+    const metrics = deduplicatedRecords.filter((r) => r.entityType === 'metric')
+    descriptiveCounts.recordedMetricCount = metrics.length
   }
 
   // 6. Safe Absence Registry (Grounded in CollectionCompleteness)

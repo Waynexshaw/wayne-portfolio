@@ -114,6 +114,7 @@ export function serializeVaultContextForPrompt(
   if (envelope.records.length > 0) {
     parts.push('<!-- PROVENANCE CITATION DIRECTIVE (CRITICAL): -->')
     parts.push('<!-- Each record below is assigned a server-managed request-local source handle (e.g. ref="S1", ref="S2"). -->')
+    parts.push('<!-- Internal source handles and internal context/schema identifiers are machine protocol only. NEVER cite or mention them in visible prose. Do not write [S1], [S2], [reasoning_context], or XML/context tag names in the answer. -->')
     parts.push('<!-- If your answer draws upon or references information from any retrieved record, you MUST append a trailing provenance tag at the very end of your response in this exact format: -->')
     parts.push('<!-- [SOURCES: S1, S2 | BASIS: DIRECT_FACT] -->')
     parts.push('<!-- Supported BASIS values: DIRECT_FACT, SYNTHESIS, INFERENCE, UNKNOWN, CONFLICT. -->')
@@ -222,7 +223,9 @@ export function serializePreparedContextForPrompt(
   parts.push('<!-- REASONING SYNTHESIS DIRECTIVES: -->')
   parts.push(`<!-- Primary Intent: ${prepared.plan.primaryIntent} | Mode: ${prepared.plan.reasoningMode} -->`)
   parts.push('<!-- 1. EXHAUSTIVE: If a verified absence is recorded, you may confirm no such records exist in the Vault. -->')
-  parts.push('<!-- 2. LIMITED: If an absence is marked limited, only a filtered/bounded subset was retrieved. DO NOT claim records do not exist globally. State absence strictly within the query bounds (e.g. "No decision records were returned for this project within the retrieved decision scope"). -->')
+  parts.push('<!-- 2. LIMITED ABSENCE BOUNDARY (CRITICAL): If an absence is marked bounded (absence_kind="BOUNDED" / global_absence_authorized="false"), only a filtered/bounded query subset was evaluated. DO NOT claim records do not exist globally. State absence strictly within the query bounds (e.g. "No decision records were returned for this project within the retrieved decision scope"). The answer MUST preserve the retrieval boundary. -->')
+  parts.push('<!--    Allowed: "No metric records were returned for Snip3rash within the retrieved metric scope." or "No matching decision records were returned for this project." -->')
+  parts.push('<!--    STRICTLY FORBIDDEN: "No metrics have been logged.", "The project has no decisions.", "No reviews exist.", or any phrasing that converts NO MATCH RETURNED into DOES NOT EXIST. -->')
   parts.push('<!-- 3. NEUTRAL FACTS: Overdue days and timestamps are calculated calendar facts. Recommendations must be separated from recorded facts. -->')
   parts.push('<!-- 4. NO SCORE: Do not invent completion percentages or project health scores. Cite descriptive counts directly. -->')
   parts.push('<!-- 5. NEGATIVE FACTUAL CLAIMS GROUNDING (CRITICAL): Any negative factual claim stating that something is absent from the Vault must be grounded strictly in: -->')
@@ -239,6 +242,7 @@ export function serializePreparedContextForPrompt(
   parts.push('<!--    - BOUNDED GAP: Grounded in limited query bounds (e.g. "No decision, review, or metric records were returned for this project within the retrieved query scope"). -->')
   parts.push('<!--    - OBSERVATIONAL GAP: Gaps in prose descriptions of retrieved records (e.g. "The retrieved project and task descriptions do not specify a numeric member target"). Missing numeric values alone must NEVER be framed as "no metrics exist in the Vault". -->')
   parts.push('<!--    - RECOMMENDATION: Prescriptive next steps, never stated as historical or recorded facts (e.g. "You could define specific target metrics and action items"). -->')
+  parts.push('<!-- 8. INTERNAL ARTIFACT CONCEALMENT (CRITICAL): Internal source handles (e.g. S1, S2) and internal context/schema identifiers are machine protocol only. NEVER cite or mention them in visible prose. Do not write [S1], [S2], [reasoning_context], XML/context tag names, or other internal identifiers in the answer. Source handles may appear ONLY inside the required trailing [SOURCES: S1, S2 | BASIS: ...] provenance protocol at the very end. -->')
 
   // Reasoning Plan & Outcomes
   parts.push('<reasoning_context>')
@@ -256,7 +260,7 @@ export function serializePreparedContextForPrompt(
   if (prepared.verifiedAbsences.length > 0) {
     parts.push('    <verified_absences>')
     for (const va of prepared.verifiedAbsences) {
-      parts.push(`      <absence domain="${va.domain}" scope="exhaustive">${escapeRecordContent(va.claim)}</absence>`)
+      parts.push(`      <absence domain="${va.domain}" absence_kind="VERIFIED" scope="exhaustive" claim_strength="VERIFIED_ABSENT" global_absence_authorized="true">${escapeRecordContent(va.claim)}</absence>`)
     }
     parts.push('    </verified_absences>')
   }
@@ -264,14 +268,24 @@ export function serializePreparedContextForPrompt(
   if (prepared.limitedAbsences.length > 0) {
     parts.push('    <limited_absences>')
     for (const la of prepared.limitedAbsences) {
-      parts.push(`      <absence domain="${la.domain}" scope="${la.scope}">${escapeRecordContent(la.claim)}</absence>`)
+      parts.push(`      <absence domain="${la.domain}" absence_kind="BOUNDED" scope="${la.scope}" claim_strength="NO_MATCH_WITHIN_RETRIEVED_SCOPE" global_absence_authorized="false">${escapeRecordContent(la.claim)}</absence>`)
     }
     parts.push('    </limited_absences>')
   }
 
-  // Descriptive Counts
+  // Descriptive Counts (conditionally serialize only evaluated counts)
   const counts = prepared.descriptiveCounts
-  parts.push(`    <descriptive_counts recorded_tasks="${counts.recordedTaskCount}" open_tasks="${counts.openRecordedTaskCount}" completed_tasks="${counts.completedRecordedTaskCount}" recorded_decisions="${counts.recordedDecisionCount}" meetings="${counts.meetingCount}" recorded_metrics="${counts.recordedMetricCount ?? 0}" />`)
+  const countAttrs: string[] = []
+  if (counts.recordedTaskCount !== undefined) countAttrs.push(`recorded_tasks="${counts.recordedTaskCount}"`)
+  if (counts.openRecordedTaskCount !== undefined) countAttrs.push(`open_tasks="${counts.openRecordedTaskCount}"`)
+  if (counts.completedRecordedTaskCount !== undefined) countAttrs.push(`completed_tasks="${counts.completedRecordedTaskCount}"`)
+  if (counts.recordedDecisionCount !== undefined) countAttrs.push(`recorded_decisions="${counts.recordedDecisionCount}"`)
+  if (counts.meetingCount !== undefined) countAttrs.push(`meetings="${counts.meetingCount}"`)
+  if (counts.recordedMetricCount !== undefined) countAttrs.push(`recorded_metrics="${counts.recordedMetricCount}"`)
+
+  if (countAttrs.length > 0) {
+    parts.push(`    <descriptive_counts ${countAttrs.join(' ')} />`)
+  }
 
   // Neutral Temporal Facts
   if (prepared.temporalFacts.length > 0) {
@@ -310,6 +324,7 @@ export function serializePreparedContextForPrompt(
   if (envelope.records.length > 0) {
     parts.push('<!-- PROVENANCE CITATION DIRECTIVE (CRITICAL): -->')
     parts.push('<!-- Each record below is assigned a server-managed request-local source handle (e.g. ref="S1", ref="S2"). -->')
+    parts.push('<!-- Internal source handles and internal context/schema identifiers are machine protocol only. NEVER cite or mention them in visible prose. Do not write [S1], [S2], [reasoning_context], XML/context tag names, or other internal identifiers in the answer. -->')
     parts.push('<!-- If your answer draws upon or references information from any retrieved record, you MUST append a trailing provenance tag at the very end of your response in this exact format: -->')
     parts.push('<!-- [SOURCES: S1, S2 | BASIS: SYNTHESIS] -->')
     parts.push('<!-- Supported BASIS values: DIRECT_FACT, SYNTHESIS, INFERENCE, UNKNOWN, CONFLICT. -->')

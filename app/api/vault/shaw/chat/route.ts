@@ -420,7 +420,7 @@ export async function POST(request: NextRequest) {
                 encoder.encode(`data: ${JSON.stringify({ type: 'text', text: cleanChunk })}\n\n`)
               )
             }
-          })
+          }, requestSourceMap)
 
           while (true) {
             const { done, value } = await reader.read()
