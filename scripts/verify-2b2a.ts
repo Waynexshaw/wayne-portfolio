@@ -2258,11 +2258,11 @@ test('EC-REG. Production-shaped Snip3rash fixture regression produces clean simp
 
 - **Quantitative tracking** – There are no metrics tracking community growth, signal engagement, or channel performance.
 
-- **Completion evidence** – No completed tasks or milestones are recorded.
+- **Completion evidence** – No completed tasks or milestones are recorded. Milestones were undocumented.
 
 **Summary**
 
-The project is active, but the recorded work is still limited to one open task. All governance artifacts (decisions, reviews, metrics) are absent.`
+The project is active, but the recorded work is still limited to one open task. All governance artifacts (decisions, reviews, metrics) are absent. [SOURCES: S2 | BASIS: DIRECT_FACT]`
 
   const cleaned = sanitizeVisibleProse(mockRawModelOutput, undefined, { isTechnicalMode: false })
 
@@ -2272,8 +2272,60 @@ The project is active, but the recorded work is still limited to one open task. 
   assert(!cleaned.includes('There are no metrics tracking'), 'Global metric absence must be normalized')
   assert(cleaned.includes('The records checked do not track'), 'Metric gap must remain observational')
   assert(!cleaned.includes('subtasks'), 'Unmodeled subtasks claim must be normalized')
+  assert(!cleaned.includes('Milestones were undocumented'), 'Unmodeled milestones were undocumented must be normalized')
   assert(!cleaned.includes('milestones'), 'Unmodeled milestones claim must be normalized')
   assert(!cleaned.includes('[Limited absence:'), 'Internal bracketed machine notes must be stripped')
+  assert(!cleaned.includes('within the retrieved scope'), 'Technical scope jargon must be normalized to records checked')
+  assert(!cleaned.includes('[SOURCES:'), 'SOURCES tag must be stripped')
+  assert(!cleaned.includes('DIRECT_FACT'), 'DIRECT_FACT must be stripped')
+})
+
+test('EC-REG2. Protocol stream filter concealment across split tokens', () => {
+  const chunks = [
+    'The project is active and has one open task.\n\n',
+    'No decisions were found in the records checked.\n\n',
+    '[SOURCES: S',
+    '2 | BASIS: ',
+    'DIRECT_FACT]',
+  ]
+  const emittedChunks: string[] = []
+  const filter = createProvenanceStreamFilter((chunk) => {
+    emittedChunks.push(chunk)
+  })
+
+  for (const c of chunks) {
+    filter.push(c)
+  }
+  const parsed = filter.flush()
+
+  // Verify none of the emitted chunks contain internal protocol
+  for (const ec of emittedChunks) {
+    assert(!ec.includes('[SOURCES:'), 'Emitted chunk must never contain [SOURCES:')
+    assert(!ec.includes('DIRECT_FACT'), 'Emitted chunk must never contain DIRECT_FACT')
+    assert(!ec.includes('S2'), 'Emitted chunk must never contain handle S2')
+  }
+
+  // Verify provenance was preserved internally in parsed result
+  assert(parsed.hasTag, 'Parsed provenance must retain hasTag')
+  assert.deepStrictEqual(parsed.handles, ['S2'], 'Parsed provenance must retain S2 handle')
+  assert.strictEqual(parsed.basis, 'DIRECT_FACT', 'Parsed provenance must retain DIRECT_FACT basis')
+  assert(!parsed.cleanText.includes('[SOURCES:'), 'Clean text must not contain [SOURCES:')
+})
+
+test('EC-REG3. Unmodeled absence claims normalized across variations', () => {
+  const samples = [
+    'Milestones were undocumented.',
+    'No milestones are recorded.',
+    'No checkpoints have been defined.',
+    'No sprints or subtasks are tracked.',
+  ]
+  for (const s of samples) {
+    const res = sanitizeVisibleProse(s, undefined, { isTechnicalMode: false })
+    assert(!res.includes('undocumented'), `Must normalize: ${s}`)
+    assert(!res.includes('No milestones are recorded'), `Must normalize: ${s}`)
+    assert(!res.includes('No checkpoints have been defined'), `Must normalize: ${s}`)
+    assert(!res.includes('No sprints or subtasks are tracked'), `Must normalize: ${s}`)
+  }
 })
 
 console.log(`\nAll ${passedTests} deterministic verification tests PASSED!\n`)

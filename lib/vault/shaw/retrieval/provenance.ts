@@ -84,7 +84,7 @@ export function resolveProvenanceRoute(source: {
   }
 }
 
-export const PROVENANCE_TAG_REGEX = /(?:\[SOURCES:\s*([^|\]]+?)(?:\s*\|\s*BASIS:\s*([A-Za-z_]+))?\s*\]|<!--\s*SOURCES:\s*([^|>-]+?)(?:\s*\|\s*BASIS:\s*([A-Za-z_]+))?\s*-->)/i
+export const PROVENANCE_TAG_REGEX = /(?:\[SOURCES:\s*([^|\]]+?)(?:\s*\|\s*BASIS:\s*([A-Za-z_]+))?\s*\]|<!--\s*SOURCES:\s*([^|>-]+?)(?:\s*\|\s*BASIS:\s*([A-Za-z_]+))?\s*-->)/gi
 
 export const INTERNAL_CONTEXT_IDENTIFIERS: ReadonlySet<string> = new Set([
   'reasoning_context',
@@ -157,7 +157,35 @@ export function validateAndNormalizeEpistemicClaims(
       "I couldn't find any metrics in the records checked"
     )
 
-    // 5. Normalize unmodeled concept assertions (subtasks, milestones, completion criteria)
+    // 5. Replace technical retrieval jargon with Simple English
+    res = res.replace(
+      /\b(?:within|in)\s+the\s+retrieved\s+(?:[a-z_]+\s+)?scope\b/gi,
+      'in the records checked'
+    )
+    res = res.replace(
+      /\bretrieved\s+scope\b/gi,
+      'records checked'
+    )
+    res = res.replace(
+      /\bretrieved\s+query\s+scope\b/gi,
+      'records checked'
+    )
+    res = res.replace(
+      /\bepistemic\s+policy\b/gi,
+      'records checked'
+    )
+    res = res.replace(
+      /\breasoning\s+context\b/gi,
+      'Vault records'
+    )
+
+    // 6. Normalize unmodeled concept assertions (milestones, subtasks, checkpoints, sprints, etc.)
+    // Vault records model projects and tasks, but not milestones, subtasks, checkpoints, etc.
+    // Replace negative assertions presenting them as absent Vault facts.
+    res = res.replace(
+      /\b(?:No\s+(?:intermediate\s+)?(?:milestones|checkpoints|subtasks|sprints|phases)\s+(?:are|have been)\s+(?:documented|recorded|set|defined|found|tracked)|(?:milestones|checkpoints|subtasks|sprints|phases)\s+(?:are|were)\s+not\s+(?:documented|recorded|set|defined|found|tracked)|milestones\s+were\s+undocumented)\b\.?/gi,
+      'The records checked do not show interim milestone breakdowns.'
+    )
     res = res.replace(
       /\bNo progress updates,\s*subtasks,\s*or completion criteria are documented\.?/gi,
       'The records checked do not show how much of the work has already been completed.'
@@ -183,7 +211,7 @@ export function validateAndNormalizeEpistemicClaims(
       'The records checked do not define specific completion criteria.'
     )
 
-    // 6. Clean unevaluated meeting domain false claims if any
+    // 7. Clean unevaluated meeting domain false claims if any
     res = res.replace(
       /[-•]?\s*Meetings\s*–?\s*the record shows zero meetings logged\.?\n?/gi,
       ''
@@ -313,7 +341,9 @@ export function parseModelProvenance(
     policy = sourceMapOrOptions.policy
   }
 
-  const match = text.match(PROVENANCE_TAG_REGEX)
+  // Use non-global match to retrieve capture groups reliably
+  const tagRegex = /(?:\[SOURCES:\s*([^|\]]+?)(?:\s*\|\s*BASIS:\s*([A-Za-z_]+))?\s*\]|<!--\s*SOURCES:\s*([^|>-]+?)(?:\s*\|\s*BASIS:\s*([A-Za-z_]+))?\s*-->)/i
+  const match = text.match(tagRegex)
   let rawHandles = ''
   let rawBasis = ''
   let hasTag = false
@@ -506,7 +536,8 @@ export function createProvenanceStreamFilter(
       fullRawText += text
       const currentClean = sanitizeVisibleProse(fullRawText, sourceMap, options)
 
-      // Hold emission if fullRawText currently ends with an unclosed bracket, HTML comment tag, or bold asterisk
+      // Hold emission if fullRawText currently ends with an unclosed bracket, HTML comment tag, bold asterisk,
+      // or trailing protocol prefix
       let safeLength = currentClean.length
       const lastOpen = fullRawText.lastIndexOf('[')
       const lastClose = fullRawText.lastIndexOf(']')
@@ -519,6 +550,7 @@ export function createProvenanceStreamFilter(
         !options?.isTechnicalMode &&
         (fullRawText.endsWith('*') || (fullRawText.match(/\*/g)?.length || 0) % 2 === 1)
 
+      // Trailing protocol prefix check (e.g. text ends with "[SOURCES:" or partial bracket tag)
       if (inBracket || inHtml || inStar) {
         let unclosedIdx = -1
         if (inBracket) unclosedIdx = Math.max(unclosedIdx, lastOpen)
@@ -532,6 +564,10 @@ export function createProvenanceStreamFilter(
           const cleanBeforeTag = sanitizeVisibleProse(textBeforeTag, sourceMap, options)
           safeLength = Math.min(safeLength, cleanBeforeTag.length)
         }
+      } else {
+        // Even if bracket is closed, verify if currentClean still contains any unstripped protocol fragment
+        // If an inline tag just closed, sanitizeVisibleProse has already stripped it cleanly
+        safeLength = currentClean.length
       }
 
       if (safeLength > emittedText.length) {
