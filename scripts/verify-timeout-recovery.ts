@@ -721,8 +721,8 @@ async function runTestSuite() {
       const textEventsA = eventsA.filter((e) => e.type === 'text')
       const errorEventsA = eventsA.filter((e) => e.type === 'error')
       assert.strictEqual(textEventsA.length, 0, 'Fabricated percentage claim must be completely withheld')
-      assert.strictEqual(errorEventsA.length, 1, 'Must emit validation error chunk')
-      assert(errorEventsA[0].error.includes('could not be validated against your Vault records'))
+      assert(errorEventsA[0].error.includes("couldn't verify this answer against the available Vault records"))
+      assert.strictEqual(errorEventsA[0].errorCategory, 'evidence_withheld')
 
       // Test Case B: Verified claim with protocol citation tags -> Published with tags cleanly concealed
       const validCandidate = `Snip3rash Plan vs Actual: One task is linked to the project. It is still open, and no linked task is recorded as completed. [SOURCES: S1 | BASIS: DIRECT_FACT]`

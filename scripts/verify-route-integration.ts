@@ -426,8 +426,8 @@ What is missing:
     // ZERO text chunks published!
     assert.strictEqual(textEvents.length, 0, 'Rejected response must withhold 100% of generated text')
     assert.strictEqual(errorEvents.length, 1)
-    assert.strictEqual(errorEvents[0].finishReason, 'content_filter')
-    assert(errorEvents[0].error.includes('could not be validated against your Vault records'))
+    assert(errorEvents[0].error.includes("couldn't verify this answer against the available Vault records"))
+    assert.strictEqual(errorEvents[0].errorCategory, 'evidence_withheld')
 
     // ZERO assistant messages saved
     const savedMessages = mockDb._getMessages().filter((m: any) => m.role === 'assistant')
@@ -617,8 +617,8 @@ What is missing:
 
     assert.strictEqual(textEvents.length, 0, 'Unsupported qualitative progress claims must be withheld')
     assert.strictEqual(errorEvents.length, 1)
-    assert.strictEqual(errorEvents[0].finishReason, 'content_filter')
-    assert(errorEvents[0].error.includes('could not be validated against your Vault records'))
+    assert(errorEvents[0].error.includes("couldn't verify this answer against the available Vault records"))
+    assert.strictEqual(errorEvents[0].errorCategory, 'evidence_withheld')
   })
 
   console.log(`\nAll ${passedTests} route integration tests PASSED!\n`)

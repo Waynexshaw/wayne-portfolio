@@ -1139,7 +1139,7 @@ export function validatePublicationEvidence(
         }
       } else if (perm.allowedNegativeClaimType === 'NONE' && !perm.evaluated) {
         const unevaluatedClaimPattern = new RegExp(
-          `\\b(?:zero\\s+${domain}s?\\s+logged|no\\s+${domain}s?\\s+(?:exist|found|logged|recorded))\\b`,
+          `\\b(?:zero\\s+${domain}s?\\s+logged|no\\s+${domain}s?(?:\\s+records?)?\\s+(?:(?:are|were|have\\s+been)\\s+)?(?:exist|found|logged|recorded)|the\\s+project\\s+has\\s+no\\s+${domain}s?|there\\s+are\\s+no\\s+${domain}s?)\\b`,
           'i'
         )
         if (unevaluatedClaimPattern.test(unquotedFactualText)) {

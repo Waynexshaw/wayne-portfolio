@@ -683,10 +683,10 @@ export async function executeShawChatTurn(
 
                 const errChunk: ShawStreamChunk = {
                   type: 'error',
-                  error: 'The generated report could not be validated against your Vault records and was withheld for accuracy.',
+                  error: "SHAW couldn't verify this answer against the available Vault records. Please try again.",
+                  errorCategory: 'evidence_withheld',
                   finishReason: 'content_filter',
                   userMessageId,
-                  provider: currentProvider,
                 }
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify(errChunk)}\n\n`))
                 controller.close()
