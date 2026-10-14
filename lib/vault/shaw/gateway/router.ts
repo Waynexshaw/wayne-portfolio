@@ -11,6 +11,7 @@ export interface RouteRequestParams {
   selectedModel?: string | null
   temperature?: number
   allowPaidFallback?: boolean
+  signal?: AbortSignal
 }
 
 export interface RouteRequestResult {
@@ -45,6 +46,7 @@ export async function routeRequest(params: RouteRequestParams): Promise<RouteReq
     selectedModel,
     temperature,
     allowPaidFallback = false,
+    signal,
   } = params
 
   // 1. Explicit Manual Selection: Gemini
@@ -58,6 +60,7 @@ export async function routeRequest(params: RouteRequestParams): Promise<RouteReq
       messages,
       temperature,
       modelOverride: model,
+      signal,
     })
     return {
       stream: result.stream,
@@ -79,6 +82,7 @@ export async function routeRequest(params: RouteRequestParams): Promise<RouteReq
       messages,
       temperature,
       modelOverride: model,
+      signal,
     })
     return {
       stream: result.stream,
@@ -102,6 +106,7 @@ export async function routeRequest(params: RouteRequestParams): Promise<RouteReq
         messages,
         temperature,
         modelOverride: model,
+        signal,
       })
       return {
         stream: result.stream,
@@ -125,6 +130,7 @@ export async function routeRequest(params: RouteRequestParams): Promise<RouteReq
         messages,
         temperature,
         modelOverride: model,
+        signal,
       })
       return {
         stream: result.stream,

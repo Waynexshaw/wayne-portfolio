@@ -169,6 +169,12 @@ export function ShawWorkspace({
   const [streamingText, setStreamingText] = useState<string>('')
   const [streamingMeta, setStreamingMeta] = useState<any>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const isUserCancelledRef = useRef<boolean>(false)
+  const activeConversationIdRef = useRef<string | null>(activeConversationId)
+
+  useEffect(() => {
+    activeConversationIdRef.current = activeConversationId
+  }, [activeConversationId])
 
   // Composer state
   const [inputMessage, setInputMessage] = useState<string>('')
@@ -348,8 +354,17 @@ export function ShawWorkspace({
       textareaRef.current.style.height = 'auto'
     }
 
+    isUserCancelledRef.current = false
+    const CLIENT_REQUEST_TIMEOUT_MS = 28000
+    let isClientTimeout = false
+
     const abortController = new AbortController()
     abortControllerRef.current = abortController
+
+    const clientTimeoutTimer = setTimeout(() => {
+      isClientTimeout = true
+      abortController.abort(new Error('CLIENT_TIMEOUT'))
+    }, CLIENT_REQUEST_TIMEOUT_MS)
 
     try {
       const requestPayload: Record<string, any> = {
@@ -413,6 +428,12 @@ export function ShawWorkspace({
       let receivedDone = false
 
       while (true) {
+        // Late-response protection: if user switched conversations, abandon reading for this view
+        if (activeConversationIdRef.current !== targetConvId) {
+          await reader.cancel('User switched conversation').catch(() => {})
+          break
+        }
+
         const { done, value } = await reader.read()
         if (done) break
 
@@ -436,7 +457,10 @@ export function ShawWorkspace({
             continue
           }
 
-          if (chunk.type === 'text' && chunk.text) {
+          if (chunk.type === 'heartbeat') {
+            // Server keepalive heartbeat; do not modify streaming prose
+            continue
+          } else if (chunk.type === 'text' && chunk.text) {
             accumulated += chunk.text
             setStreamingText(accumulated)
           } else if (chunk.type === 'meta') {
@@ -454,26 +478,49 @@ export function ShawWorkspace({
         }
       }
 
-      if (!receivedDone) {
-        const interruptedErr: any = new Error('Response generation was interrupted before completion')
-        interruptedErr.statusCode = 500
-        interruptedErr.provider = targetRouting
-        interruptedErr.userMessageId = activeTargetMessageId
-        throw interruptedErr
-      }
+      // Only evaluate completion if still on active conversation
+      if (activeConversationIdRef.current === targetConvId) {
+        if (!receivedDone) {
+          const interruptedErr: any = new Error('Response generation was interrupted before completion')
+          interruptedErr.statusCode = 500
+          interruptedErr.provider = targetRouting
+          interruptedErr.userMessageId = activeTargetMessageId
+          throw interruptedErr
+        }
 
-      // Stream successfully finished, reload messages to get persistent DB record
-      const refreshed = await getShawConversationDetailAction(workspaceId, targetConvId)
-      if (refreshed) {
-        setMessages(refreshed.messages)
-      }
+        // Stream successfully finished, reload messages to get persistent DB record
+        const refreshed = await getShawConversationDetailAction(workspaceId, targetConvId)
+        if (refreshed && activeConversationIdRef.current === targetConvId) {
+          setMessages(refreshed.messages)
+        }
 
-      // Refresh conversations list to update title if changed
-      const updatedList = await getShawConversationsAction(workspaceId)
-      setConversations(updatedList)
+        // Refresh conversations list to update title if changed
+        const updatedList = await getShawConversationsAction(workspaceId)
+        setConversations(updatedList)
+      }
     } catch (err: any) {
-      if (err.name === 'AbortError') {
-        console.log('Stream aborted by user')
+      if (err.name === 'AbortError' || err.message === 'CLIENT_TIMEOUT') {
+        if (isUserCancelledRef.current) {
+          console.log('Stream aborted by user')
+        } else {
+          console.warn('Request timed out or was interrupted')
+          const resolvedMessageId = err.userMessageId || activeTargetMessageId
+          if (activeConversationIdRef.current === targetConvId) {
+            setInlineError({
+              conversationId: targetConvId,
+              messageId: resolvedMessageId,
+              userPrompt: textToSend,
+              provider: err.provider || targetRouting,
+              statusCode: 504,
+              errorSummary: isClientTimeout
+                ? 'The response took too long to complete. You can try again or switch to another provider.'
+                : err.message || 'The request was interrupted or disconnected.',
+              capability,
+              routingMode: targetRouting,
+              createdAt: new Date().toISOString(),
+            })
+          }
+        }
       } else {
         console.error('Chat request error:', err)
         const resolvedMessageId = err.userMessageId || activeTargetMessageId
@@ -484,19 +531,22 @@ export function ShawWorkspace({
           activeTargetMessageId = err.userMessageId
         }
 
-        setInlineError({
-          conversationId: targetConvId,
-          messageId: resolvedMessageId,
-          userPrompt: textToSend,
-          provider: err.provider || targetRouting,
-          statusCode: err.statusCode || (err.message?.includes('503') ? 503 : undefined),
-          errorSummary: err.message || 'An error occurred during response generation',
-          capability,
-          routingMode: targetRouting,
-          createdAt: new Date().toISOString(),
-        })
+        if (activeConversationIdRef.current === targetConvId) {
+          setInlineError({
+            conversationId: targetConvId,
+            messageId: resolvedMessageId,
+            userPrompt: textToSend,
+            provider: err.provider || targetRouting,
+            statusCode: err.statusCode || (err.message?.includes('503') ? 503 : undefined),
+            errorSummary: err.message || 'An error occurred during response generation',
+            capability,
+            routingMode: targetRouting,
+            createdAt: new Date().toISOString(),
+          })
+        }
       }
     } finally {
+      clearTimeout(clientTimeoutTimer)
       setIsStreaming(false)
       setStreamingText('')
       abortControllerRef.current = null
@@ -520,6 +570,7 @@ export function ShawWorkspace({
   }
 
   const handleStopStream = () => {
+    isUserCancelledRef.current = true
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
       abortControllerRef.current = null

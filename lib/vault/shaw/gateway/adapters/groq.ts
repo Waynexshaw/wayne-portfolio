@@ -70,6 +70,21 @@ export class GroqAdapter implements ProviderAdapter {
       stream: true,
     }
 
+    const connectTimeoutMs = params.connectTimeoutMs ?? 8000
+    const inactivityTimeoutMs = params.inactivityTimeoutMs ?? 10000
+    const internalAbort = new AbortController()
+
+    let connectTimer: NodeJS.Timeout | null = setTimeout(() => {
+      internalAbort.abort(new Error('Connection timeout connecting to Groq (8s)'))
+    }, connectTimeoutMs)
+
+    const onParentAbort = () => {
+      internalAbort.abort(params.signal?.reason || new Error('Aborted by parent signal'))
+    }
+    if (params.signal) {
+      params.signal.addEventListener('abort', onParentAbort, { once: true })
+    }
+
     let response: Response
     try {
       response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -79,18 +94,32 @@ export class GroqAdapter implements ProviderAdapter {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(requestBody),
+        signal: internalAbort.signal,
       })
     } catch (err: any) {
+      const isTimeout =
+        (internalAbort.signal.aborted && !params.signal?.aborted) ||
+        err?.message?.includes('Connection timeout')
       throw new ProviderError({
         provider: 'groq',
-        statusCode: 500,
+        statusCode: isTimeout ? 504 : 500,
         isRateLimit: false,
         isQuotaExceeded: false,
-        message: err.message || 'Network failure connecting to Groq',
+        message: isTimeout
+          ? 'Connection timeout connecting to Groq (8s)'
+          : err.message || 'Network failure connecting to Groq',
       })
+    } finally {
+      if (connectTimer) {
+        clearTimeout(connectTimer)
+        connectTimer = null
+      }
     }
 
     if (!response.ok) {
+      if (params.signal) {
+        params.signal.removeEventListener('abort', onParentAbort)
+      }
       let errorMsg = response.statusText
       let isRateLimit = response.status === 429
       try {
@@ -111,6 +140,9 @@ export class GroqAdapter implements ProviderAdapter {
     }
 
     if (!response.body) {
+      if (params.signal) {
+        params.signal.removeEventListener('abort', onParentAbort)
+      }
       throw new ProviderError({
         provider: 'groq',
         statusCode: 500,
@@ -128,7 +160,24 @@ export class GroqAdapter implements ProviderAdapter {
       async pull(controller) {
         try {
           while (true) {
-            const { done, value } = await reader.read()
+            // Inactivity-bounded read
+            let readTimer: NodeJS.Timeout | null = null
+            let readResult: ReadableStreamReadResult<Uint8Array>
+
+            try {
+              const timeoutPromise = new Promise<never>((_, reject) => {
+                readTimer = setTimeout(() => {
+                  reader.cancel('Inactivity timeout').catch(() => {})
+                  reject(new Error(`Provider read inactivity timeout (${inactivityTimeoutMs}ms)`))
+                }, inactivityTimeoutMs)
+              })
+
+              readResult = await Promise.race([reader.read(), timeoutPromise])
+            } finally {
+              if (readTimer) clearTimeout(readTimer)
+            }
+
+            const { done, value } = readResult
             if (done) {
               const latencyMs = Date.now() - startTime
               const finishReason = normalizeGroqFinishReason(rawFinishReason)
@@ -210,10 +259,17 @@ export class GroqAdapter implements ProviderAdapter {
             rawFinishReason: 'stream_exception',
           })
           controller.close()
+        } finally {
+          if (params.signal) {
+            params.signal.removeEventListener('abort', onParentAbort)
+          }
         }
       },
-      cancel() {
-        reader.cancel()
+      cancel(reason) {
+        if (params.signal) {
+          params.signal.removeEventListener('abort', onParentAbort)
+        }
+        reader.cancel(reason).catch(() => {})
       },
     })
 
