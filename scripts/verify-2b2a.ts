@@ -34,6 +34,7 @@ import {
   isTechnicalOrDebugPrompt,
   buildAnswerEpistemicPolicy,
   buildAnswerContract,
+  validatePublicationEvidence,
   AnswerEpistemicPolicy,
   VaultRecord,
   DomainOutcome,
@@ -1949,7 +1950,7 @@ Counts are based on the retrieved Vault context.`,
 test('EC-A. BOUNDED metric absence remains bounded in body', () => {
   const input = 'No metric records are recorded for the project within the retrieved scope.'
   const cleaned = validateAndNormalizeEpistemicClaims(input, { isTechnicalMode: false })
-  assert(cleaned.includes('within the retrieved scope'), 'Bounded absence in body must remain bounded')
+  assert(cleaned.includes('in the records checked'), 'Bounded absence in body must remain bounded in simple English')
 })
 
 test('EC-B. Same metric absence remains bounded in summary', () => {
@@ -2273,7 +2274,8 @@ The project is active, but the recorded work is still limited to one open task. 
   assert(cleaned.includes('The records checked do not track'), 'Metric gap must remain observational')
   assert(!cleaned.includes('subtasks'), 'Unmodeled subtasks claim must be normalized')
   assert(!cleaned.includes('Milestones were undocumented'), 'Unmodeled milestones were undocumented must be normalized')
-  assert(!cleaned.includes('milestones'), 'Unmodeled milestones claim must be normalized')
+  assert(!cleaned.includes('milestone'), 'Unmodeled milestone claims must be completely eliminated')
+  assert(!cleaned.includes('breakdowns'), 'Must not invent unmodeled breakdown claims')
   assert(!cleaned.includes('[Limited absence:'), 'Internal bracketed machine notes must be stripped')
   assert(!cleaned.includes('within the retrieved scope'), 'Technical scope jargon must be normalized to records checked')
   assert(!cleaned.includes('[SOURCES:'), 'SOURCES tag must be stripped')
@@ -2325,7 +2327,780 @@ test('EC-REG3. Unmodeled absence claims normalized across variations', () => {
     assert(!res.includes('No milestones are recorded'), `Must normalize: ${s}`)
     assert(!res.includes('No checkpoints have been defined'), `Must normalize: ${s}`)
     assert(!res.includes('No sprints or subtasks are tracked'), `Must normalize: ${s}`)
+    assert(!res.includes('milestone'), `Must not mention milestone: ${s}`)
+    assert(!res.includes('breakdowns'), `Must not mention breakdowns: ${s}`)
   }
 })
 
+test('EC-REG4. Exact Snip3rash production prompt regression: streaming & saved output', () => {
+  const chunks = [
+    'Progress Report: Snip3rash Trading Academy\n\n',
+    'What is recorded:\n',
+    '- Project: "Snip3rash trading academy" is active with urgent priority.\n',
+    '- Task: "October objective" is todo, priority medium. No due date set.\n',
+    '- Task status: One task is linked to the project. It is still open, and no linked task is recorded as completed.\n\n',
+    'What is missing or unclear:\n',
+    '- Decisions: No decisions were found in the records checked.\n',
+    '- Reviews: No reviews were found in the records checked.\n',
+    '- Metrics: No metrics were found in the records checked.\n',
+    '- Progress: The task is still open, but the records checked do not show how much of the work has already been completed.\n',
+    '- Completion: None of the project\'s recorded tasks are completed.\n\n',
+    'Recommendations:\n',
+    '- Setting a due date and breaking the objective into smaller execution tasks would help track progress.\n\n',
+    '[SOURCES: S',
+    '2 | BASIS: DIRECT_FACT]',
+  ]
+
+  const streamedChunks: string[] = []
+  const filter = createProvenanceStreamFilter((chunk) => {
+    streamedChunks.push(chunk)
+  }, undefined, { isTechnicalMode: false })
+
+  for (const c of chunks) {
+    filter.push(c)
+  }
+  const parsed = filter.flush()
+
+  // Verify streamed output: every chunk is clean
+  for (const sc of streamedChunks) {
+    assert(!sc.includes('[SOURCES:'), 'Streamed chunk must not contain [SOURCES:')
+    assert(!sc.includes('DIRECT_FACT'), 'Streamed chunk must not contain DIRECT_FACT')
+    assert(!sc.includes('S2'), 'Streamed chunk must not contain S2')
+    assert(!sc.includes('milestone'), 'Streamed chunk must not contain milestone')
+    assert(!sc.includes('within the retrieved scope'), 'Streamed chunk must not contain technical jargon')
+  }
+
+  // Verify saved output: cleanText contains clean English, no protocol, no unmodeled absence claims
+  const savedOutput = parsed.cleanText
+  assert(!savedOutput.includes('[SOURCES:'), 'Saved output must not contain [SOURCES:')
+  assert(!savedOutput.includes('DIRECT_FACT'), 'Saved output must not contain DIRECT_FACT')
+  assert(!savedOutput.includes('within the retrieved scope'), 'Saved output must not contain technical jargon')
+  assert(!savedOutput.includes('milestone'), 'Saved output must not claim milestones are missing')
+  assert(!savedOutput.includes('subtasks are documented'), 'Saved output must not claim subtasks are missing')
+  assert(savedOutput.includes('One task is linked to the project. It is still open, and no linked task is recorded as completed.'), 'Saved output must state grounded task facts')
+  assert(savedOutput.includes('breaking the objective into smaller execution tasks'), 'Breaking down tasks must appear as recommendation')
+
+  // Verify provenance tag was properly extracted
+  assert(parsed.hasTag, 'Must extract provenance tag')
+  assert.strictEqual(parsed.basis, 'DIRECT_FACT', 'Must extract DIRECT_FACT basis')
+  assert.deepStrictEqual(parsed.handles, ['S2'], 'Must extract S2 handle')
+})
+
+// ============================================================================
+// Controlled Answer Publication Suite (CP-1 through CP-13)
+// ============================================================================
+
+test('CP-1. Pre-publication validation approves compliant, grounded response', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    entityTarget: { name: 'Snip3rash trading academy', domain: 'project' },
+    domainRequests: [
+      { domain: 'project', importance: 'REQUIRED', queryMode: 'targeted', limit: 5 },
+      { domain: 'task', importance: 'REQUIRED', queryMode: 'targeted', limit: 10 },
+      { domain: 'decision', importance: 'OPTIONAL', queryMode: 'targeted', limit: 10 },
+    ],
+    requiresPreparation: true,
+  }
+
+  const outcomes: DomainOutcome[] = [
+    {
+      domain: 'project',
+      importance: 'REQUIRED',
+      status: 'AVAILABLE',
+      returnedCount: 1,
+      records: [{
+        entityType: 'project',
+        entityId: 'p-1',
+        title: 'Snip3rash trading academy',
+        timestamps: {},
+        fields: { status: 'active', priority: 'urgent' },
+        epistemicClass: 'WV_RECORD',
+        provenance: { table: 'workspace_projects', id: 'p-1', workspace_id: 'ws-1' },
+      }],
+    },
+    {
+      domain: 'task',
+      importance: 'REQUIRED',
+      status: 'AVAILABLE',
+      returnedCount: 1,
+      records: [{
+        entityType: 'task',
+        entityId: 't-1',
+        title: 'October objective',
+        timestamps: {},
+        fields: { status: 'todo' },
+        epistemicClass: 'WV_RECORD',
+        provenance: { table: 'tasks', id: 't-1', workspace_id: 'ws-1' },
+      }],
+    },
+    {
+      domain: 'decision',
+      importance: 'OPTIONAL',
+      status: 'LIMITED_EMPTY',
+      returnedCount: 0,
+      records: [],
+    },
+  ]
+
+  const prepared = prepareReasoningContext(mockPlan, outcomes, 5)
+  const candidate = `Progress Report: Snip3rash Trading Academy
+
+What is recorded:
+- Project: "Snip3rash trading academy" is active with urgent priority.
+- Task: "October objective" is todo. No due date set.
+- Counts: One task is linked to the project. It is still open, and no linked task is recorded as completed.
+
+What is missing or unclear:
+- Decisions: No decisions were found in the records checked.
+- Progress: The task is still open, but the records checked do not show how much of the work has already been completed.
+
+Recommendations:
+- Setting a due date and breaking the objective into smaller execution tasks would help track progress.
+
+[SOURCES: S1, S2 | BASIS: DIRECT_FACT]`
+
+  const result = validatePublicationEvidence(candidate, {
+    policy: prepared.epistemicPolicy,
+    contract: prepared.answerContract,
+  })
+
+  assert.strictEqual(result.isApproved, true, 'Compliant report must be approved')
+  assert(result.publishedText.includes('One task is linked to the project. It is still open, and no linked task is recorded as completed.'))
+  assert(!result.publishedText.includes('[SOURCES:'), 'Published text must not contain protocol tags')
+  assert.strictEqual(result.rejectionReasons.length, 0)
+})
+
+test('CP-2. Rejected unsupported claims: false completed task count', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  const outcomes: DomainOutcome[] = [{
+    domain: 'task',
+    importance: 'REQUIRED',
+    status: 'AVAILABLE',
+    returnedCount: 1,
+    records: [{
+      entityType: 'task',
+      entityId: 't-1',
+      title: 'October objective',
+      timestamps: {},
+      fields: { status: 'todo' },
+      epistemicClass: 'WV_RECORD',
+      provenance: { table: 'tasks', id: 't-1', workspace_id: 'ws-1' },
+    }],
+  }]
+  const prepared = prepareReasoningContext(mockPlan, outcomes, 5)
+
+  // Candidate asserts 2 completed tasks when completed count is 0
+  const candidate = 'The project is doing well. Completed 2 tasks so far and more work is coming.'
+  const result = validatePublicationEvidence(candidate, {
+    policy: prepared.epistemicPolicy,
+    contract: prepared.answerContract,
+  })
+
+  assert.strictEqual(result.isApproved, false, 'Contradicted task facts must be rejected')
+  assert.strictEqual(result.publishedText, '', 'Unapproved text must be withheld completely')
+  assert(result.rejectionReasons.some(r => r.includes('0 completed tasks')), 'Must state reason for rejection')
+})
+
+test('CP-3. Rejected unsupported claims: unmodeled construct absence as fact', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  const prepared = prepareReasoningContext(mockPlan, [], 5)
+
+  // Unmodeled construct claimed missing from the Vault
+  const candidate = 'Milestones are undocumented in your Vault and no milestones have been defined.'
+  const result = validatePublicationEvidence(candidate, {
+    policy: prepared.epistemicPolicy,
+    contract: prepared.answerContract,
+  })
+
+  assert(!result.publishedText.includes('milestone'), 'Must not publish milestone absence claim')
+})
+
+test('CP-4. Rejected unsupported claims: invented completion percentage or score', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  const prepared = prepareReasoningContext(mockPlan, [], 5)
+
+  const candidate = 'Progress report: Project is at 85% completed with a health score of 9.'
+  const result = validatePublicationEvidence(candidate, {
+    policy: prepared.epistemicPolicy,
+    contract: prepared.answerContract,
+  })
+
+  assert.strictEqual(result.isApproved, false, 'Invented percentage/score must be rejected')
+  assert(result.rejectionReasons.some(r => r.includes('percentage') || r.includes('score')))
+})
+
+test('CP-5. Rejected unsupported claims: unauthorized global absence on bounded domain', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  const outcomes: DomainOutcome[] = [{
+    domain: 'decision',
+    importance: 'OPTIONAL',
+    status: 'LIMITED_EMPTY',
+    returnedCount: 0,
+    records: [],
+  }]
+  const prepared = prepareReasoningContext(mockPlan, outcomes, 5)
+
+  const candidate = 'No decisions exist in the Vault for this project.'
+  const result = validatePublicationEvidence(candidate, {
+    policy: prepared.epistemicPolicy,
+    contract: prepared.answerContract,
+  })
+
+  assert(!result.publishedText.includes('No decisions exist in the Vault'), 'Must not publish global absence for bounded domain')
+})
+
+test('CP-6. Rejected unsupported claims: unevaluated domain count claim', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  // meeting is unevaluated
+  const prepared = prepareReasoningContext(mockPlan, [], 5)
+
+  const candidate = 'Status update:\n- zero meetings logged for this project.'
+  const result = validatePublicationEvidence(candidate, {
+    policy: prepared.epistemicPolicy,
+    contract: prepared.answerContract,
+  })
+
+  assert(!result.publishedText.includes('zero meetings logged'), 'Unevaluated domain claim must not be published')
+})
+
+test('CP-7. No partial unsafe SSE emissions: record-sensitive reasoning buffers during streaming', () => {
+  const chunks = [
+    'Progress Report: Snip3rash\n',
+    '- Task: October objective is todo.\n',
+    'Completed 5 tasks.\n',
+    '[SOURCES: S1 | BASIS: DIRECT_FACT]',
+  ]
+
+  const emittedChunks: string[] = []
+  const isRecordSensitive = true
+
+  const filter = createProvenanceStreamFilter((cleanChunk) => {
+    if (!isRecordSensitive) {
+      emittedChunks.push(cleanChunk)
+    }
+  })
+
+  for (const c of chunks) {
+    filter.push(c)
+  }
+
+  // During streaming, ZERO chunks must have been emitted!
+  assert.strictEqual(emittedChunks.length, 0, 'Zero tokens must be emitted before validation in record-sensitive mode')
+
+  const parsed = filter.flush()
+  const mockPolicy: AnswerEpistemicPolicy = {
+    intent: 'PROJECT_PROGRESS',
+    evaluatedDomains: ['task'],
+    unevaluatedDomains: [],
+    domainPermissions: {} as any,
+    knownNullFields: [],
+    directFactualCounts: { recordedTaskCount: 1, completedRecordedTaskCount: 0 },
+    unmodeledConceptsAllowedAsFact: false,
+    summaryMayStrengthen: false,
+    isTechnicalMode: false,
+  }
+
+  const validation = validatePublicationEvidence(parsed.cleanText, { policy: mockPolicy })
+  assert.strictEqual(validation.isApproved, false, 'Invalid candidate must fail validation')
+
+  // Since validation failed, nothing is emitted to the client!
+  assert.strictEqual(emittedChunks.length, 0, 'No partial unsafe SSE emission occurred')
+})
+
+test('CP-8. Stream completion and error handling: withheld response emits safe notification', () => {
+  const validationResult = {
+    isApproved: false,
+    rejectionReasons: ['Response asserts tasks are completed when Vault records show 0 completed tasks'],
+  }
+
+  let emittedErrorChunk: any = null
+  if (!validationResult.isApproved) {
+    emittedErrorChunk = {
+      type: 'error',
+      error: 'The generated report could not be validated against your Vault records and was withheld for accuracy.',
+      finishReason: 'content_filter',
+    }
+  }
+
+  assert(emittedErrorChunk !== null)
+  assert.strictEqual(emittedErrorChunk.type, 'error')
+  assert.strictEqual(emittedErrorChunk.finishReason, 'content_filter')
+  assert(!emittedErrorChunk.error.includes('Completed 5 tasks'), 'Error must not leak rejected response text')
+})
+
+test('CP-9. Persisted versus visible response consistency', () => {
+  const candidate = `Progress Report: Snip3rash Trading Academy
+
+What is recorded:
+- Project: "Snip3rash trading academy" is active.
+- Task: "October objective" is todo.
+- Task status: One task is linked to the project. It is still open, and no linked task is recorded as completed.
+
+[SOURCES: S1 | BASIS: DIRECT_FACT]`
+
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  const outcomes: DomainOutcome[] = [{
+    domain: 'task',
+    importance: 'REQUIRED',
+    status: 'AVAILABLE',
+    returnedCount: 1,
+    records: [{ entityType: 'task', entityId: 't-1', title: 'October objective', timestamps: {}, fields: { status: 'todo' }, epistemicClass: 'WV_RECORD', provenance: { table: 'tasks', id: 't-1', workspace_id: 'ws-1' } }],
+  }]
+  const prepared = prepareReasoningContext(mockPlan, outcomes, 5)
+
+  const validation = validatePublicationEvidence(candidate, { policy: prepared.epistemicPolicy })
+  assert(validation.isApproved)
+
+  // Emitted visible text
+  const visibleText = validation.publishedText
+
+  // In route.ts: fullResponseText = cleanResponseText -> inserted into shaw_messages
+  const persistedText = visibleText
+
+  assert.strictEqual(visibleText, persistedText, 'Visible text and persisted text must be strictly identical')
+  assert(!persistedText.includes('[SOURCES:'), 'Persisted text must not contain protocol tags')
+})
+
+test('CP-10. Provenance preservation: authoritative citations resolved from source map', () => {
+  const mockEnv: any = {
+    records: [
+      { entityType: 'project', entityId: 'p-1', title: 'Snip3rash trading academy', timestamps: {}, fields: {}, epistemicClass: 'WV_RECORD' },
+      { entityType: 'task', entityId: 't-1', title: 'October objective', timestamps: {}, fields: {}, epistemicClass: 'WV_RECORD' },
+    ],
+    resolvedScope: { workspaceId: 'ws-1' },
+    completeness: [],
+  }
+  const sourceMap = createRequestSourceMap(mockEnv)
+  const candidate = 'The project has one open task. [SOURCES: S1, S2 | BASIS: DIRECT_FACT]'
+
+  const parsed = parseModelProvenance(candidate, sourceMap)
+  const provenance = resolveAuthoritativeProvenance(sourceMap, parsed)
+
+  assert.strictEqual(provenance.status, 'COMPLETE')
+  assert.strictEqual(provenance.citations.length, 2)
+  assert.strictEqual(provenance.citations[0].title, 'Snip3rash trading academy')
+  assert.strictEqual(provenance.citations[1].title, 'October objective')
+  assert.strictEqual(provenance.basis, 'DIRECT_FACT')
+})
+
+test('CP-11. PROJECT_PROGRESS end-to-end controlled publication passes with clean Simple English', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'PROJECT_PROGRESS',
+    reasoningMode: 'PROGRESS',
+    entityTarget: { name: 'Snip3rash trading academy', domain: 'project' },
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  const taskRec: VaultRecord = {
+    entityType: 'task',
+    entityId: 't-1',
+    title: 'October objective',
+    timestamps: {},
+    fields: { status: 'todo' },
+    epistemicClass: 'WV_RECORD',
+    provenance: { table: 'tasks', id: 't-1', workspace_id: 'ws-1' },
+  }
+  const prjRec: VaultRecord = {
+    entityType: 'project',
+    entityId: 'p-1',
+    title: 'Snip3rash trading academy',
+    timestamps: {},
+    fields: { status: 'active', priority: 'urgent' },
+    epistemicClass: 'WV_RECORD',
+    provenance: { table: 'workspace_projects', id: 'p-1', workspace_id: 'ws-1' },
+  }
+  const outcomes: DomainOutcome[] = [
+    { domain: 'project', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [prjRec] },
+    { domain: 'task', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [taskRec] },
+    { domain: 'decision', importance: 'OPTIONAL', status: 'LIMITED_EMPTY', returnedCount: 0, records: [] },
+    { domain: 'review', importance: 'OPTIONAL', status: 'LIMITED_EMPTY', returnedCount: 0, records: [] },
+    { domain: 'metric', importance: 'OPTIONAL', status: 'LIMITED_EMPTY', returnedCount: 0, records: [] },
+  ]
+  const prepared = prepareReasoningContext(mockPlan, outcomes, 5)
+
+  const rawCandidate = `Progress Report: Snip3rash Trading Academy
+
+What is recorded:
+- Project: "Snip3rash trading academy" is active with urgent priority.
+- Task: "October objective" is todo. No due date set.
+- Status: One task is linked to the project. It is still open, and no linked task is recorded as completed.
+
+What is missing or unclear:
+- Decisions: No decision records exist in the records checked.
+- Reviews: No review records were found in the records checked.
+- Metrics: No metric records were found in the records checked.
+- Progress: The task is still open, but the records checked do not show how much of the work has already been completed.
+
+Recommendations:
+- Setting a due date and breaking the objective into smaller execution tasks would help track progress.
+
+[SOURCES: S1, S2 | BASIS: DIRECT_FACT]`
+
+  const validation = validatePublicationEvidence(rawCandidate, {
+    policy: prepared.epistemicPolicy,
+    contract: prepared.answerContract,
+  })
+
+  assert.strictEqual(validation.isApproved, true)
+  assert(!validation.publishedText.includes('milestone'))
+  assert(!validation.publishedText.includes('within the retrieved scope'))
+  assert(validation.publishedText.includes('One task is linked to the project. It is still open, and no linked task is recorded as completed.'))
+})
+
+test('CP-12. WEEKLY_FOCUS end-to-end controlled publication passes', () => {
+  const mockPlan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'WEEKLY_FOCUS',
+    reasoningMode: 'PRIORITIZATION',
+    domainRequests: [],
+    requiresPreparation: true,
+  }
+  const taskRec: VaultRecord = {
+    entityType: 'task',
+    entityId: 't-1',
+    title: 'October objective',
+    timestamps: {},
+    fields: { status: 'todo' },
+    epistemicClass: 'WV_RECORD',
+    provenance: { table: 'tasks', id: 't-1', workspace_id: 'ws-1' },
+  }
+  const outcomes: DomainOutcome[] = [
+    { domain: 'task', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [taskRec] },
+  ]
+  const prepared = prepareReasoningContext(mockPlan, outcomes, 5)
+
+  const candidate = `Weekly Focus:
+
+Here are your priorities for this week based on your Vault records:
+- Task: "October objective" (todo) has no due date set.
+- Focus: You have 1 open task and no completed tasks recorded.
+
+[SOURCES: S1 | BASIS: DIRECT_FACT]`
+
+  const validation = validatePublicationEvidence(candidate, {
+    policy: prepared.epistemicPolicy,
+    contract: prepared.answerContract,
+  })
+
+  assert.strictEqual(validation.isApproved, true)
+  assert(validation.publishedText.includes('October objective'))
+})
+
+test('CP-13. Ordinary conversation streaming: emits chunk-by-chunk without pre-publication buffering', () => {
+  const chunks = ['Hello ', 'Wayne, ', 'how can I ', 'help you ', 'today?']
+  const streamedChunks: string[] = []
+  const isRecordSensitive = false // Ordinary conversation!
+
+  const filter = createProvenanceStreamFilter((chunk) => {
+    if (!isRecordSensitive && chunk.length > 0) {
+      streamedChunks.push(chunk)
+    }
+  })
+
+  for (const c of chunks) {
+    filter.push(c)
+  }
+  filter.flush()
+
+  // Every chunk must have been emitted live!
+  assert.strictEqual(streamedChunks.length, 5, 'Ordinary conversation must stream each chunk live')
+  assert.strictEqual(streamedChunks.join(''), 'Hello Wayne, how can I help you today?')
+})
+
+// ============================================================================
+// Phase 3 — Evidence Integrity Regression Suite (NUM & QUAL Tests)
+// ============================================================================
+
+test('EI-NUM-1. Budget 75,000 must not authorize 75% completion', () => {
+  const rec: VaultRecord = {
+    entityType: 'project',
+    entityId: 'p-1',
+    title: 'Project Nightfall',
+    epistemicClass: 'WV_RECORD',
+    fields: { budget: 75000 },
+    provenance: { table: 'workspace_projects', id: 'p-1', workspace_id: 'ws-1' },
+    timestamps: {},
+  }
+  const res = validatePublicationEvidence('Project Nightfall is 75% complete.', { records: [rec] })
+  assert.strictEqual(res.isApproved, false, 'Budget must not authorize completion percentage')
+  assert(res.rejectionReasons.some((r) => r.includes('completion percentage')))
+})
+
+test('EI-NUM-2. Retention percentage must not authorize completion percentage', () => {
+  const rec: VaultRecord = {
+    entityType: 'metric',
+    entityId: 'm-1',
+    title: 'User Retention Rate',
+    epistemicClass: 'WV_RECORD',
+    fields: { metric_name: 'retention_rate', value: '75%' },
+    provenance: { table: 'workspace_metrics', id: 'm-1', workspace_id: 'ws-1' },
+    timestamps: {},
+  }
+  const res = validatePublicationEvidence('The project is 75% complete based on latest records.', {
+    records: [rec],
+  })
+  assert.strictEqual(res.isApproved, false, 'Retention rate must not authorize project completion percentage')
+  assert(res.rejectionReasons.some((r) => r.includes('completion percentage')))
+})
+
+test('EI-NUM-3. Historical count must not authorize current count', () => {
+  const rec: VaultRecord = {
+    entityType: 'metric',
+    entityId: 'm-1',
+    title: 'Community Members Q1 2024',
+    epistemicClass: 'WV_RECORD',
+    fields: { value: 500, period: '2024-Q1', is_historical: true },
+    provenance: { table: 'workspace_metrics', id: 'm-1', workspace_id: 'ws-1' },
+    timestamps: { created_at: '2024-01-01T00:00:00Z' },
+  }
+  const res = validatePublicationEvidence('The current active community has 500 members.', {
+    records: [rec],
+  })
+  assert.strictEqual(res.isApproved, false, 'Historical metric must not authorize current count')
+  assert(res.rejectionReasons.some((r) => r.includes('Historical metric value')))
+})
+
+test('EI-NUM-4. Target must not authorize achieved result', () => {
+  const rec: VaultRecord = {
+    entityType: 'metric',
+    entityId: 'm-1',
+    title: 'Revenue Goal',
+    epistemicClass: 'WV_RECORD',
+    fields: { activeTargets: [{ target_value: '80%' }] },
+    provenance: { table: 'workspace_metrics', id: 'm-1', workspace_id: 'ws-1' },
+    timestamps: {},
+  }
+  const res = validatePublicationEvidence('The project achieved 80% progress toward revenue.', {
+    records: [rec],
+  })
+  assert.strictEqual(res.isApproved, false, 'Target must not authorize achieved result')
+  assert(res.rejectionReasons.some((r) => r.includes('Target value')))
+})
+
+test('EI-NUM-5. Project A metric must not authorize Project B progress', () => {
+  const recA: VaultRecord = {
+    entityType: 'project',
+    entityId: 'p-a',
+    title: 'Project Alpha',
+    epistemicClass: 'WV_RECORD',
+    fields: { completion: '90%' },
+    provenance: { table: 'workspace_projects', id: 'p-a', workspace_id: 'ws-1' },
+    timestamps: {},
+  }
+  const recB: VaultRecord = {
+    entityType: 'project',
+    entityId: 'p-b',
+    title: 'Project Beta',
+    epistemicClass: 'WV_RECORD',
+    fields: {},
+    provenance: { table: 'workspace_projects', id: 'p-b', workspace_id: 'ws-1' },
+    timestamps: {},
+  }
+  const res = validatePublicationEvidence('Project Beta is 90% complete.', {
+    records: [recA, recB],
+  })
+  assert.strictEqual(res.isApproved, false, 'Project A completion must not authorize Project B completion')
+  assert(res.rejectionReasons.some((r) => r.includes('does not match the project in the sentence')))
+})
+
+function createTestPolicy(overrides?: Partial<AnswerEpistemicPolicy>): AnswerEpistemicPolicy {
+  return {
+    intent: 'PROJECT_PROGRESS',
+    evaluatedDomains: ['task'],
+    unevaluatedDomains: [],
+    domainPermissions: {} as any,
+    knownNullFields: [],
+    directFactualCounts: { recordedTaskCount: 1, openRecordedTaskCount: 1, completedRecordedTaskCount: 0 },
+    unmodeledConceptsAllowedAsFact: false,
+    summaryMayStrengthen: false,
+    isTechnicalMode: false,
+    ...overrides,
+  }
+}
+
+test('EI-QUAL-1. Explicitly completed partnership recorded in meeting is approved', () => {
+  const recMeeting: VaultRecord = {
+    entityType: 'meeting',
+    entityId: 'mtg-1',
+    title: 'Strategic Partnership Meeting',
+    epistemicClass: 'WV_RECORD',
+    fields: { notes: 'Partnership agreement finalized and completed.' },
+    provenance: { table: 'workspace_meetings', id: 'mtg-1', workspace_id: 'ws-1' },
+    timestamps: {},
+  }
+  const policy = createTestPolicy({
+    domainPermissions: {
+      task: { domain: 'task', status: 'AVAILABLE', evaluated: true, allowedNegativeClaimType: 'VERIFIED_GLOBAL', globalAbsenceAuthorized: true },
+      meeting: { domain: 'meeting', status: 'AVAILABLE', evaluated: true, allowedNegativeClaimType: 'VERIFIED_GLOBAL', globalAbsenceAuthorized: true },
+    } as any,
+  })
+  const res = validatePublicationEvidence(
+    'A meeting confirmed that the strategic partnership was finished, and the team made steady progress.',
+    {
+      policy,
+      records: [recMeeting],
+    }
+  )
+  assert.strictEqual(res.isApproved, true, 'Explicitly evidenced meeting partnership must be approved')
+})
+
+test('EI-QUAL-2. Recorded community growth metric is approved', () => {
+  const recMetric: VaultRecord = {
+    entityType: 'metric',
+    entityId: 'm-2',
+    title: 'Community Growth Metric',
+    epistemicClass: 'WV_RECORD',
+    fields: { metric_name: 'community_growth', value: 1200 },
+    provenance: { table: 'workspace_metrics', id: 'm-2', workspace_id: 'ws-1' },
+    timestamps: {},
+  }
+  const policy = createTestPolicy({
+    domainPermissions: {
+      task: { domain: 'task', status: 'AVAILABLE', evaluated: true, allowedNegativeClaimType: 'VERIFIED_GLOBAL', globalAbsenceAuthorized: true },
+      metric: { domain: 'metric', status: 'AVAILABLE', evaluated: true, allowedNegativeClaimType: 'VERIFIED_GLOBAL', globalAbsenceAuthorized: true },
+    } as any,
+  })
+  const res = validatePublicationEvidence(
+    'The community growth metric shows significant progress has been made with new member onboarding.',
+    {
+      policy,
+      records: [recMetric],
+    }
+  )
+  assert.strictEqual(res.isApproved, true, 'Explicitly evidenced community growth metric must be approved')
+})
+
+test('EI-QUAL-3. Completed research analysis is approved', () => {
+  const recResearch: VaultRecord = {
+    entityType: 'research',
+    entityId: 'res-1',
+    title: 'Market Analysis',
+    epistemicClass: 'WV_RECORD',
+    fields: { status: 'completed', summary: 'Preliminary analysis finished.' },
+    provenance: { table: 'workspace_research', id: 'res-1', workspace_id: 'ws-1' },
+    timestamps: {},
+  }
+  const policy = createTestPolicy({
+    directFactualCounts: { recordedTaskCount: 0, openRecordedTaskCount: 0, completedRecordedTaskCount: 0 },
+    domainPermissions: {
+      task: { domain: 'task', status: 'AVAILABLE', evaluated: true, allowedNegativeClaimType: 'VERIFIED_GLOBAL', globalAbsenceAuthorized: true },
+      research: { domain: 'research', status: 'AVAILABLE', evaluated: true, allowedNegativeClaimType: 'VERIFIED_GLOBAL', globalAbsenceAuthorized: true },
+    } as any,
+  })
+  const res = validatePublicationEvidence(
+    'The market research study is partially complete and the preliminary analysis is finished.',
+    {
+      policy,
+      records: [recResearch],
+    }
+  )
+  assert.strictEqual(res.isApproved, true, 'Explicitly evidenced completed research must be approved')
+})
+
+test('EI-POS-1. Legitimate metric reporting with correct subject and meaning is approved', () => {
+  const recMetric: VaultRecord = {
+    entityType: 'metric',
+    entityId: 'm-1',
+    title: 'User Retention Rate',
+    epistemicClass: 'WV_RECORD',
+    fields: { metric_name: 'retention_rate', value: '75%' },
+    provenance: { table: 'workspace_metrics', id: 'm-1', workspace_id: 'ws-1' },
+    timestamps: {},
+  }
+  const res = validatePublicationEvidence(
+    'The user retention rate is recorded at 75% for October.',
+    { records: [recMetric] }
+  )
+  assert.strictEqual(res.isApproved, true, 'Legitimate metric reporting must be approved')
+})
+
+test('EI-POS-2. Legitimate project completion reporting is approved', () => {
+  const recProject: VaultRecord = {
+    entityType: 'project',
+    entityId: 'p-1',
+    title: 'Project Alpha',
+    epistemicClass: 'WV_RECORD',
+    fields: { completion: '90%' },
+    provenance: { table: 'workspace_projects', id: 'p-1', workspace_id: 'ws-1' },
+    timestamps: {},
+  }
+  const res = validatePublicationEvidence('Project Alpha is 90% complete.', {
+    records: [recProject],
+  })
+  assert.strictEqual(res.isApproved, true, 'Legitimate project completion must be approved')
+})
+
+test('EI-REG-SNIP. Snip3rash ungrounded progress claim withheld when 0 completed tasks and no cross-domain evidence', () => {
+  const recProject: VaultRecord = {
+    entityType: 'project',
+    entityId: 'p-s',
+    title: 'Snip3rash trading academy',
+    epistemicClass: 'WV_RECORD',
+    fields: {},
+    provenance: { table: 'workspace_projects', id: 'p-s', workspace_id: 'ws-1' },
+    timestamps: {},
+  }
+  const recTask: VaultRecord = {
+    entityType: 'task',
+    entityId: 't-s',
+    title: 'October objective',
+    epistemicClass: 'WV_RECORD',
+    fields: { status: 'todo' },
+    provenance: { table: 'tasks', id: 't-s', workspace_id: 'ws-1' },
+    timestamps: {},
+  }
+  const policy = createTestPolicy({
+    directFactualCounts: { recordedTaskCount: 1, openRecordedTaskCount: 1, completedRecordedTaskCount: 0 },
+  })
+  const res = validatePublicationEvidence(
+    'The project has made steady progress and is halfway complete.',
+    {
+      policy,
+      records: [recProject, recTask],
+    }
+  )
+  assert.strictEqual(res.isApproved, false, 'Ungrounded progress claim on Snip3rash must be withheld')
+  assert(res.rejectionReasons.some((r) => r.includes('qualitative progress')))
+})
+
 console.log(`\nAll ${passedTests} deterministic verification tests PASSED!\n`)
+

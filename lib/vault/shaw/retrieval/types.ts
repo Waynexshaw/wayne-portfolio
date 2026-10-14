@@ -191,6 +191,7 @@ export type ReasoningIntent =
   | 'RESEARCH_IMPACT'
   | 'PLAN_VS_ACTUAL'
   | 'DECISION_GAP_ANALYSIS'
+  | 'SINGLE_DOMAIN_RETRIEVAL'
 
 export type DomainImportance = 'REQUIRED' | 'OPTIONAL'
 
