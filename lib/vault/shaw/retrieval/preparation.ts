@@ -451,6 +451,11 @@ export function buildAnswerContract(
       recordedFacts.push({
         type: 'RECORDED_FACT',
         domain: 'task',
+        statement: `One task was found, and it is still marked as pending.`,
+      })
+      recordedFacts.push({
+        type: 'RECORDED_FACT',
+        domain: 'task',
         statement: `One task is linked to the project. It is still open, and no linked task is recorded as completed.`,
       })
     } else {
@@ -496,6 +501,28 @@ export function buildAnswerContract(
       statement:
         'The task is still open, but the records checked do not show how much of the work has already been completed.',
     })
+  }
+
+  if (
+    records.some((r) => r.entityType === 'project') &&
+    !records.some((r) => r.entityType === 'project' && r.fields?.completion !== undefined)
+  ) {
+    observationalGaps.push({
+      type: 'OBSERVATIONAL_GAP',
+      statement:
+        'Overall project progress is unknown because no project completion percentage is recorded.',
+    })
+  }
+
+  if (policy.unevaluatedDomains && policy.unevaluatedDomains.length > 0) {
+    const unqueried = policy.unevaluatedDomains
+      .filter((d) => d === 'decision' || d === 'meeting')
+    if (unqueried.length > 0) {
+      observationalGaps.push({
+        type: 'OBSERVATIONAL_GAP',
+        statement: `${unqueried.join(' and ').replace(/^./, (c) => c.toUpperCase())} records were not checked for this query.`,
+      })
+    }
   }
 
   // 5. Recommendations

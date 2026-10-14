@@ -27,6 +27,7 @@ import {
   ShawMessage,
   ShawCapability,
   ShawRoutingMode,
+  ShawErrorCategory,
   ComplianceResult,
 } from '@/lib/vault/shaw/types'
 import {
@@ -45,6 +46,7 @@ export interface InlineRequestError {
   provider?: string
   statusCode?: number | string
   errorSummary: string
+  errorCategory?: ShawErrorCategory
   capability: ShawCapability
   routingMode: ShawRoutingMode
   createdAt: string
@@ -57,34 +59,45 @@ interface InlineFailureCardProps {
 }
 
 function InlineFailureCard({ error, isStreaming, onRetry }: InlineFailureCardProps) {
-  const provider = (error.provider || error.routingMode || '').toLowerCase()
+  const isEvidenceWithheld = error.errorCategory === 'evidence_withheld'
   let providerLabel = 'AI Provider'
   let providerTitle = "Provider couldn't respond"
 
-  if (provider.includes('gemini')) {
-    providerLabel = 'Google Gemini'
-    providerTitle = "Gemini couldn't respond"
-  } else if (provider.includes('groq')) {
-    providerLabel = 'Groq'
-    providerTitle = "Groq couldn't respond"
-  } else if (provider.includes('auto')) {
-    providerLabel = 'Auto Free-First'
-    providerTitle = "SHAW couldn't complete request"
+  if (isEvidenceWithheld) {
+    providerTitle = 'Report withheld for accuracy'
+    providerLabel = 'Accuracy Check'
+  } else {
+    const provider = (error.provider || error.routingMode || '').toLowerCase()
+    if (provider.includes('gemini')) {
+      providerLabel = 'Google Gemini'
+      providerTitle = "Gemini couldn't respond"
+    } else if (provider.includes('groq')) {
+      providerLabel = 'Groq'
+      providerTitle = "Groq couldn't respond"
+    } else if (provider.includes('auto')) {
+      providerLabel = 'Auto Free-First'
+      providerTitle = "SHAW couldn't complete request"
+    }
   }
 
   // Clean error message summary
-  let summary = error.errorSummary || 'An error occurred during response generation'
-  // Remove technical prefixes like [gemini] HTTP 503: or Error:
-  summary = summary.replace(/^\[[a-z0-9_-]+\]\s*(HTTP\s*\d+:\s*)?/i, '')
-  summary = summary.replace(/^(Error:\s*)+/i, '')
-  if (summary.startsWith('{') && summary.endsWith('}')) {
-    try {
-      const parsed = JSON.parse(summary)
-      summary = parsed.message || parsed.error || summary
-    } catch {}
+  let summary = isEvidenceWithheld
+    ? "SHAW couldn't verify this answer against the available Vault records. Please try again."
+    : (error.errorSummary || 'An error occurred during response generation')
+
+  if (!isEvidenceWithheld) {
+    // Remove technical prefixes like [gemini] HTTP 503: or Error:
+    summary = summary.replace(/^\[[a-z0-9_-]+\]\s*(HTTP\s*\d+:\s*)?/i, '')
+    summary = summary.replace(/^(Error:\s*)+/i, '')
+    if (summary.startsWith('{') && summary.endsWith('}')) {
+      try {
+        const parsed = JSON.parse(summary)
+        summary = parsed.message || parsed.error || summary
+      } catch {}
+    }
   }
 
-  const isManualProvider = error.routingMode !== 'auto_free_first'
+  const isManualProvider = !isEvidenceWithheld && error.routingMode !== 'auto_free_first'
 
   return (
     <div className="flex gap-3 text-xs leading-relaxed max-w-3xl mr-auto justify-start animate-in fade-in-0 duration-150">
@@ -105,7 +118,7 @@ function InlineFailureCard({ error, isStreaming, onRetry }: InlineFailureCardPro
         <div className="pt-2 border-t border-border/40 flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono text-muted-foreground">
           <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-secondary/80 text-muted-foreground">
             <span>{providerLabel}</span>
-            {error.statusCode && (
+            {error.statusCode && !isEvidenceWithheld && (
               <>
                 <span className="opacity-40">•</span>
                 <span>HTTP {error.statusCode}</span>
@@ -470,8 +483,14 @@ export function ShawWorkspace({
             receivedDone = true
           } else if (chunk.type === 'error') {
             const streamErr: any = new Error(chunk.error || 'Stream error')
-            streamErr.statusCode = chunk.statusCode || 500
-            streamErr.provider = chunk.provider || targetRouting
+            streamErr.errorCategory = chunk.errorCategory
+            if (chunk.errorCategory === 'evidence_withheld') {
+              streamErr.statusCode = chunk.statusCode
+              streamErr.provider = undefined
+            } else {
+              streamErr.statusCode = chunk.statusCode || 500
+              streamErr.provider = chunk.provider || targetRouting
+            }
             streamErr.userMessageId = chunk.userMessageId || activeTargetMessageId
             throw streamErr
           }
@@ -532,13 +551,17 @@ export function ShawWorkspace({
         }
 
         if (activeConversationIdRef.current === targetConvId) {
+          const isWithheld = err.errorCategory === 'evidence_withheld'
           setInlineError({
             conversationId: targetConvId,
             messageId: resolvedMessageId,
             userPrompt: textToSend,
-            provider: err.provider || targetRouting,
-            statusCode: err.statusCode || (err.message?.includes('503') ? 503 : undefined),
-            errorSummary: err.message || 'An error occurred during response generation',
+            provider: isWithheld ? undefined : (err.provider || targetRouting),
+            statusCode: isWithheld ? undefined : (err.statusCode || (err.message?.includes('503') ? 503 : undefined)),
+            errorSummary: isWithheld
+              ? "SHAW couldn't verify this answer against the available Vault records. Please try again."
+              : (err.message || 'An error occurred during response generation'),
+            errorCategory: err.errorCategory,
             capability,
             routingMode: targetRouting,
             createdAt: new Date().toISOString(),

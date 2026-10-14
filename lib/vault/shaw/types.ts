@@ -151,12 +151,20 @@ export type ShawCompletionReason =
   | 'error'
   | 'other'
 
+export type ShawErrorCategory =
+  | 'evidence_withheld'
+  | 'provider_error'
+  | 'timeout'
+  | 'client_network'
+  | 'unknown'
+
 export interface ShawStreamChunk {
   type: 'text' | 'meta' | 'error' | 'done'
   text?: string
   provider?: string
   model?: string
   error?: string
+  errorCategory?: ShawErrorCategory
   tokensIn?: number
   tokensOut?: number
   latencyMs?: number

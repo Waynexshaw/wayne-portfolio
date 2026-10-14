@@ -2649,7 +2649,8 @@ test('CP-8. Stream completion and error handling: withheld response emits safe n
   if (!validationResult.isApproved) {
     emittedErrorChunk = {
       type: 'error',
-      error: 'The generated report could not be validated against your Vault records and was withheld for accuracy.',
+      error: "SHAW couldn't verify this answer against the available Vault records. Please try again.",
+      errorCategory: 'evidence_withheld',
       finishReason: 'content_filter',
     }
   }
