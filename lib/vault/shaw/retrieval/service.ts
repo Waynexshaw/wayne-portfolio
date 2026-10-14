@@ -741,9 +741,9 @@ export class VaultRetrievalService {
         .limit(1)
 
       if (prj && prj.length > 0) {
-        queryBuilder = queryBuilder.eq('project_id', prj[0].id)
+        queryBuilder = queryBuilder.or(`project_id.eq.${prj[0].id},title.ilike.%${query}%,decision.ilike.%${query}%,context.ilike.%${query}%`)
       } else {
-        queryBuilder = queryBuilder.or(`title.ilike.%${query}%,decision.ilike.%${query}%`)
+        queryBuilder = queryBuilder.or(`title.ilike.%${query}%,decision.ilike.%${query}%,context.ilike.%${query}%`)
       }
     }
 
@@ -933,25 +933,56 @@ export class VaultRetrievalService {
       .select('id, project_id, title, meeting_type, status, scheduled_at, ended_at, agenda, notes, outcomes, workspace_projects(title)')
       .eq('workspace_id', this.workspaceId)
 
+    const query = (intent.entityQuery || '').trim()
+    if (query) {
+      // Check if query is a project name
+      const { data: prj } = await (this.supabase as any)
+        .from('workspace_projects')
+        .select('id')
+        .eq('workspace_id', this.workspaceId)
+        .or(`slug.ilike.%${query}%,title.ilike.%${query}%`)
+        .limit(1)
+
+      if (prj && prj.length > 0) {
+        queryBuilder = queryBuilder.or(
+          `project_id.eq.${prj[0].id},title.ilike.%${query}%,notes.ilike.%${query}%,agenda.ilike.%${query}%`
+        )
+      } else {
+        queryBuilder = queryBuilder.or(
+          `title.ilike.%${query}%,notes.ilike.%${query}%,agenda.ilike.%${query}%`
+        )
+      }
+    }
+
     if (intent.timeframe === 'upcoming') {
       queryBuilder = queryBuilder.gte('scheduled_at', new Date().toISOString()).order('scheduled_at', { ascending: true })
     } else {
       queryBuilder = queryBuilder.order('scheduled_at', { ascending: false })
     }
 
-    const { data: meetings } = await queryBuilder.limit(5)
+    const { data: meetings, error } = await queryBuilder.limit(5)
 
     if (completeness) {
       completeness.push({
         domain: 'meeting',
-        queryMode: 'catalog',
-        resultScope: 'bounded',
+        queryMode: query ? 'targeted' : 'catalog',
+        resultScope: query ? 'filtered' : 'bounded',
         returnedCount: (meetings || []).length,
         appliedLimit: 5,
+        filterDescription: query ? `query: ${query}` : undefined,
       })
     }
 
-    if (!meetings || meetings.length === 0) return
+    if (error || !meetings || meetings.length === 0) {
+      if (query) {
+        emptyStates.push({
+          domain: 'meeting',
+          query,
+          message: `No meetings matching "${query}" were found.`,
+        })
+      }
+      return
+    }
 
     for (const m of meetings) {
       const { data: participants } = await (this.supabase as any)

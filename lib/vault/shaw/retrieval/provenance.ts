@@ -1154,6 +1154,32 @@ export function validatePublicationEvidence(
     }
   }
 
+  // 5. Broad absence claims regarding questions
+  const globalQuestionAbsencePattern =
+    /\b(?:(?:the\s+)?vault\s+(?:contains|has|holds)\s+no\s+(?:unanswered|open|unresolved)\s+questions|there\s+are\s+no\s+(?:unanswered|open|unresolved)\s+questions\s+(?:in\s+(?:the\s+|your\s+)?vault|for\s+[a-z0-9_\-]+)|no\s+(?:unanswered|open|unresolved)\s+questions\s+exist(?:\s+in\s+(?:the\s+|your\s+)?vault)?|(?:the\s+)?project\s+has\s+no\s+(?:unanswered|open|unresolved)\s+questions)\b/i
+
+  if (globalQuestionAbsencePattern.test(unquotedFactualText)) {
+    violations.push({
+      type: 'UNAUTHORIZED_GLOBAL_ABSENCE',
+      detail: 'Global absence claim regarding questions without records-checked qualification',
+      severity: 'FATAL',
+    })
+    rejectionReasons.push('Global absence claim asserted for unmodeled or unexamined questions')
+  }
+
+  // 6. Extrapolation of unrecorded decisions to claim no decisions occurred
+  const unrecordedDecisionExtrapolationPattern =
+    /\bno\s+decisions?\s+(?:were|was|have\s+been)\s+(?:made|taken|reached)\b/i
+
+  if (unrecordedDecisionExtrapolationPattern.test(unquotedFactualText)) {
+    violations.push({
+      type: 'UNAUTHORIZED_GLOBAL_ABSENCE',
+      detail: 'Absence of decision records extrapolated to claim no real-world decisions were made',
+      severity: 'FATAL',
+    })
+    rejectionReasons.push('Absence of Vault records cannot be asserted as proof that no decisions occurred')
+  }
+
   const isApproved = violations.every((v) => v.severity !== 'FATAL')
 
   return {
