@@ -32,6 +32,13 @@ import {
   AnswerContract,
 } from '@/lib/vault/shaw/retrieval'
 
+import { GroqAdapter } from '@/lib/vault/shaw/gateway/adapters/groq'
+import { getGroqModel } from '@/lib/vault/shaw/gateway/config'
+
+export const TOTAL_REQUEST_TIMEOUT_MS = 25000
+export const PROVIDER_INACTIVITY_TIMEOUT_MS = 10000
+export const HEARTBEAT_INTERVAL_MS = 4000
+
 export interface ExecuteShawChatOptions {
   supabase?: any
   routeRequestFn?: typeof routeRequest
@@ -357,6 +364,12 @@ export async function executeShawChatTurn(
 
     const runId = runRecord?.id
 
+    const requestStartTime = Date.now()
+    const requestAbortController = new AbortController()
+    let totalRequestTimer: NodeJS.Timeout | null = setTimeout(() => {
+      requestAbortController.abort(new Error('Total request deadline exceeded (25s)'))
+    }, TOTAL_REQUEST_TIMEOUT_MS)
+
     // 8. Route to intelligence provider
     const routeFn = options?.routeRequestFn || routeRequest
     let routeResult
@@ -367,8 +380,13 @@ export async function executeShawChatTurn(
         routingMode: routingMode as ShawRoutingMode,
         selectedModel: selectedModel || conversation.selected_model,
         allowPaidFallback,
+        signal: requestAbortController.signal,
       })
     } catch (routeErr: any) {
+      if (totalRequestTimer) {
+        clearTimeout(totalRequestTimer)
+        totalRequestTimer = null
+      }
       if (runId) {
         await (supabase as any)
           .from('shaw_ai_runs')
@@ -412,7 +430,7 @@ export async function executeShawChatTurn(
     }
 
     // 10. Transform stream to SSE and accumulate response
-    const reader = stream.getReader()
+    let activeReader = stream.getReader()
     const encoder = new TextEncoder()
     let fullResponseText = ''
     let isCompleted = false
@@ -421,8 +439,16 @@ export async function executeShawChatTurn(
     let adapterFinishReason: ShawCompletionReason | null = null
     let adapterRawFinishReason: string | null = null
 
+    let currentProvider = provider
+    let currentModel = model
+    let currentWasFallback = wasFallback
+    let currentGetUsage = getUsage
+    let hasEmittedText = false
+
     const outputStream = new ReadableStream({
       async pull(controller) {
+        let heartbeatTimer: NodeJS.Timeout | null = null
+
         try {
           const isTechnicalMode = isTechnicalOrDebugPrompt(trimmedMessage)
           const isRecordSensitive = Boolean(
@@ -435,10 +461,19 @@ export async function executeShawChatTurn(
           const effectiveContract =
             preparedReasoningContext?.answerContract || singleDomainContext?.answerContract
 
+          if (isRecordSensitive) {
+            heartbeatTimer = setInterval(() => {
+              try {
+                controller.enqueue(encoder.encode(': ping\n\n'))
+              } catch {}
+            }, HEARTBEAT_INTERVAL_MS)
+          }
+
           const provenanceFilter = createProvenanceStreamFilter(
             (cleanChunk: string) => {
               // Only stream incrementally for ordinary conversational requests
               if (!isRecordSensitive && cleanChunk.length > 0) {
+                hasEmittedText = true
                 controller.enqueue(
                   encoder.encode(`data: ${JSON.stringify({ type: 'text', text: cleanChunk })}\n\n`)
                 )
@@ -451,42 +486,149 @@ export async function executeShawChatTurn(
             }
           )
 
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) {
-              break
+          let fallbackAttempted = wasFallback
+          let readLoopActive = true
+
+          while (readLoopActive) {
+            while (true) {
+              let readResult: ReadableStreamReadResult<ShawStreamChunk>
+              try {
+                readResult = await activeReader.read()
+              } catch (readErr: any) {
+                streamError = {
+                  message: readErr.message || 'Stream read error',
+                  finishReason: 'interrupted',
+                  rawFinishReason: 'stream_exception',
+                }
+                break
+              }
+
+              const { done, value } = readResult
+              if (done) {
+                break
+              }
+
+              if (value.type === 'text' && value.text) {
+                fullResponseText += value.text
+                provenanceFilter.push(value.text)
+              } else if (value.type === 'meta') {
+                if (value.finishReason) adapterFinishReason = value.finishReason
+                if (value.rawFinishReason) adapterRawFinishReason = value.rawFinishReason
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify(value)}\n\n`))
+              } else if (value.type === 'done') {
+                receivedAdapterDone = true
+                if (value.finishReason) adapterFinishReason = value.finishReason
+                if (value.rawFinishReason) adapterRawFinishReason = value.rawFinishReason
+              } else if (value.type === 'error') {
+                streamError = {
+                  message: value.error || 'Provider stream error',
+                  finishReason: value.finishReason,
+                  rawFinishReason: value.rawFinishReason || undefined,
+                }
+                if (value.finishReason) adapterFinishReason = value.finishReason
+                if (value.rawFinishReason) adapterRawFinishReason = value.rawFinishReason
+                break
+              }
             }
 
-            if (value.type === 'text' && value.text) {
-              fullResponseText += value.text
-              provenanceFilter.push(value.text)
-            } else if (value.type === 'meta') {
-              if (value.finishReason) adapterFinishReason = value.finishReason
-              if (value.rawFinishReason) adapterRawFinishReason = value.rawFinishReason
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify(value)}\n\n`))
-            } else if (value.type === 'done') {
-              receivedAdapterDone = true
-              if (value.finishReason) adapterFinishReason = value.finishReason
-              if (value.rawFinishReason) adapterRawFinishReason = value.rawFinishReason
-            } else if (value.type === 'error') {
-              streamError = {
-                message: value.error || 'Provider stream error',
-                finishReason: value.finishReason,
-                rawFinishReason: value.rawFinishReason,
+            const usage = currentGetUsage()
+            const effectiveFinishReason: ShawCompletionReason =
+              adapterFinishReason || usage.finishReason || (receivedAdapterDone ? 'stop' : 'interrupted')
+            const effectiveRawFinishReason = adapterRawFinishReason || usage.rawFinishReason || null
+
+            const isConfirmedNormal =
+              !streamError && receivedAdapterDone && effectiveFinishReason === 'stop'
+
+            if (!isConfirmedNormal) {
+              // Phase 3: Inspect whether stalled or failed Gemini attempt can safely fall back to Groq
+              const remainingBudgetMs = TOTAL_REQUEST_TIMEOUT_MS - (Date.now() - requestStartTime)
+              const canFallback =
+                !hasEmittedText && // Invariant 1: No answer text published
+                routingMode === 'auto_free_first' &&
+                currentProvider === 'gemini' &&
+                !fallbackAttempted &&
+                remainingBudgetMs >= 8000 && // Invariant 5: Total request deadline respected
+                new GroqAdapter().isConfigured()
+
+              if (canFallback) {
+                fallbackAttempted = true
+                // Invariant 3: Previous provider attempt is cancelled
+                await activeReader.cancel('Stall/error fallback to Groq').catch(() => {})
+
+                try {
+                  const groqAdapter = new GroqAdapter()
+                  const targetGroqModel = selectedModel || conversation.selected_model || getGroqModel()
+                  const fallbackResult = await groqAdapter.streamCompletion({
+                    systemPrompt,
+                    messages: history,
+                    temperature: 0.7,
+                    modelOverride: targetGroqModel,
+                    signal: requestAbortController.signal,
+                  })
+
+                  activeReader = fallbackResult.stream.getReader()
+                  currentProvider = 'groq'
+                  currentModel = targetGroqModel
+                  currentWasFallback = true
+                  currentGetUsage = fallbackResult.getUsage
+
+                  // Reset accumulation state for Groq attempt
+                  fullResponseText = ''
+                  streamError = null
+                  receivedAdapterDone = false
+                  adapterFinishReason = null
+                  adapterRawFinishReason = null
+
+                  if (runId) {
+                    await (supabase as any)
+                      .from('shaw_ai_runs')
+                      .update({
+                        provider: 'groq',
+                        model: currentModel,
+                        status: 'fallback',
+                      })
+                      .eq('id', runId)
+                  }
+
+                  // Continue outer loop with Groq stream
+                  continue
+                } catch (fallbackErr: any) {
+                  streamError = {
+                    message: `Fallback to Groq failed: ${fallbackErr.message || 'connection failed'}`,
+                    finishReason: 'interrupted',
+                    rawFinishReason: 'fallback_failed',
+                  }
+                }
               }
-              if (value.finishReason) adapterFinishReason = value.finishReason
-              if (value.rawFinishReason) adapterRawFinishReason = value.rawFinishReason
-              break
             }
+
+            readLoopActive = false
+          }
+
+          if (heartbeatTimer) {
+            clearInterval(heartbeatTimer)
+            heartbeatTimer = null
+          }
+          if (totalRequestTimer) {
+            clearTimeout(totalRequestTimer)
+            totalRequestTimer = null
           }
 
           if (isCompleted) return
           isCompleted = true
 
-          const usage = getUsage()
+          const usage = currentGetUsage()
           const effectiveFinishReason: ShawCompletionReason =
             adapterFinishReason || usage.finishReason || (receivedAdapterDone ? 'stop' : 'interrupted')
           const effectiveRawFinishReason = adapterRawFinishReason || usage.rawFinishReason || null
+
+          if (requestAbortController.signal.aborted && !streamError) {
+            streamError = {
+              message: 'The AI provider took too long to complete (timeout deadline exceeded). Please try again.',
+              finishReason: 'interrupted',
+              rawFinishReason: 'timeout',
+            }
+          }
 
           const isConfirmedNormal =
             !streamError && receivedAdapterDone && effectiveFinishReason === 'stop'
@@ -544,7 +686,7 @@ export async function executeShawChatTurn(
                   error: 'The generated report could not be validated against your Vault records and was withheld for accuracy.',
                   finishReason: 'content_filter',
                   userMessageId,
-                  provider,
+                  provider: currentProvider,
                 }
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify(errChunk)}\n\n`))
                 controller.close()
@@ -555,6 +697,7 @@ export async function executeShawChatTurn(
               cleanResponseText = appendCtaIfRequested(cleanResponseText, trimmedMessage)
 
               // Publish approved response text to client via SSE
+              hasEmittedText = true
               controller.enqueue(
                 encoder.encode(`data: ${JSON.stringify({ type: 'text', text: cleanResponseText })}\n\n`)
               )
@@ -564,6 +707,7 @@ export async function executeShawChatTurn(
               if (finalWithCta.length > cleanResponseText.length) {
                 const ctaDiff = finalWithCta.slice(cleanResponseText.length)
                 const ctaChunk: ShawStreamChunk = { type: 'text', text: ctaDiff }
+                hasEmittedText = true
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify(ctaChunk)}\n\n`))
                 cleanResponseText = finalWithCta
               }
@@ -590,8 +734,8 @@ export async function executeShawChatTurn(
                 workspace_id: workspaceId,
                 role: 'assistant',
                 content: fullResponseText,
-                model_provider: provider,
-                model_name: model,
+                model_provider: currentProvider,
+                model_name: currentModel,
                 tokens_in: usage.tokensIn || null,
                 tokens_out: usage.tokensOut || null,
                 latency_ms: usage.latencyMs || null,
@@ -609,6 +753,8 @@ export async function executeShawChatTurn(
                 .from('shaw_ai_runs')
                 .update({
                   status: 'completed',
+                  provider: currentProvider,
+                  model: currentModel,
                   tokens_in: usage.tokensIn || null,
                   tokens_out: usage.tokensOut || null,
                   latency_ms: usage.latencyMs || null,
@@ -669,7 +815,6 @@ export async function executeShawChatTurn(
           } else {
             // Abnormal, interrupted, or truncated completion:
             // DO NOT insert assistant turn into shaw_messages!
-            // This ensures retry eligibility is preserved (lastAssistant remains null).
             const errorMessage =
               streamError?.message ||
               (effectiveFinishReason === 'length'
@@ -686,6 +831,8 @@ export async function executeShawChatTurn(
                 .update({
                   status: 'failed',
                   error_message: errorMessage,
+                  provider: currentProvider,
+                  model: currentModel,
                   tokens_in: usage.tokensIn || null,
                   tokens_out: usage.tokensOut || null,
                   latency_ms: usage.latencyMs || null,
@@ -714,21 +861,32 @@ export async function executeShawChatTurn(
               finishReason: effectiveFinishReason,
               rawFinishReason: effectiveRawFinishReason || undefined,
               userMessageId,
-              provider,
+              provider: currentProvider,
             }
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(errChunk)}\n\n`))
             controller.close()
             return
           }
         } catch (err: any) {
+          if (heartbeatTimer) {
+            clearInterval(heartbeatTimer)
+            heartbeatTimer = null
+          }
+          if (totalRequestTimer) {
+            clearTimeout(totalRequestTimer)
+            totalRequestTimer = null
+          }
+
           if (!isCompleted && runId) {
             isCompleted = true
-            const usage = getUsage ? getUsage() : { tokensIn: 0, tokensOut: 0, latencyMs: 0 }
+            const usage = currentGetUsage ? currentGetUsage() : { tokensIn: 0, tokensOut: 0, latencyMs: 0 }
             await (supabase as any)
               .from('shaw_ai_runs')
               .update({
                 status: 'failed',
                 error_message: err.message || 'Stream processing error',
+                provider: currentProvider,
+                model: currentModel,
                 tokens_in: usage.tokensIn || null,
                 tokens_out: usage.tokensOut || null,
                 latency_ms: usage.latencyMs || null,
@@ -756,26 +914,34 @@ export async function executeShawChatTurn(
             finishReason: 'error',
             rawFinishReason: 'server_exception',
             userMessageId,
-            provider,
+            provider: currentProvider,
           }
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(errChunk)}\n\n`))
           controller.close()
         }
       },
       async cancel(reason) {
+        if (totalRequestTimer) {
+          clearTimeout(totalRequestTimer)
+          totalRequestTimer = null
+        }
+        requestAbortController.abort(reason)
+
         try {
-          await reader.cancel(reason)
+          await activeReader.cancel(reason)
         } catch {}
 
         if (!isCompleted && runId) {
           isCompleted = true
           try {
-            const usage = getUsage ? getUsage() : { tokensIn: 0, tokensOut: 0, latencyMs: 0 }
+            const usage = currentGetUsage ? currentGetUsage() : { tokensIn: 0, tokensOut: 0, latencyMs: 0 }
             await (supabase as any)
               .from('shaw_ai_runs')
               .update({
                 status: 'failed',
                 error_message: 'Client disconnected or stream cancelled by user',
+                provider: currentProvider,
+                model: currentModel,
                 tokens_in: usage.tokensIn || null,
                 tokens_out: usage.tokensOut || null,
                 latency_ms: usage.latencyMs || null,
@@ -787,6 +953,7 @@ export async function executeShawChatTurn(
                   interrupted: true,
                   finish_reason: 'interrupted',
                   raw_finish_reason: 'client_abort',
+                  rawFinishReason: 'client_abort',
                   partial_text: fullResponseText,
                   user_message_id: userMessageId,
                   ...(isRetry && userMessageId

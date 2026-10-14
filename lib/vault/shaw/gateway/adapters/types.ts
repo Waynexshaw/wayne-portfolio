@@ -11,6 +11,9 @@ export interface AdapterCompletionParams {
   messages: AdapterMessage[]
   temperature?: number
   modelOverride?: string
+  signal?: AbortSignal
+  connectTimeoutMs?: number
+  inactivityTimeoutMs?: number
 }
 
 export interface ProviderErrorDetails {
