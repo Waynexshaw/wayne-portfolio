@@ -602,7 +602,7 @@ export function detectPlanVsActual(trimmed: string): boolean {
 }
 
 export function detectDecisionGapAnalysis(trimmed: string): boolean {
-  return /\b(?:activity\s+but\s+no\s+(?:recorded\s+)?decisions?|decision\s+gaps?|projects?\s+(?:with(?:out| no)|lacking)\s+(?:recorded\s+)?decisions?|no\s+decisions?\s+recorded\s+for\s+active\s+projects?)\b/i.test(trimmed)
+  return /\b(?:activity\s+but\s+no\s+(?:recorded\s+)?decisions?|decision\s+gaps?|projects?\s+(?:with(?:out| no)|lacking)\s+(?:recorded\s+)?decisions?|no\s+decisions?\s+recorded\s+for\s+active\s+projects?|analyze\s+(?:the\s+)?(?:important\s+)?decisions?\s+and\s+(?:unresolved\s+)?questions?)\b/i.test(trimmed)
 }
 
 export function detectResearchImpact(trimmed: string): boolean {
@@ -793,17 +793,20 @@ export function planReasoning(input: PlannerInput): ReasoningPlan | null {
 
   // 4. DECISION_GAP_ANALYSIS (Precedence 4)
   if (detectDecisionGapAnalysis(trimmed)) {
+    const isTargeted = Boolean(activeEntityName)
     const domainRequests: ReasoningDomainRequest[] = [
       {
         domain: 'project',
         importance: 'REQUIRED',
-        queryMode: 'catalog',
-        limit: 20,
+        queryMode: isTargeted ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
+        limit: isTargeted ? 10 : 20,
       },
       {
         domain: 'decision',
         importance: 'REQUIRED',
-        queryMode: 'catalog',
+        queryMode: isTargeted ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
         limit: 25,
       },
       {
@@ -814,9 +817,17 @@ export function planReasoning(input: PlannerInput): ReasoningPlan | null {
       },
       {
         domain: 'task',
-        importance: 'OPTIONAL',
-        queryMode: 'catalog',
+        importance: isTargeted ? 'REQUIRED' : 'OPTIONAL',
+        queryMode: isTargeted ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
         limit: 25,
+      },
+      {
+        domain: 'meeting',
+        importance: 'OPTIONAL',
+        queryMode: isTargeted ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
+        limit: 5,
       },
     ]
 
@@ -828,7 +839,9 @@ export function planReasoning(input: PlannerInput): ReasoningPlan | null {
       temporalWindow: timeframe,
       domainRequests,
       requiresPreparation: true,
-      reason: 'Detected decision gap analysis across active projects',
+      reason: isTargeted
+        ? `Detected decision gap analysis for ${activeEntityName}`
+        : 'Detected decision gap analysis across active projects',
     }
   }
 

@@ -415,6 +415,129 @@ export function buildAnswerContract(
   const observationalGaps: AnswerContractItem[] = []
   const recommendations: AnswerContractItem[] = []
 
+  // Dedicated DECISION_GAP_ANALYSIS contract branch
+  if (plan.primaryIntent === 'DECISION_GAP_ANALYSIS') {
+    const targetEntity = plan.entityTarget?.name || 'this project'
+
+    // 1. Documented decisions and meetings
+    for (const r of records) {
+      if (r.entityType === 'project') {
+        recordedFacts.push({
+          type: 'RECORDED_FACT',
+          domain: 'project',
+          statement: `Project "${r.title}" is marked ${r.fields?.status || 'active'} with priority ${r.fields?.priority || 'normal'}.`,
+        })
+        if (r.fields?.description) {
+          recordedFacts.push({
+            type: 'RECORDED_FACT',
+            domain: 'project',
+            statement: `Documented project scope: ${String(r.fields.description).slice(0, 180)}.`,
+          })
+        }
+      } else if (r.entityType === 'decision') {
+        const decText = r.fields?.decision ? `: ${String(r.fields.decision).slice(0, 160)}` : ''
+        recordedFacts.push({
+          type: 'RECORDED_FACT',
+          domain: 'decision',
+          statement: `Documented decision "${r.title}"${decText}.`,
+        })
+      } else if (r.entityType === 'task') {
+        const status = r.fields?.status || 'todo'
+        recordedFacts.push({
+          type: 'RECORDED_FACT',
+          domain: 'task',
+          statement: `Task "${r.title}" is marked ${status}.`,
+        })
+        if (r.fields?.notes && /\?/.test(String(r.fields.notes))) {
+          recordedFacts.push({
+            type: 'RECORDED_FACT',
+            domain: 'task',
+            statement: `Task "${r.title}" contains recorded open question: ${String(r.fields.notes).slice(0, 140)}.`,
+          })
+        }
+      } else if (r.entityType === 'meeting') {
+        const outcomeText = r.fields?.outcomes ? ` (outcomes: ${String(r.fields.outcomes).slice(0, 140)})` : ''
+        recordedFacts.push({
+          type: 'RECORDED_FACT',
+          domain: 'meeting',
+          statement: `Meeting "${r.title}"${outcomeText}.`,
+        })
+        if (r.fields?.agenda && /\?/.test(String(r.fields.agenda))) {
+          recordedFacts.push({
+            type: 'RECORDED_FACT',
+            domain: 'meeting',
+            statement: `Meeting "${r.title}" agenda notes open question: ${String(r.fields.agenda).slice(0, 140)}.`,
+          })
+        }
+      }
+    }
+
+    // 2. Bounded gaps (strictly preserving bounded retrieval scope)
+    for (const la of limitedAbsences) {
+      const scopeDesc = la.targetEntityName
+        ? `linked to "${la.targetEntityName}" in the records checked`
+        : 'in the records checked'
+      boundedGaps.push({
+        type: 'BOUNDED_GAP',
+        domain: la.domain,
+        statement: `No ${la.domain} records ${scopeDesc}.`,
+        boundary: la.claim,
+      })
+    }
+
+    // 3. Observational gaps
+    const decisionRecords = records.filter((r) => r.entityType === 'decision')
+    if (decisionRecords.length === 0) {
+      observationalGaps.push({
+        type: 'OBSERVATIONAL_GAP',
+        statement: `No decision records are logged for "${targetEntity}" in the records checked. This indicates a documentation gap in the Vault, not proof that no decisions were made.`,
+      })
+    }
+
+    const projectRec = records.find((r) => r.entityType === 'project')
+    if (projectRec && projectRec.fields?.description) {
+      observationalGaps.push({
+        type: 'OBSERVATIONAL_GAP',
+        statement: `Possible decision gaps should be derived directly from documented project scope ("${String(projectRec.fields.description).slice(0, 100)}...") where architecture, governance, or rollout choices lack recorded decision records.`,
+      })
+    } else if (records.some((r) => r.entityType === 'task')) {
+      observationalGaps.push({
+        type: 'OBSERVATIONAL_GAP',
+        statement: `Possible decision gaps should be derived directly from active tasks where execution choices lack corresponding decision records.`,
+      })
+    }
+
+    observationalGaps.push({
+      type: 'OBSERVATIONAL_GAP',
+      statement: `Whether unrecorded open questions exist cannot be verified from the Vault. If no open questions are explicitly documented in retrieved notes, state that none were found in the examined records rather than claiming the project has no unanswered questions.`,
+    })
+
+    if (policy.unevaluatedDomains && policy.unevaluatedDomains.length > 0) {
+      const unqueried = policy.unevaluatedDomains.filter(
+        (d) => d === 'research' || d === 'crm' || d === 'review' || d === 'metric'
+      )
+      if (unqueried.length > 0) {
+        observationalGaps.push({
+          type: 'OBSERVATIONAL_GAP',
+          statement: `${unqueried.join(' and ').replace(/^./, (c) => c.toUpperCase())} records were not checked for this query.`,
+        })
+      }
+    }
+
+    // 4. Context-specific recommendation
+    recommendations.push({
+      type: 'RECOMMENDATION',
+      statement: `Review the documented objectives and pending tasks for "${targetEntity}" to formally record key decisions and track outstanding questions.`,
+    })
+
+    return {
+      recordedFacts,
+      boundedGaps,
+      observationalGaps,
+      recommendations,
+    }
+  }
+
   // 1. Recorded facts from records
   for (const r of records) {
     if (r.entityType === 'project') {
