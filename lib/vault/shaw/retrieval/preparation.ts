@@ -18,6 +18,7 @@
 
 import {
   ReasoningPlan,
+  RetrievalPlan,
   DomainOutcome,
   VaultRecord,
   RetrievalDomain,
@@ -444,12 +445,22 @@ export function buildAnswerContract(
 
   // 2. Direct counts & null fields
   if (policy.directFactualCounts.recordedTaskCount !== undefined) {
-    recordedFacts.push({
-      type: 'RECORDED_FACT',
-      domain: 'task',
-      statement: `Only ${policy.directFactualCounts.recordedTaskCount} task is currently linked to this project in the records checked.`,
-    })
-    if (policy.directFactualCounts.completedRecordedTaskCount === 0) {
+    const total = policy.directFactualCounts.recordedTaskCount
+    const completed = policy.directFactualCounts.completedRecordedTaskCount ?? 0
+    if (total === 1 && completed === 0) {
+      recordedFacts.push({
+        type: 'RECORDED_FACT',
+        domain: 'task',
+        statement: `One task is linked to the project. It is still open, and no linked task is recorded as completed.`,
+      })
+    } else {
+      recordedFacts.push({
+        type: 'RECORDED_FACT',
+        domain: 'task',
+        statement: `Only ${total} task${total === 1 ? '' : 's'} is currently linked to this project in the records checked.`,
+      })
+    }
+    if (completed === 0) {
       recordedFacts.push({
         type: 'RECORDED_FACT',
         domain: 'task',
@@ -491,7 +502,7 @@ export function buildAnswerContract(
   recommendations.push({
     type: 'RECOMMENDATION',
     statement:
-      'Setting a due date and breaking the objective into specific steps would help track progress.',
+      'Setting a due date and breaking the objective into specific smaller tasks would help track progress.',
   })
 
   return {
@@ -599,3 +610,132 @@ export function flattenPreparedContextToEnvelope(
     },
   }
 }
+
+/**
+ * Assembles a minimal typed AnswerEpistemicPolicy and AnswerContract
+ * for single-domain or ad-hoc Vault retrieval outcomes, ensuring identical
+ * controlled publication validation safety across all Vault-augmented requests.
+ */
+export function prepareSingleDomainContext(
+  plan: RetrievalPlan,
+  envelope: VaultContextEnvelope,
+  prompt?: string
+): {
+  epistemicPolicy: AnswerEpistemicPolicy
+  answerContract: AnswerContract
+} {
+  const isTechnicalMode = isTechnicalOrDebugPrompt(prompt)
+  const evaluatedDomains: RetrievalDomain[] = []
+  const unevaluatedDomains: RetrievalDomain[] = []
+  const domainPermissions: Record<RetrievalDomain, DomainEpistemicPermission> = {} as any
+
+  const queriedDomains = new Set<RetrievalDomain>([
+    ...(plan.intents.map((i) => i.domain)),
+    ...(envelope.provenance.domainsQueried || []),
+  ])
+
+  let recordedTaskCount: number | undefined = undefined
+  let openRecordedTaskCount: number | undefined = undefined
+  let completedRecordedTaskCount: number | undefined = undefined
+
+  for (const domain of ALL_VAULT_DOMAINS) {
+    if (queriedDomains.has(domain)) {
+      evaluatedDomains.push(domain)
+      const domainRecords = envelope.records.filter((r) => r.entityType === domain)
+      const comp = envelope.completeness?.find((c) => c.domain === domain)
+
+      const isConfirmedEmpty =
+        domainRecords.length === 0 && comp?.resultScope === 'exhaustive' && !comp.hasMore
+      const isLimitedEmpty = domainRecords.length === 0 && !isConfirmedEmpty
+
+      let allowedNegativeClaimType: 'NONE' | 'BOUNDED_ONLY' | 'VERIFIED_GLOBAL' = 'NONE'
+      if (isConfirmedEmpty) allowedNegativeClaimType = 'VERIFIED_GLOBAL'
+      else if (isLimitedEmpty) allowedNegativeClaimType = 'BOUNDED_ONLY'
+
+      let directCounts: { total?: number; open?: number; completed?: number } | undefined = undefined
+      if (domain === 'task') {
+        const total = domainRecords.length
+        const open = domainRecords.filter(
+          (r) => r.fields?.status !== 'completed' && r.fields?.status !== 'done'
+        ).length
+        const completed = domainRecords.filter(
+          (r) => r.fields?.status === 'completed' || r.fields?.status === 'done'
+        ).length
+        directCounts = { total, open, completed }
+        recordedTaskCount = total
+        openRecordedTaskCount = open
+        completedRecordedTaskCount = completed
+      } else {
+        directCounts = { total: domainRecords.length }
+      }
+
+      domainPermissions[domain] = {
+        domain,
+        evaluated: true,
+        status: isConfirmedEmpty
+          ? 'CONFIRMED_EMPTY'
+          : isLimitedEmpty
+          ? 'LIMITED_EMPTY'
+          : 'AVAILABLE',
+        globalAbsenceAuthorized: isConfirmedEmpty,
+        boundedScope: isLimitedEmpty
+          ? comp?.filterDescription || `records returned for ${domain}`
+          : undefined,
+        allowedNegativeClaimType,
+        directCounts,
+      }
+    } else {
+      unevaluatedDomains.push(domain)
+      domainPermissions[domain] = {
+        domain,
+        evaluated: false,
+        status: 'UNEVALUATED',
+        globalAbsenceAuthorized: false,
+        allowedNegativeClaimType: 'NONE',
+      }
+    }
+  }
+
+  const descriptiveCounts: PreparedDescriptiveCounts = {
+    recordedTaskCount,
+    openRecordedTaskCount,
+    completedRecordedTaskCount,
+  }
+
+  const epistemicPolicy: AnswerEpistemicPolicy = {
+    intent: 'SINGLE_DOMAIN_RETRIEVAL',
+    evaluatedDomains,
+    unevaluatedDomains,
+    domainPermissions,
+    knownNullFields: [],
+    directFactualCounts: descriptiveCounts,
+    unmodeledConceptsAllowedAsFact: false,
+    summaryMayStrengthen: false,
+    isTechnicalMode,
+  }
+
+  const recordedFacts: AnswerContractItem[] = envelope.records.map((r) => ({
+    type: 'RECORDED_FACT',
+    domain: r.entityType,
+    statement: `Record "${r.title}" (${r.entityType}) is logged in Vault.`,
+  }))
+
+  const boundedGaps: AnswerContractItem[] = envelope.emptyStates.map((e) => ({
+    type: 'BOUNDED_GAP',
+    domain: e.domain,
+    statement: e.message || `No ${e.domain} records were returned for "${e.query}".`,
+  }))
+
+  const answerContract: AnswerContract = {
+    recordedFacts,
+    boundedGaps,
+    observationalGaps: [],
+    recommendations: [],
+  }
+
+  return {
+    epistemicPolicy,
+    answerContract,
+  }
+}
+
