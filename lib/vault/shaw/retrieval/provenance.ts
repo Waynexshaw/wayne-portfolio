@@ -644,6 +644,7 @@ export type PublicationViolationType =
   | 'INVENTED_PERCENTAGE_OR_SCORE'
   | 'UNSUPPORTED_PROGRESS_CLAIM'
   | 'UNGROUNDED_DECISION_GAP'
+  | 'UNSUPPORTED_CAUSAL_CLAIM'
 
 export interface PublicationViolation {
   type: PublicationViolationType
@@ -1233,6 +1234,42 @@ export function validatePublicationEvidence(
       rejectionReasons.push(
         'Response introduces unrelated token-model or audit-provider suggestions not evidenced in project records'
       )
+    }
+  }
+
+  // 8. Unsupported causal claim check (claiming research caused or drove a decision without supporting evidence)
+  const causalClaimPattern =
+    /\b(?:research\s+(?:caused|drove|resulted\s+in|led\s+directly\s+to|dictated)\s+(?:the\s+)?(?:decision|choice))\b/i
+  if (causalClaimPattern.test(unquotedFactualText)) {
+    const hasDocumentedCausalLink = allRecords.some(
+      (r) =>
+        r.entityType === 'decision' &&
+        /\bresearch\b/i.test(JSON.stringify(r.fields || {}))
+    )
+    if (!hasDocumentedCausalLink) {
+      violations.push({
+        type: 'UNSUPPORTED_CAUSAL_CLAIM',
+        detail: 'Response claims research caused a decision without supporting evidence in decision records',
+        severity: 'FATAL',
+      })
+      rejectionReasons.push('Unsupported causal claim asserting research caused a decision')
+    }
+  }
+
+  // 9. Blocker claim contradiction (claiming tasks are marked blocked when 0 blocked tasks exist)
+  const blockedFactualPattern =
+    /\b(?:[1-9]\d*\s+tasks?\s+(?:are|were|have\s+been)\s+(?:marked|recorded|logged)\s+(?:as\s+)?blocked|tasks?\s+(?:are|were)\s+marked\s+(?:as\s+)?blocked)\b/i
+  if (blockedFactualPattern.test(unquotedFactualText)) {
+    const hasBlockedTask = allRecords.some(
+      (r) => r.entityType === 'task' && String(r.fields?.status || '').toLowerCase() === 'blocked'
+    )
+    if (!hasBlockedTask) {
+      violations.push({
+        type: 'CONTRADICTED_FACT',
+        detail: 'Response claims tasks are marked blocked, but no tasks have blocked status in Vault records',
+        severity: 'FATAL',
+      })
+      rejectionReasons.push('Response asserts tasks are marked as blocked when 0 blocked tasks exist')
     }
   }
 
