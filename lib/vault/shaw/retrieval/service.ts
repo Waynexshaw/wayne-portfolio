@@ -284,6 +284,11 @@ export class VaultRetrievalService {
     // B. Targeted Project Entity Mode
     // ------------------------------------------------------------------------
     const trimmedQuery = query.trim()
+    const normalizedQuery = trimmedQuery
+      .replace(/\s+(?:projects?|initiatives?|workspaces?|accounts?)$/i, '')
+      .trim()
+
+    // 1. Try exact/raw query first
     let queryBuilder = (this.supabase as any)
       .from('workspace_projects')
       .select('id, title, slug, description, status, priority, start_date, target_date, completed_at, created_at, updated_at', { count: 'exact' })
@@ -292,7 +297,25 @@ export class VaultRetrievalService {
       .order('created_at', { ascending: false })
       .limit(10)
 
-    const { data: projects, error, count } = await queryBuilder
+    let { data: projects, error, count } = await queryBuilder
+
+    // 2. Defensive normalization: If raw query returned no matches, try normalized query
+    if ((!projects || projects.length === 0) && normalizedQuery && normalizedQuery !== trimmedQuery && normalizedQuery.length >= 2) {
+      const normBuilder = (this.supabase as any)
+        .from('workspace_projects')
+        .select('id, title, slug, description, status, priority, start_date, target_date, completed_at, created_at, updated_at', { count: 'exact' })
+        .eq('workspace_id', this.workspaceId)
+        .or(`slug.ilike.%${normalizedQuery}%,title.ilike.%${normalizedQuery}%`)
+        .order('created_at', { ascending: false })
+        .limit(10)
+
+      const normResult = await normBuilder
+      if (normResult.data && normResult.data.length > 0) {
+        projects = normResult.data
+        error = normResult.error
+        count = normResult.count
+      }
+    }
 
     if (error || !projects || projects.length === 0) {
       emptyStates.push({
@@ -311,6 +334,23 @@ export class VaultRetrievalService {
         filterDescription: `Targeted query for "${trimmedQuery}"`,
       })
       return
+    }
+
+    // 3. Prefer exact-title matching when multiple candidates match (e.g. "Phoenix Project" vs "Phoenix Project Alpha")
+    if (projects.length > 1) {
+      const exactRawMatches = projects.filter(
+        (p: any) => p.title.toLowerCase() === trimmedQuery.toLowerCase() || p.slug.toLowerCase() === trimmedQuery.toLowerCase()
+      )
+      if (exactRawMatches.length === 1) {
+        projects = exactRawMatches
+      } else if (normalizedQuery && normalizedQuery !== trimmedQuery) {
+        const exactNormMatches = projects.filter(
+          (p: any) => p.title.toLowerCase() === normalizedQuery.toLowerCase() || p.slug.toLowerCase() === normalizedQuery.toLowerCase()
+        )
+        if (exactNormMatches.length === 1) {
+          projects = exactNormMatches
+        }
+      }
     }
 
     if (projects.length > 1) {
@@ -626,6 +666,54 @@ export class VaultRetrievalService {
     })
   }
 
+  /**
+   * Resolves a workspace project by entity query with exact-match precedence
+   * and defensive classifier normalization (e.g. "Community structure project" -> "Community structure").
+   */
+  private async resolveTargetProject(
+    query: string | undefined
+  ): Promise<{ id: string; title: string; slug: string } | null> {
+    const trimmed = (query || '').trim()
+    if (!trimmed) return null
+
+    // 1. Try exact/raw query first
+    const { data: exactMatches } = await (this.supabase as any)
+      .from('workspace_projects')
+      .select('id, title, slug')
+      .eq('workspace_id', this.workspaceId)
+      .or(`slug.ilike.%${trimmed}%,title.ilike.%${trimmed}%`)
+      .order('created_at', { ascending: false })
+      .limit(5)
+
+    if (exactMatches && exactMatches.length > 0) {
+      const exactTitle = exactMatches.find(
+        (p: any) => p.title.toLowerCase() === trimmed.toLowerCase() || p.slug.toLowerCase() === trimmed.toLowerCase()
+      )
+      return exactTitle || exactMatches[0]
+    }
+
+    // 2. Try defensive normalization (strip trailing generic classifiers)
+    const normalized = trimmed.replace(/\s+(?:projects?|initiatives?|workspaces?|accounts?)$/i, '').trim()
+    if (normalized && normalized !== trimmed && normalized.length >= 2) {
+      const { data: normMatches } = await (this.supabase as any)
+        .from('workspace_projects')
+        .select('id, title, slug')
+        .eq('workspace_id', this.workspaceId)
+        .or(`slug.ilike.%${normalized}%,title.ilike.%${normalized}%`)
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+      if (normMatches && normMatches.length > 0) {
+        const exactNormTitle = normMatches.find(
+          (p: any) => p.title.toLowerCase() === normalized.toLowerCase() || p.slug.toLowerCase() === normalized.toLowerCase()
+        )
+        return exactNormTitle || normMatches[0]
+      }
+    }
+
+    return null
+  }
+
   // --------------------------------------------------------------------------
   // 3. Operational Tasks Contract
   // --------------------------------------------------------------------------
@@ -649,15 +737,10 @@ export class VaultRetrievalService {
 
     if (intent.entityQuery) {
       // If entity query matches a project, filter tasks by that project
-      const { data: matchedProjects } = await (this.supabase as any)
-        .from('workspace_projects')
-        .select('id')
-        .eq('workspace_id', this.workspaceId)
-        .or(`slug.ilike.%${intent.entityQuery}%,title.ilike.%${intent.entityQuery}%`)
-        .limit(1)
+      const targetProject = await this.resolveTargetProject(intent.entityQuery)
 
-      if (matchedProjects && matchedProjects.length > 0) {
-        queryBuilder = queryBuilder.eq('project_id', matchedProjects[0].id)
+      if (targetProject) {
+        queryBuilder = queryBuilder.eq('project_id', targetProject.id)
       } else {
         queryBuilder = queryBuilder.ilike('title', `%${intent.entityQuery}%`)
       }
@@ -733,15 +816,10 @@ export class VaultRetrievalService {
 
     if (query) {
       // Check if query is a project name
-      const { data: prj } = await (this.supabase as any)
-        .from('workspace_projects')
-        .select('id')
-        .eq('workspace_id', this.workspaceId)
-        .or(`slug.ilike.%${query}%,title.ilike.%${query}%`)
-        .limit(1)
+      const targetProject = await this.resolveTargetProject(query)
 
-      if (prj && prj.length > 0) {
-        queryBuilder = queryBuilder.or(`project_id.eq.${prj[0].id},title.ilike.%${query}%,decision.ilike.%${query}%,context.ilike.%${query}%`)
+      if (targetProject) {
+        queryBuilder = queryBuilder.or(`project_id.eq.${targetProject.id},title.ilike.%${query}%,decision.ilike.%${query}%,context.ilike.%${query}%`)
       } else {
         queryBuilder = queryBuilder.or(`title.ilike.%${query}%,decision.ilike.%${query}%,context.ilike.%${query}%`)
       }
@@ -936,16 +1014,11 @@ export class VaultRetrievalService {
     const query = (intent.entityQuery || '').trim()
     if (query) {
       // Check if query is a project name
-      const { data: prj } = await (this.supabase as any)
-        .from('workspace_projects')
-        .select('id')
-        .eq('workspace_id', this.workspaceId)
-        .or(`slug.ilike.%${query}%,title.ilike.%${query}%`)
-        .limit(1)
+      const targetProject = await this.resolveTargetProject(query)
 
-      if (prj && prj.length > 0) {
+      if (targetProject) {
         queryBuilder = queryBuilder.or(
-          `project_id.eq.${prj[0].id},title.ilike.%${query}%,notes.ilike.%${query}%,agenda.ilike.%${query}%`
+          `project_id.eq.${targetProject.id},title.ilike.%${query}%,notes.ilike.%${query}%,agenda.ilike.%${query}%`
         )
       } else {
         queryBuilder = queryBuilder.or(
@@ -1290,15 +1363,9 @@ export class VaultRetrievalService {
     // If entityTarget is provided, find matching project IDs
     let targetProjectIds: string[] = []
     if (entityTarget) {
-      const { data: matchedProjects } = await (this.supabase as any)
-        .from('workspace_projects')
-        .select('id')
-        .eq('workspace_id', this.workspaceId)
-        .or(`title.ilike.%${entityTarget}%,slug.ilike.%${entityTarget}%`)
-        .limit(5)
-
-      if (matchedProjects && matchedProjects.length > 0) {
-        targetProjectIds = matchedProjects.map((p: any) => p.id)
+      const targetProject = await this.resolveTargetProject(entityTarget)
+      if (targetProject) {
+        targetProjectIds = [targetProject.id]
       }
     }
 

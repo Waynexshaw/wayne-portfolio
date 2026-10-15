@@ -412,6 +412,11 @@ function cleanAndValidateCandidate(raw: string): string | null {
     .replace(/\s+(?:right\s+now|currently|now|today|yesterday|at\s+the\s+moment|and\s+why)$/i, '')
     .trim()
 
+  // Strip trailing generic entity classifiers (e.g. "Community structure project" -> "Community structure", "Growth initiative" -> "Growth")
+  candidate = candidate
+    .replace(/\s+(?:projects?|initiatives?|workspaces?|accounts?)$/i, '')
+    .trim()
+
   if (candidate.length < 2) return null
 
   const lower = candidate.toLowerCase()
