@@ -595,11 +595,11 @@ function resolveContextEntity(
 // ============================================================================
 
 export function detectPeriodAccomplishment(trimmed: string): boolean {
-  return /\b(?:what\s+did\s+i\s+(?:accomplish|achieve|get\s+done)|what\s+have\s+i\s+(?:accomplished|achieved)|key\s+accomplishments?|period\s+accomplishments?|my\s+accomplishments?)\b/i.test(trimmed)
+  return /\b(?:what\s+did\s+i\s+(?:accomplish|achieve|get\s+done)|what\s+have\s+i\s+(?:accomplished|achieved)|key\s+accomplishments?|period\s+accomplishments?|my\s+accomplishments?|what\s+was\s+completed(?:\s+(?:this|last)\s+week)?)\b/i.test(trimmed)
 }
 
 export function detectBlockerAssessment(trimmed: string): boolean {
-  return /\b(?:what(?:\s+is|'s)?\s+blocking|block(?:ers?|ed)|roadblocks?|stuck\s+tasks?|impediments?|what\s+is\s+stuck)\b/i.test(trimmed)
+  return /\b(?:what(?:\s+is|'s)?\s+blocking|block(?:ers?|ed)|roadblocks?|stuck\s+tasks?|impediments?|what\s+is\s+stuck|identify\s+(?:any\s+)?(?:blockers|impediments|roadblocks))\b/i.test(trimmed)
 }
 
 export function detectPlanVsActual(trimmed: string): boolean {
@@ -611,11 +611,11 @@ export function detectDecisionGapAnalysis(trimmed: string): boolean {
 }
 
 export function detectResearchImpact(trimmed: string): boolean {
-  return /\b(?:(?:what\s+does\s+)?(?:my\s+)?research\s+say\s+that\s+could\s+affect|research\s+impact\s+(?:on|for)|how\s+does\s+research\s+affect|implications?\s+of\s+(?:our\s+|the\s+)?research)\b/i.test(trimmed)
+  return /\b(?:(?:what\s+does\s+)?(?:my\s+)?research\s+say\s+that\s+could\s+affect|research\s+impact\s+(?:on|for)|how\s+does\s+research\s+affect|implications?\s+of\s+(?:our\s+|the\s+)?research|impact\s+of\s+(?:our\s+|the\s+)?research)\b/i.test(trimmed)
 }
 
 export function detectMeetingPrep(trimmed: string): boolean {
-  return /\b(?:prepare\s+me\s+for\s+(?:my\s+)?meeting|prep\s+(?:me\s+)?for\s+(?:my\s+)?meeting|meeting\s+prep\b)/i.test(trimmed)
+  return /\b(?:prepare\s+(?:me\s+)?for\s+(?:my\s+|the\s+|a\s+|an\s+|upcoming\s+|tomorrow'?s?\s+)?meeting|prep\s+(?:me\s+)?for\s+(?:my\s+|the\s+|a\s+|an\s+|upcoming\s+|tomorrow'?s?\s+)?meeting|meeting\s+prep\b)/i.test(trimmed)
 }
 
 export function detectProjectProgress(trimmed: string, activeEntityName: string | null): boolean {
@@ -632,7 +632,7 @@ export function detectWeeklyFocus(trimmed: string): boolean {
 }
 
 export function detectCrossDomainRecap(trimmed: string): boolean {
-  return /\b(?:what\s+happened(?:\s+last\s+week|\s+this\s+week|\s+recently)?|weekly\s+recap|cross[- ]domain\s+recap|recap\s+of\s+(?:the\s+)?week|operational\s+recap|catch\s+me\s+up\s+on\s+recent\s+activity)\b/i.test(trimmed)
+  return /\b(?:what\s+happened(?:\s+last\s+week|\s+this\s+week|\s+recently)?|weekly\s+recap|cross[- ]domain\s+recap|recap\s+of\s+(?:the\s+)?week|operational\s+recap|catch\s+me\s+up\s+on\s+recent\s+activity|recap\s+recent\s+activity)\b/i.test(trimmed)
 }
 
 /**
@@ -693,6 +693,17 @@ export function planReasoning(input: PlannerInput): ReasoningPlan | null {
         queryMode: 'catalog',
         limit: 5,
       },
+      ...(activeEntityName
+        ? [
+            {
+              domain: 'project' as const,
+              importance: 'OPTIONAL' as const,
+              queryMode: 'targeted' as const,
+              entityTarget: activeEntityName,
+              limit: 5,
+            },
+          ]
+        : []),
     ]
 
     return {
@@ -912,6 +923,13 @@ export function planReasoning(input: PlannerInput): ReasoningPlan | null {
         limit: 5,
       },
       {
+        domain: 'project',
+        importance: 'OPTIONAL',
+        queryMode: activeEntityName ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
+        limit: 5,
+      },
+      {
         domain: 'task',
         importance: 'OPTIONAL',
         queryMode: activeEntityName ? 'targeted' : 'catalog',
@@ -1067,6 +1085,13 @@ export function planReasoning(input: PlannerInput): ReasoningPlan | null {
         statusFilter: 'completed',
         temporalFilter: temporalExp || 'last_week',
         limit: 10,
+      },
+      {
+        domain: 'project',
+        importance: 'OPTIONAL',
+        queryMode: activeEntityName ? 'targeted' : 'catalog',
+        entityTarget: activeEntityName || undefined,
+        limit: 5,
       },
     ]
 

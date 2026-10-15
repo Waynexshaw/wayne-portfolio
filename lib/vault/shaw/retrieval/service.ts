@@ -24,6 +24,7 @@ import {
   DomainOutcomeStatus,
   ReasoningDomainRequest,
 } from './types'
+import { resolveTemporalWindow } from './temporal'
 
 const MAX_TOTAL_RECORDS = 40
 const MAX_DOC_TEXT_LENGTH = 1500
@@ -729,10 +730,33 @@ export class VaultRetrievalService {
       .select('id, project_id, title, description, status, priority, due_date, completed_at, created_at, workspace_projects(title, slug)')
       .eq('workspace_id', this.workspaceId)
 
+    let timeframeDesc: string | undefined = undefined
     if (intent.statusFilter === 'completed') {
       queryBuilder = queryBuilder.eq('status', 'completed')
+      if (intent.timeframe) {
+        const window =
+          typeof intent.timeframe === 'object' && intent.timeframe.startIso
+            ? intent.timeframe
+            : typeof intent.timeframe === 'string'
+            ? resolveTemporalWindow(intent.timeframe as any)
+            : undefined
+        if (window?.startIso && window?.endIso) {
+          queryBuilder = queryBuilder
+            .gte('completed_at', window.startIso)
+            .lte('completed_at', window.endIso)
+          timeframeDesc = `completed within ${window.label || window.startIso.slice(0, 10)}`
+        }
+      }
+      queryBuilder = queryBuilder.order('completed_at', { ascending: false, nullsFirst: false })
     } else if (intent.statusFilter === 'open') {
       queryBuilder = queryBuilder.in('status', ['todo', 'in_progress', 'blocked'])
+      queryBuilder = queryBuilder
+        .order('due_date', { ascending: true, nullsFirst: false })
+        .order('priority', { ascending: false })
+    } else {
+      queryBuilder = queryBuilder
+        .order('due_date', { ascending: true, nullsFirst: false })
+        .order('priority', { ascending: false })
     }
 
     if (intent.entityQuery) {
@@ -746,19 +770,22 @@ export class VaultRetrievalService {
       }
     }
 
-    const { data: tasks, error } = await queryBuilder
-      .order('due_date', { ascending: true, nullsFirst: false })
-      .order('priority', { ascending: false })
-      .limit(20)
+    const { data: tasks, error } = await queryBuilder.limit(20)
 
     if (completeness) {
+      const filterParts = [
+        intent.statusFilter ? `status: ${intent.statusFilter}` : undefined,
+        timeframeDesc,
+        intent.entityQuery ? `query: ${intent.entityQuery}` : undefined,
+      ].filter(Boolean)
+
       completeness.push({
         domain: 'task',
         queryMode: 'catalog',
-        resultScope: intent.statusFilter || intent.entityQuery ? 'filtered' : 'bounded',
+        resultScope: intent.statusFilter || intent.entityQuery || intent.timeframe ? 'filtered' : 'bounded',
         returnedCount: (tasks || []).length,
         appliedLimit: 20,
-        filterDescription: intent.statusFilter ? `status: ${intent.statusFilter}` : undefined,
+        filterDescription: filterParts.length > 0 ? filterParts.join('; ') : undefined,
       })
     }
 
@@ -807,7 +834,8 @@ export class VaultRetrievalService {
     records: VaultRecord[],
     ambiguities: AmbiguityItem[],
     emptyStates: NotFoundItem[],
-    completeness?: CollectionCompleteness[]
+    completeness?: CollectionCompleteness[],
+    temporalFilter?: any
   ) {
     let queryBuilder = (this.supabase as any)
       .from('decisions')
@@ -825,18 +853,39 @@ export class VaultRetrievalService {
       }
     }
 
+    let timeframeDesc: string | undefined = undefined
+    if (temporalFilter) {
+      const window =
+        typeof temporalFilter === 'object' && temporalFilter.startDateString
+          ? temporalFilter
+          : typeof temporalFilter === 'string'
+          ? resolveTemporalWindow(temporalFilter as any)
+          : undefined
+      if (window?.startDateString && window?.endDateString) {
+        queryBuilder = queryBuilder
+          .gte('decided_at', window.startDateString)
+          .lte('decided_at', window.endDateString)
+        timeframeDesc = `decided within ${window.label || window.startDateString}`
+      }
+    }
+
     const { data: decisions, error } = await queryBuilder
       .order('decided_at', { ascending: false })
       .limit(10)
 
     if (completeness) {
+      const filterParts = [
+        query ? `query: ${query}` : undefined,
+        timeframeDesc,
+      ].filter(Boolean)
+
       completeness.push({
         domain: 'decision',
         queryMode: query ? 'targeted' : 'catalog',
-        resultScope: query ? 'filtered' : 'bounded',
+        resultScope: query || temporalFilter ? 'filtered' : 'bounded',
         returnedCount: (decisions || []).length,
         appliedLimit: 10,
-        filterDescription: query ? `query: ${query}` : undefined,
+        filterDescription: filterParts.length > 0 ? filterParts.join('; ') : undefined,
       })
     }
 
@@ -1027,8 +1076,24 @@ export class VaultRetrievalService {
       }
     }
 
+    let timeframeDesc: string | undefined = undefined
     if (intent.timeframe === 'upcoming') {
       queryBuilder = queryBuilder.gte('scheduled_at', new Date().toISOString()).order('scheduled_at', { ascending: true })
+      timeframeDesc = 'upcoming'
+    } else if (intent.timeframe) {
+      const window =
+        typeof intent.timeframe === 'object' && intent.timeframe.startIso
+          ? intent.timeframe
+          : typeof intent.timeframe === 'string'
+          ? resolveTemporalWindow(intent.timeframe as any)
+          : undefined
+      if (window?.startIso && window?.endIso) {
+        queryBuilder = queryBuilder
+          .gte('scheduled_at', window.startIso)
+          .lte('scheduled_at', window.endIso)
+        timeframeDesc = `scheduled within ${window.label || window.startIso.slice(0, 10)}`
+      }
+      queryBuilder = queryBuilder.order('scheduled_at', { ascending: false })
     } else {
       queryBuilder = queryBuilder.order('scheduled_at', { ascending: false })
     }
@@ -1036,13 +1101,18 @@ export class VaultRetrievalService {
     const { data: meetings, error } = await queryBuilder.limit(5)
 
     if (completeness) {
+      const filterParts = [
+        query ? `query: ${query}` : undefined,
+        timeframeDesc,
+      ].filter(Boolean)
+
       completeness.push({
         domain: 'meeting',
         queryMode: query ? 'targeted' : 'catalog',
-        resultScope: query ? 'filtered' : 'bounded',
+        resultScope: query || intent.timeframe ? 'filtered' : 'bounded',
         returnedCount: (meetings || []).length,
         appliedLimit: 5,
-        filterDescription: query ? `query: ${query}` : undefined,
+        filterDescription: filterParts.length > 0 ? filterParts.join('; ') : undefined,
       })
     }
 
@@ -1506,7 +1576,7 @@ export class VaultRetrievalService {
             {
               entityQuery: req.entityTarget,
               statusFilter: req.statusFilter,
-              timeframe: req.temporalFilter,
+              timeframe: req.temporalFilter ? (temporalWindow || req.temporalFilter) : undefined,
             },
             domainRecords,
             domainAmbiguities,
@@ -1521,7 +1591,8 @@ export class VaultRetrievalService {
             domainRecords,
             domainAmbiguities,
             domainEmptyStates,
-            domainCompleteness
+            domainCompleteness,
+            req.temporalFilter ? (temporalWindow || req.temporalFilter) : undefined
           )
           break
 
@@ -1537,7 +1608,10 @@ export class VaultRetrievalService {
 
         case 'meeting':
           await this.retrieveMeetings(
-            { timeframe: req.temporalFilter, entityQuery: req.entityTarget },
+            {
+              timeframe: req.temporalFilter ? (temporalWindow || req.temporalFilter) : undefined,
+              entityQuery: req.entityTarget,
+            },
             domainRecords,
             domainAmbiguities,
             domainEmptyStates,
