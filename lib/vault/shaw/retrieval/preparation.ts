@@ -498,14 +498,19 @@ export function buildAnswerContract(
     if (projectRec && projectRec.fields?.description) {
       observationalGaps.push({
         type: 'OBSERVATIONAL_GAP',
-        statement: `Possible decision gaps should be derived directly from documented project scope ("${String(projectRec.fields.description).slice(0, 100)}...") where architecture, governance, or rollout choices lack recorded decision records.`,
+        statement: `Possible decision gaps should be derived directly from documented project scope ("${String(projectRec.fields.description).slice(0, 100)}..."). For a project focused on community structure, suitable possible questions may concern community roles, responsibilities, organization, or onboarding. Do NOT introduce token models, smart-contract audits, or unrelated technical choices unless explicitly documented in retrieved records.`,
       })
     } else if (records.some((r) => r.entityType === 'task')) {
       observationalGaps.push({
         type: 'OBSERVATIONAL_GAP',
-        statement: `Possible decision gaps should be derived directly from active tasks where execution choices lack corresponding decision records.`,
+        statement: `Possible decision gaps should be derived directly from active tasks where execution choices lack corresponding decision records. Do not introduce unrelated technical or token choices without project evidence.`,
       })
     }
+
+    observationalGaps.push({
+      type: 'OBSERVATIONAL_GAP',
+      statement: `Activity digest entries reflect recent timeframe activity windows. Do not cite workspace-wide activity digest numbers as if they represent decisions or tasks for a specific target project.`,
+    })
 
     observationalGaps.push({
       type: 'OBSERVATIONAL_GAP',

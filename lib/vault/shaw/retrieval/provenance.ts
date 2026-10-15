@@ -84,7 +84,7 @@ export function resolveProvenanceRoute(source: {
   }
 }
 
-export const PROVENANCE_TAG_REGEX = /(?:\[SOURCES:\s*([^|\]]+?)(?:\s*\|\s*BASIS:\s*([A-Za-z_]+))?\s*\]|<!--\s*SOURCES:\s*([^|>-]+?)(?:\s*\|\s*BASIS:\s*([A-Za-z_]+))?\s*-->)/gi
+export const PROVENANCE_TAG_REGEX = /(?:\[[\s\u200B-\u200D\uFEFF]*SOURCES:[\s\u200B-\u200D\uFEFF]*([^|\]]+?)(?:[\s\u200B-\u200D\uFEFF]*\|[\s\u200B-\u200D\uFEFF]*BASIS:[\s\u200B-\u200D\uFEFF]*([A-Za-z_]+))?[\s\u200B-\u200D\uFEFF]*\]|<!--[\s\u200B-\u200D\uFEFF]*\[?[\s\u200B-\u200D\uFEFF]*SOURCES:[\s\u200B-\u200D\uFEFF]*([^|\]>-]+?)(?:[\s\u200B-\u200D\uFEFF]*\|[\s\u200B-\u200D\uFEFF]*BASIS:[\s\u200B-\u200D\uFEFF]*([A-Za-z_]+))?[\s\u200B-\u200D\uFEFF]*\]?[\s\u200B-\u200D\uFEFF]*-->)/gi
 
 export const INTERNAL_CONTEXT_IDENTIFIERS: ReadonlySet<string> = new Set([
   'reasoning_context',
@@ -232,6 +232,16 @@ export function validateAndNormalizeEpistemicClaims(
       /[-•]?\s*Meetings\s*–?\s*the record shows zero meetings logged\.?\n?/gi,
       ''
     )
+
+    // 8. Clean misleading conflation of workspace activity digest with project decisions
+    res = res.replace(
+      /\s*[-•]?\s*The\s+recent\s+activity\s+digest\s+shows\s+a\s+decisions?\s+count\s+of\s*[0-9]+[.,]?/gi,
+      ''
+    )
+    res = res.replace(
+      /\s*[-•]?\s*The\s+recent\s+activity\s+digest\s+shows\s+zero\s+decisions?\s+logged[.,]?/gi,
+      ''
+    )
   }
 
   return res
@@ -273,8 +283,15 @@ export function sanitizeVisibleProse(
     policy = sourceMapOrOptions.policy
   }
 
-  // 1. Strip trailing provenance tags
-  let res = text.replace(PROVENANCE_TAG_REGEX, '')
+  // 0. Strip zero-width and invisible control characters
+  let res = text.replace(/[\u200B-\u200D\uFEFF]/g, '')
+
+  // 1. Strip trailing provenance tags and any internal source protocol tags
+  res = res.replace(PROVENANCE_TAG_REGEX, '')
+  res = res.replace(/<!--[\s\S]*?SOURCES:[\s\S]*?-->/gi, '')
+  res = res.replace(/\[[\s\u200B-\u200D\uFEFF]*SOURCES:[^\]]*\]/gi, '')
+  res = res.replace(/<!--[\s\u200B-\u200D\uFEFF]*SOURCES:[^>]*-->/gi, '')
+  res = res.replace(/<!--\s*-->/g, '')
 
   // 2. Rewrite internal tag references in narrative prose (e.g. "based on [reasoning_context]")
   res = res.replace(
@@ -357,9 +374,10 @@ export function parseModelProvenance(
     policy = sourceMapOrOptions.policy
   }
 
-  // Use non-global match to retrieve capture groups reliably
-  const tagRegex = /(?:\[SOURCES:\s*([^|\]]+?)(?:\s*\|\s*BASIS:\s*([A-Za-z_]+))?\s*\]|<!--\s*SOURCES:\s*([^|>-]+?)(?:\s*\|\s*BASIS:\s*([A-Za-z_]+))?\s*-->)/i
-  const match = text.match(tagRegex)
+  // Use non-global match to retrieve capture groups reliably on zero-width stripped text
+  const strippedText = text.replace(/[\u200B-\u200D\uFEFF]/g, '')
+  const tagRegex = /(?:\[[\s\u200B-\u200D\uFEFF]*SOURCES:[\s\u200B-\u200D\uFEFF]*([^|\]]+?)(?:[\s\u200B-\u200D\uFEFF]*\|[\s\u200B-\u200D\uFEFF]*BASIS:[\s\u200B-\u200D\uFEFF]*([A-Za-z_]+))?[\s\u200B-\u200D\uFEFF]*\]|<!--[\s\u200B-\u200D\uFEFF]*SOURCES:[\s\u200B-\u200D\uFEFF]*([^|>-]+?)(?:[\s\u200B-\u200D\uFEFF]*\|[\s\u200B-\u200D\uFEFF]*BASIS:[\s\u200B-\u200D\uFEFF]*([A-Za-z_]+))?[\s\u200B-\u200D\uFEFF]*-->)/i
+  const match = strippedText.match(tagRegex)
   let rawHandles = ''
   let rawBasis = ''
   let hasTag = false
@@ -625,6 +643,7 @@ export type PublicationViolationType =
   | 'PROTOCOL_LEAK'
   | 'INVENTED_PERCENTAGE_OR_SCORE'
   | 'UNSUPPORTED_PROGRESS_CLAIM'
+  | 'UNGROUNDED_DECISION_GAP'
 
 export interface PublicationViolation {
   type: PublicationViolationType
@@ -682,7 +701,11 @@ export function validatePublicationEvidence(
   })
 
   // 1. Protocol leak check
-  if (PROVENANCE_TAG_REGEX.test(cleanedText) || /\[SOURCES:[^\]]*\]/i.test(cleanedText)) {
+  if (
+    PROVENANCE_TAG_REGEX.test(cleanedText) ||
+    /\[[\s\u200B-\u200D\uFEFF]*SOURCES:[^\]]*\]/i.test(cleanedText) ||
+    /<!--[\s\u200B-\u200D\uFEFF]*SOURCES:[^>]*-->/i.test(cleanedText)
+  ) {
     violations.push({
       type: 'PROTOCOL_LEAK',
       detail: 'Internal provenance protocol tag leaked into visible prose',
@@ -1178,6 +1201,39 @@ export function validatePublicationEvidence(
       severity: 'FATAL',
     })
     rejectionReasons.push('Absence of Vault records cannot be asserted as proof that no decisions occurred')
+  }
+
+  // 7. Unbacked technical / token / audit decision gap suggestions
+  // Reject introducing token models, tokenomics, or smart contract audits when retrieved records do not mention them.
+  const allRecordsText = allRecords
+    .map((r) => {
+      const parts = [r.title]
+      if (r.fields) {
+        for (const [_, v] of Object.entries(r.fields)) {
+          if (typeof v === 'string') parts.push(v)
+          else if (Array.isArray(v)) parts.push(JSON.stringify(v))
+        }
+      }
+      return parts.join(' ')
+    })
+    .join(' ')
+
+  const hasTokenOrAuditEvidence = /\b(?:tokens?|tokenomics|token[- ]model|smart[- ]contracts?|audits?|auditors?|blockchain|polygon|ethereum|solana|crypto|web3|defi)\b/i.test(allRecordsText)
+
+  if (!hasTokenOrAuditEvidence) {
+    const ungroundedTokenOrAuditPattern =
+      /\b(?:token[- ]models?|tokenomics|token\s+mechanics|smart[- ]contract(?:\s+audit)?(?:\s+providers?)?|audit\s+providers?)\b/i
+    if (ungroundedTokenOrAuditPattern.test(candidateText)) {
+      violations.push({
+        type: 'UNGROUNDED_DECISION_GAP',
+        detail:
+          'Response introduces unrelated token-model or smart-contract audit decision gaps without supporting project evidence',
+        severity: 'FATAL',
+      })
+      rejectionReasons.push(
+        'Response introduces unrelated token-model or audit-provider suggestions not evidenced in project records'
+      )
+    }
   }
 
   const isApproved = violations.every((v) => v.severity !== 'FATAL')

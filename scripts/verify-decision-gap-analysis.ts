@@ -23,7 +23,14 @@ import {
   buildAnswerContract,
 } from '../lib/vault/shaw/retrieval/preparation'
 import { serializePreparedContextForPrompt } from '../lib/vault/shaw/retrieval/serializer'
-import { validatePublicationEvidence, PublicationEvidenceValidationContext } from '../lib/vault/shaw/retrieval/provenance'
+import {
+  validatePublicationEvidence,
+  PublicationEvidenceValidationContext,
+  sanitizeVisibleProse,
+  createProvenanceStreamFilter,
+  parseModelProvenance,
+  resolveAuthoritativeProvenance,
+} from '../lib/vault/shaw/retrieval/provenance'
 import {
   ReasoningPlan,
   DomainOutcome,
@@ -553,4 +560,279 @@ test('10. Safe handling of unavailable required domains and adherence to query l
     serialized.includes('<unmet_requirement>One or more required domains could not be retrieved'),
     'Prompt must inform model of unmet requirement'
   )
+})
+
+// ----------------------------------------------------------------------------
+// Test 11: Community Structure Project with Minimal Description
+// ----------------------------------------------------------------------------
+test('11. Community structure project with minimal description produces grounded contract guidance', () => {
+  const plan: ReasoningPlan = {
+    isReasoningPlan: true,
+    primaryIntent: 'DECISION_GAP_ANALYSIS',
+    reasoningMode: 'GAP_ANALYSIS',
+    entityTarget: { name: 'Community structure', domain: 'project' },
+    domainRequests: [
+      { domain: 'project', importance: 'REQUIRED', queryMode: 'targeted', entityTarget: 'Community structure', limit: 10 },
+      { domain: 'decision', importance: 'REQUIRED', queryMode: 'targeted', entityTarget: 'Community structure', limit: 25 },
+      { domain: 'task', importance: 'REQUIRED', queryMode: 'targeted', entityTarget: 'Community structure', limit: 25 },
+    ],
+    requiresPreparation: true,
+    reason: 'Test minimal description project',
+  }
+
+  const mockRecords: VaultRecord[] = [
+    {
+      entityType: 'project',
+      entityId: 'proj-comm',
+      title: 'Community structure',
+      timestamps: {},
+      epistemicClass: 'WV_RECORD',
+      fields: { status: 'active', priority: 'medium', description: 'Map out structure for the community' },
+      provenance: { table: 'workspace_projects', id: 'proj-comm', workspace_id: 'ws-pevra' },
+    },
+  ]
+
+  const outcomes: DomainOutcome[] = [
+    { domain: 'project', importance: 'REQUIRED', status: 'AVAILABLE', returnedCount: 1, records: [mockRecords[0]] },
+    { domain: 'decision', importance: 'REQUIRED', status: 'LIMITED_EMPTY', returnedCount: 0, records: [] },
+    { domain: 'task', importance: 'REQUIRED', status: 'LIMITED_EMPTY', returnedCount: 0, records: [] },
+  ]
+
+  const prepared = prepareReasoningContext(plan, outcomes, 40, new Date())
+  const contract = prepared.answerContract!
+
+  const scopeObservation = contract.observationalGaps.find((g) =>
+    g.statement.includes('Possible decision gaps should be derived directly from documented project scope')
+  )
+  assert.ok(scopeObservation, 'Contract must include scope-derived decision gap guidance')
+  assert.ok(scopeObservation.statement.includes('Map out structure for the community'), 'Must anchor to exact description')
+  assert.ok(
+    scopeObservation.statement.includes('Do NOT introduce token models, smart-contract audits'),
+    'Contract must explicitly forbid ungrounded token/audit models'
+  )
+})
+
+// ----------------------------------------------------------------------------
+// Test 12: Rejection of Unrelated Token-Model and Audit-Provider Suggestions
+// ----------------------------------------------------------------------------
+test('12. Rejection of unrelated token-model and audit-provider suggestions', () => {
+  const context: PublicationEvidenceValidationContext = {
+    records: [
+      {
+        entityType: 'project',
+        entityId: 'proj-comm',
+        title: 'Community structure',
+        timestamps: {},
+        epistemicClass: 'WV_RECORD',
+        fields: { status: 'active', description: 'Map out structure for the community' },
+        provenance: { table: 'workspace_projects', id: 'proj-comm', workspace_id: 'ws-pevra' },
+      },
+    ],
+  }
+
+  // Candidate with ungrounded token-model and smart-contract audit provider suggestions
+  const ungroundedCandidate = `Documented decisions
+- I couldn’t find any decision records linked to the Community structure project in the records I checked.
+
+Open questions
+- No open-question entries were found in the records I examined.
+
+Possible decision gaps
+- Because no decisions are recorded, it is possible that important choices – for example how the community will be governed, what token-model will be used, or which smart-contract audit provider will be selected – have not been documented in the Vault.
+
+What cannot be verified
+- Whether any decisions were made outside of the Vault.
+[SOURCES: S1 | BASIS: SYNTHESIS]`
+
+  const result = validatePublicationEvidence(ungroundedCandidate, context)
+  assert.strictEqual(result.isApproved, false, 'Ungrounded token/audit suggestions must be rejected')
+  const ungroundedViolation = result.violations.find((v) => v.type === 'UNGROUNDED_DECISION_GAP')
+  assert.ok(ungroundedViolation, 'Violation must be UNGROUNDED_DECISION_GAP')
+  assert.ok(
+    result.rejectionReasons.some((r) => r.includes('token-model or audit-provider')),
+    'Rejection reason must explicitly state ungrounded token/audit reason'
+  )
+})
+
+// ----------------------------------------------------------------------------
+// Test 13: Acceptance of Genuinely Grounded Community-Structure Questions
+// ----------------------------------------------------------------------------
+test('13. Acceptance of genuinely grounded community-structure decision questions', () => {
+  const context: PublicationEvidenceValidationContext = {
+    records: [
+      {
+        entityType: 'project',
+        entityId: 'proj-comm',
+        title: 'Community structure',
+        timestamps: {},
+        epistemicClass: 'WV_RECORD',
+        fields: { status: 'active', description: 'Map out structure for the community' },
+        provenance: { table: 'workspace_projects', id: 'proj-comm', workspace_id: 'ws-pevra' },
+      },
+    ],
+  }
+
+  const groundedCandidate = `Documented decisions
+- I couldn't find any decision records linked to the Community structure project in the records I checked.
+
+Open questions
+- I did not find explicitly documented open questions in the records examined.
+
+Possible decision gaps
+- Because the project scope focuses on mapping out community structure, possible decision areas that may need attention include defining community leadership roles, setting responsibilities and member tiers, and establishing organizational guidelines.
+
+What cannot be verified
+- Whether decisions were made offline or through unrecorded channels.
+- Records in domains not queried (such as metrics, reviews, or research).
+
+[SOURCES: S1 | BASIS: SYNTHESIS]`
+
+  const result = validatePublicationEvidence(groundedCandidate, context)
+  assert.strictEqual(result.isApproved, true, 'Properly grounded community questions must be approved')
+  assert.strictEqual(result.violations.length, 0)
+  assert.ok(!result.publishedText.includes('[SOURCES:'), 'Published prose must conceal trailing source protocol')
+  assert.ok(result.publishedText.includes('community leadership roles'), 'Published text must retain grounded analysis')
+})
+
+// ----------------------------------------------------------------------------
+// Test 14: Correct Scoping of Activity Digest Counts
+// ----------------------------------------------------------------------------
+test('14. Correct scoping of activity digest counts and prevention of workspace conflation', async () => {
+  const calls: { table: string; filters: Record<string, any> }[] = []
+
+  const mockSupabase = {
+    from: (table: string) => {
+      const filters: Record<string, any> = {}
+      const chain: any = {
+        select: () => chain,
+        eq: (col: string, val: any) => {
+          filters[col] = val
+          return chain
+        },
+        or: (val: any) => {
+          filters['or'] = val
+          return chain
+        },
+        in: (col: string, val: any) => {
+          filters[`${col}.in`] = val
+          return chain
+        },
+        gte: (col: string, val: any) => {
+          filters[`${col}.gte`] = val
+          return chain
+        },
+        lte: (col: string, val: any) => {
+          filters[`${col}.lte`] = val
+          return chain
+        },
+        order: () => chain,
+        limit: () => {
+          calls.push({ table, filters: { ...filters } })
+          if (table === 'workspace_projects') {
+            return Promise.resolve({
+              data: [{ id: 'proj-comm-123', title: 'Community structure' }],
+            })
+          }
+          if (table === 'tasks') {
+            return Promise.resolve({ data: [] })
+          }
+          if (table === 'decisions') {
+            return Promise.resolve({ data: [] })
+          }
+          return Promise.resolve({ data: [] })
+        },
+      }
+      return chain
+    },
+  }
+
+  const service = new VaultRetrievalService(mockSupabase as any, 'ws-pevra')
+
+  // A. Targeted activity retrieval scopes to project
+  const outcomeTargeted = await service.executeDomainRequest({
+    domain: 'activity',
+    importance: 'REQUIRED',
+    queryMode: 'targeted',
+    entityTarget: 'Community structure',
+    limit: 10,
+  })
+
+  assert.strictEqual(outcomeTargeted.records.length, 1)
+  const actTargeted = outcomeTargeted.records[0]
+  assert.strictEqual(actTargeted.title, 'Activity Digest (Recent - Community structure)')
+  assert.strictEqual(actTargeted.fields?.scope, 'Project: Community structure')
+  assert.strictEqual(actTargeted.fields?.isProjectScoped, true)
+
+  // Verify task and decision queries received project_id filter
+  const taskQuery = calls.find((c) => c.table === 'tasks')
+  assert.deepStrictEqual(taskQuery?.filters['project_id.in'], ['proj-comm-123'])
+
+  // B. Normalization cleans conflated workspace digest prose
+  const conflatedProse = 'Documented decisions: I found 0 decisions. The recent activity digest shows a decisions count of 0.'
+  const cleaned = sanitizeVisibleProse(conflatedProse)
+  assert.ok(!cleaned.includes('The recent activity digest shows a decisions count of 0'), 'Conflated count must be stripped')
+  assert.ok(cleaned.includes('I found 0 decisions'), 'Substantive prose must be preserved')
+})
+
+// ----------------------------------------------------------------------------
+// Test 15: Concealment of Internal Source Tags in All Response Paths
+// ----------------------------------------------------------------------------
+test('15. Concealment of internal source tags in all response paths including zero-width spaces', () => {
+  // A. Zero-width space provenance tag
+  const zeroWidthTag = 'Clean analysis.\n\n[\u200BSOURCES: S1 | BASIS: SYNTHESIS]'
+  const cleanedA = sanitizeVisibleProse(zeroWidthTag)
+  assert.strictEqual(cleanedA, 'Clean analysis.', 'Zero-width space tag must be completely stripped')
+
+  // B. Multiple zero-width / BOM variants
+  const bomTag = 'Clean analysis.\n\n[\uFEFF\u200CSOURCES: S1, S2 | BASIS: DIRECT_FACT]'
+  const cleanedB = sanitizeVisibleProse(bomTag)
+  assert.strictEqual(cleanedB, 'Clean analysis.', 'BOM and zero-width joiner tags must be completely stripped')
+
+  // C. HTML comments with provenance
+  const htmlTag = 'Clean analysis.\n\n<!-- [SOURCES: S1 | BASIS: SYNTHESIS] -->'
+  const cleanedC = sanitizeVisibleProse(htmlTag)
+  assert.strictEqual(cleanedC, 'Clean analysis.', 'HTML comment provenance tag must be stripped')
+
+  // D. Streaming filter concealment during chunk emission
+  let emittedChunks = ''
+  const filter = createProvenanceStreamFilter((chunk) => {
+    emittedChunks += chunk
+  })
+
+  filter.push('First part of response.\n\n[')
+  filter.push('\u200BSOURCES: S1 |')
+  filter.push(' BASIS: SYNTHESIS]')
+  const parsed = filter.flush()
+
+  assert.ok(!emittedChunks.includes('SOURCES:'), 'Emitted chunks must never contain protocol tags')
+  assert.strictEqual(parsed.cleanText, 'First part of response.', 'Clean text must conceal tag')
+  assert.strictEqual(parsed.hasTag, true, 'Model provenance must still be recognized for audit')
+  assert.deepStrictEqual(parsed.handles, ['S1'])
+})
+
+// ----------------------------------------------------------------------------
+// Test 16: Preservation of Existing Provenance and Publication Safeguards
+// ----------------------------------------------------------------------------
+test('16. Preservation of existing provenance resolution and publication safeguards', () => {
+  const sourceMap = new Map()
+  sourceMap.set('S1', {
+    entityType: 'project',
+    entityId: 'p-1',
+    title: 'Community structure',
+    timestamps: {},
+    epistemicClass: 'WV_RECORD',
+    provenance: { table: 'workspace_projects', id: 'p-1', workspace_id: 'ws-1' },
+  })
+
+  const parsed = parseModelProvenance('Valid analysis.\n\n[\u200BSOURCES: S1 | BASIS: SYNTHESIS]', sourceMap)
+  assert.strictEqual(parsed.cleanText, 'Valid analysis.')
+  assert.strictEqual(parsed.hasTag, true)
+  assert.deepStrictEqual(parsed.handles, ['S1'])
+  assert.strictEqual(parsed.basis, 'SYNTHESIS')
+
+  const resolved = resolveAuthoritativeProvenance(sourceMap, parsed)
+  assert.strictEqual(resolved.status, 'COMPLETE')
+  assert.strictEqual(resolved.citations.length, 1)
+  assert.strictEqual(resolved.citations[0].title, 'Community structure')
+  assert.strictEqual(resolved.citations[0].url, '/vault/projects/p-1')
 })

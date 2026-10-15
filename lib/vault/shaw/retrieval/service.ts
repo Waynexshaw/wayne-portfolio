@@ -1271,29 +1271,51 @@ export class VaultRetrievalService {
   private async retrieveActivityDigest(
     timeframe: any,
     records: VaultRecord[],
-    completeness?: CollectionCompleteness[]
+    completeness?: CollectionCompleteness[],
+    entityTarget?: string
   ) {
     if (completeness) {
       completeness.push({
         domain: 'activity',
-        queryMode: 'catalog',
+        queryMode: entityTarget ? 'targeted' : 'catalog',
         resultScope: 'bounded',
         returnedCount: 1,
-        filterDescription: timeframe?.label || 'Recent',
+        filterDescription: `${timeframe?.label || 'Recent'}${entityTarget ? ` - ${entityTarget}` : ''}`,
       })
     }
 
     const startIso = timeframe?.startIso || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
     const endIso = timeframe?.endIso || new Date().toISOString()
 
+    // If entityTarget is provided, find matching project IDs
+    let targetProjectIds: string[] = []
+    if (entityTarget) {
+      const { data: matchedProjects } = await (this.supabase as any)
+        .from('workspace_projects')
+        .select('id')
+        .eq('workspace_id', this.workspaceId)
+        .or(`title.ilike.%${entityTarget}%,slug.ilike.%${entityTarget}%`)
+        .limit(5)
+
+      if (matchedProjects && matchedProjects.length > 0) {
+        targetProjectIds = matchedProjects.map((p: any) => p.id)
+      }
+    }
+
     // 1. Completed tasks in window
-    const { data: completedTasks } = await (this.supabase as any)
+    let tasksQuery = (this.supabase as any)
       .from('tasks')
-      .select('id, title, status, priority, completed_at, workspace_projects(title)')
+      .select('id, title, status, priority, completed_at, project_id, workspace_projects(title)')
       .eq('workspace_id', this.workspaceId)
       .eq('status', 'completed')
       .gte('completed_at', startIso)
       .lte('completed_at', endIso)
+
+    if (targetProjectIds.length > 0) {
+      tasksQuery = tasksQuery.in('project_id', targetProjectIds)
+    }
+
+    const { data: completedTasks } = await tasksQuery
       .order('completed_at', { ascending: false })
       .limit(10)
 
@@ -1301,29 +1323,44 @@ export class VaultRetrievalService {
     const startDateString = timeframe?.startDateString || startIso.slice(0, 10)
     const endDateString = timeframe?.endDateString || endIso.slice(0, 10)
 
-    const { data: decisions } = await (this.supabase as any)
+    let decisionsQuery = (this.supabase as any)
       .from('decisions')
-      .select('id, title, decision, decided_at, workspace_projects(title)')
+      .select('id, title, decision, decided_at, project_id, workspace_projects(title)')
       .eq('workspace_id', this.workspaceId)
       .gte('decided_at', startDateString)
       .lte('decided_at', endDateString)
+
+    if (targetProjectIds.length > 0) {
+      decisionsQuery = decisionsQuery.in('project_id', targetProjectIds)
+    }
+
+    const { data: decisions } = await decisionsQuery
       .order('decided_at', { ascending: false })
       .limit(5)
 
-    // 3. Interactions logged in window
-    const { data: interactions } = await (this.supabase as any)
-      .from('interactions')
-      .select('id, interaction_type, subject, summary, interaction_date, contact_id, contacts(display_name)')
-      .eq('workspace_id', this.workspaceId)
-      .gte('interaction_date', startIso)
-      .lte('interaction_date', endIso)
-      .order('interaction_date', { ascending: false })
-      .limit(10)
+    // 3. Interactions logged in window (only for workspace-wide or if not strictly project scoped)
+    let interactions: any[] = []
+    if (!entityTarget) {
+      const { data: interData } = await (this.supabase as any)
+        .from('interactions')
+        .select('id, interaction_type, subject, summary, interaction_date, contact_id, contacts(display_name)')
+        .eq('workspace_id', this.workspaceId)
+        .gte('interaction_date', startIso)
+        .lte('interaction_date', endIso)
+        .order('interaction_date', { ascending: false })
+        .limit(10)
+      interactions = interData || []
+    }
+
+    const scopeLabel = entityTarget ? `Project: ${entityTarget}` : 'Workspace-wide'
+    const titleLabel = entityTarget
+      ? `Activity Digest (Recent - ${entityTarget})`
+      : `Workspace Activity Digest (${timeframe?.label || 'Recent - All Projects'})`
 
     records.push({
       entityType: 'activity',
-      entityId: `activity-${startIso.slice(0, 10)}-${endIso.slice(0, 10)}`,
-      title: `Activity Digest (${timeframe?.label || 'Recent'})`,
+      entityId: `activity-${startIso.slice(0, 10)}-${endIso.slice(0, 10)}${entityTarget ? `-${entityTarget.toLowerCase().replace(/[^a-z0-9]/g, '')}` : ''}`,
+      title: titleLabel,
       timestamps: {
         period_start: startIso,
         period_end: endIso,
@@ -1331,6 +1368,9 @@ export class VaultRetrievalService {
       epistemicClass: 'WV_RECORD',
       fields: {
         timeframeLabel: timeframe?.label || 'Recent Activity',
+        scope: scopeLabel,
+        isProjectScoped: Boolean(entityTarget && targetProjectIds.length > 0),
+        targetEntity: entityTarget || null,
         completedTasksCount: (completedTasks || []).length,
         completedTasks: (completedTasks || []).map((t: any) => ({
           id: t.id,
@@ -1346,8 +1386,8 @@ export class VaultRetrievalService {
           decided_at: d.decided_at,
           project: d.workspace_projects?.title || null,
         })),
-        interactionsCount: (interactions || []).length,
-        interactions: (interactions || []).map((i: any) => ({
+        interactionsCount: interactions.length,
+        interactions: interactions.map((i: any) => ({
           id: i.id,
           type: i.interaction_type,
           subject: i.subject,
@@ -1469,7 +1509,7 @@ export class VaultRetrievalService {
           break
 
         case 'activity':
-          await this.retrieveActivityDigest(temporalWindow, domainRecords, domainCompleteness)
+          await this.retrieveActivityDigest(temporalWindow, domainRecords, domainCompleteness, req.entityTarget)
           break
       }
     } catch (err: any) {
