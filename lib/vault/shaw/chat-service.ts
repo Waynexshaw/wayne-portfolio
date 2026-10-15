@@ -17,6 +17,7 @@ import {
   resolveAuthoritativeProvenance,
   createProvenanceStreamFilter,
   validatePublicationEvidence,
+  sanitizeVisibleProse,
   RequestSourceMap,
   VaultContextEnvelope,
   planReasoning,
@@ -695,6 +696,10 @@ export async function executeShawChatTurn(
 
               cleanResponseText = validationResult.publishedText
               cleanResponseText = appendCtaIfRequested(cleanResponseText, trimmedMessage)
+              cleanResponseText = sanitizeVisibleProse(cleanResponseText, requestSourceMap, {
+                isTechnicalMode,
+                policy: effectivePolicy,
+              })
 
               // Publish approved response text to client via SSE
               hasEmittedText = true
@@ -704,16 +709,23 @@ export async function executeShawChatTurn(
             } else {
               // For ordinary conversational requests: CTA was appended after incremental chunks
               const finalWithCta = appendCtaIfRequested(cleanResponseText, trimmedMessage)
-              if (finalWithCta.length > cleanResponseText.length) {
-                const ctaDiff = finalWithCta.slice(cleanResponseText.length)
+              const sanitizedFinal = sanitizeVisibleProse(finalWithCta, requestSourceMap, {
+                isTechnicalMode,
+                policy: effectivePolicy,
+              })
+              if (sanitizedFinal.length > cleanResponseText.length) {
+                const ctaDiff = sanitizedFinal.slice(cleanResponseText.length)
                 const ctaChunk: ShawStreamChunk = { type: 'text', text: ctaDiff }
                 hasEmittedText = true
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify(ctaChunk)}\n\n`))
-                cleanResponseText = finalWithCta
+                cleanResponseText = sanitizedFinal
               }
             }
 
-            fullResponseText = cleanResponseText
+            fullResponseText = sanitizeVisibleProse(cleanResponseText, requestSourceMap, {
+              isTechnicalMode,
+              policy: effectivePolicy,
+            })
 
             // Authoritatively resolve provenance against real Vault records
             const provenanceResult = resolveAuthoritativeProvenance(
