@@ -543,7 +543,576 @@ export function buildAnswerContract(
     }
   }
 
-  // 1. Recorded facts from records
+  // --------------------------------------------------------------------------
+  // Dedicated MEETING_PREP contract branch
+  // --------------------------------------------------------------------------
+  if (plan.primaryIntent === 'MEETING_PREP') {
+    const targetEntity = plan.entityTarget?.name || 'upcoming meeting'
+    const meetingRecords = records.filter((r) => r.entityType === 'meeting')
+    const crmRecords = records.filter((r) => r.entityType === 'crm')
+    const projectRecords = records.filter((r) => r.entityType === 'project')
+    const taskRecords = records.filter((r) => r.entityType === 'task')
+    const decisionRecords = records.filter((r) => r.entityType === 'decision')
+
+    for (const m of meetingRecords) {
+      const scheduled = m.timestamps?.scheduled_at ? ` (scheduled: ${m.timestamps.scheduled_at})` : ''
+      recordedFacts.push({
+        type: 'RECORDED_FACT',
+        domain: 'meeting',
+        statement: `Meeting "${m.title}"${scheduled}.`,
+      })
+      if (m.fields?.agenda) {
+        recordedFacts.push({
+          type: 'RECORDED_FACT',
+          domain: 'meeting',
+          statement: `Documented meeting agenda: ${String(m.fields.agenda).slice(0, 160)}.`,
+        })
+      }
+      if (m.fields?.outcomes) {
+        recordedFacts.push({
+          type: 'RECORDED_FACT',
+          domain: 'meeting',
+          statement: `Previous documented outcomes: ${String(m.fields.outcomes).slice(0, 160)}.`,
+        })
+      }
+      if (Array.isArray(m.fields?.participants) && m.fields.participants.length > 0) {
+        const pNames = m.fields.participants.map((p: any) => p.name || p.email).filter(Boolean).join(', ')
+        recordedFacts.push({
+          type: 'RECORDED_FACT',
+          domain: 'meeting',
+          statement: `Recorded participants: ${pNames}.`,
+        })
+      }
+    }
+
+    for (const c of crmRecords) {
+      const stage = c.fields?.stage ? ` (stage: ${c.fields.stage})` : ''
+      recordedFacts.push({
+        type: 'RECORDED_FACT',
+        domain: 'crm',
+        statement: `Contact "${c.title}"${stage}.`,
+      })
+      if (Array.isArray(c.fields?.recentInteractions) && c.fields.recentInteractions.length > 0) {
+        const latest = c.fields.recentInteractions[0]
+        recordedFacts.push({
+          type: 'RECORDED_FACT',
+          domain: 'crm',
+          statement: `Latest interaction: ${latest.subject || latest.type || 'touchpoint'} on ${latest.date || 'recent date'}.`,
+        })
+      }
+    }
+
+    for (const p of projectRecords) {
+      recordedFacts.push({
+        type: 'RECORDED_FACT',
+        domain: 'project',
+        statement: `Project "${p.title}" is marked ${p.fields?.status || 'active'}.`,
+      })
+      if (p.fields?.description) {
+        recordedFacts.push({
+          type: 'RECORDED_FACT',
+          domain: 'project',
+          statement: `Project scope: ${String(p.fields.description).slice(0, 160)}.`,
+        })
+      }
+    }
+
+    for (const t of taskRecords.slice(0, 5)) {
+      recordedFacts.push({
+        type: 'RECORDED_FACT',
+        domain: 'task',
+        statement: `Active task "${t.title}" is marked ${t.fields?.status || 'todo'}.`,
+      })
+    }
+
+    for (const d of decisionRecords.slice(0, 3)) {
+      recordedFacts.push({
+        type: 'RECORDED_FACT',
+        domain: 'decision',
+        statement: `Recent decision "${d.title}": ${String(d.fields?.decision || '').slice(0, 120)}.`,
+      })
+    }
+
+    for (const la of limitedAbsences) {
+      boundedGaps.push({
+        type: 'BOUNDED_GAP',
+        domain: la.domain,
+        statement: la.claim,
+        boundary: la.claim,
+      })
+    }
+
+    if (meetingRecords.length === 0) {
+      boundedGaps.push({
+        type: 'BOUNDED_GAP',
+        domain: 'meeting',
+        statement: `No scheduled meeting records matching "${targetEntity}" were found in the records checked.`,
+      })
+      observationalGaps.push({
+        type: 'OBSERVATIONAL_GAP',
+        statement: `No meeting record was found for "${targetEntity}". Meeting preparation is assembled from available project, CRM, task, and decision records. Clearly disclose the absence of meeting-specific evidence.`,
+      })
+    }
+
+    observationalGaps.push({
+      type: 'OBSERVATIONAL_GAP',
+      statement: `Keep preparation suggestions (talking points, questions to ask, next steps) clearly separate from documented facts.`,
+    })
+    observationalGaps.push({
+      type: 'OBSERVATIONAL_GAP',
+      statement: `What cannot be verified: unrecorded offline conversations, calendar events outside the Vault, or private notes.`,
+    })
+
+    recommendations.push({
+      type: 'RECOMMENDATION',
+      statement: `Confirm agenda alignment, review open action items, and establish agreed next steps during the discussion.`,
+    })
+
+    return { recordedFacts, boundedGaps, observationalGaps, recommendations }
+  }
+
+  // --------------------------------------------------------------------------
+  // Dedicated RESEARCH_IMPACT contract branch
+  // --------------------------------------------------------------------------
+  if (plan.primaryIntent === 'RESEARCH_IMPACT') {
+    const researchRecords = records.filter((r) => r.entityType === 'research')
+    const evidenceRecords = records.filter((r) => r.entityType === 'evidence')
+    const projectRecords = records.filter((r) => r.entityType === 'project')
+    const decisionRecords = records.filter((r) => r.entityType === 'decision')
+
+    for (const r of researchRecords) {
+      recordedFacts.push({
+        type: 'RECORDED_FACT',
+        domain: 'research',
+        statement: `Research record "${r.title}" (workflow status: ${r.fields?.workflow_status || 'active'}).`,
+      })
+      if (r.fields?.research_question) {
+        recordedFacts.push({
+          type: 'RECORDED_FACT',
+          domain: 'research',
+          statement: `Research question: ${String(r.fields.research_question).slice(0, 160)}.`,
+        })
+      }
+      if (r.fields?.summary) {
+        recordedFacts.push({
+          type: 'RECORDED_FACT',
+          domain: 'research',
+          statement: `Research summary: ${String(r.fields.summary).slice(0, 160)}.`,
+        })
+      }
+      if (r.fields?.findings) {
+        recordedFacts.push({
+          type: 'RECORDED_FACT',
+          domain: 'research',
+          statement: `Documented findings: ${String(r.fields.findings).slice(0, 160)}.`,
+        })
+      }
+      if (r.fields?.conclusion) {
+        recordedFacts.push({
+          type: 'RECORDED_FACT',
+          domain: 'research',
+          statement: `Documented conclusion: ${String(r.fields.conclusion).slice(0, 160)}.`,
+        })
+      }
+    }
+
+    for (const ev of evidenceRecords) {
+      if (ev.fields?.public_claim) {
+        recordedFacts.push({
+          type: 'RECORDED_FACT',
+          domain: 'evidence',
+          statement: `Documented evidence claim: ${String(ev.fields.public_claim).slice(0, 140)}.`,
+        })
+      }
+    }
+
+    for (const p of projectRecords) {
+      recordedFacts.push({
+        type: 'RECORDED_FACT',
+        domain: 'project',
+        statement: `Project "${p.title}" is marked ${p.fields?.status || 'active'}.`,
+      })
+    }
+
+    for (const d of decisionRecords) {
+      recordedFacts.push({
+        type: 'RECORDED_FACT',
+        domain: 'decision',
+        statement: `Decision "${d.title}": ${String(d.fields?.decision || '').slice(0, 120)}.`,
+      })
+    }
+
+    for (const la of limitedAbsences) {
+      boundedGaps.push({
+        type: 'BOUNDED_GAP',
+        domain: la.domain,
+        statement: la.claim,
+        boundary: la.claim,
+      })
+    }
+
+    observationalGaps.push({
+      type: 'OBSERVATIONAL_GAP',
+      statement: `Distinguish documented research findings from possible implications. Do not assert that research findings caused or changed a decision or project direction unless the records explicitly document that causal connection.`,
+    })
+    observationalGaps.push({
+      type: 'OBSERVATIONAL_GAP',
+      statement: `Workflow status 'completed' indicates the research activity was finalized, not that research conclusions represent verified external facts.`,
+    })
+    observationalGaps.push({
+      type: 'OBSERVATIONAL_GAP',
+      statement: `Verbatim quotes represent exact recorded source text, while claim summaries represent interpretations.`,
+    })
+    observationalGaps.push({
+      type: 'OBSERVATIONAL_GAP',
+      statement: `What cannot be verified: unrecorded market changes, external research, or untested operational assumptions.`,
+    })
+
+    recommendations.push({
+      type: 'RECOMMENDATION',
+      statement: `Validate research findings against current project constraints and test key hypotheses before making major commitments.`,
+    })
+
+    return { recordedFacts, boundedGaps, observationalGaps, recommendations }
+  }
+
+  // --------------------------------------------------------------------------
+  // Dedicated PERIOD_ACCOMPLISHMENT contract branch
+  // --------------------------------------------------------------------------
+  if (plan.primaryIntent === 'PERIOD_ACCOMPLISHMENT') {
+    const periodLabel = plan.temporalWindow?.label || 'the requested period'
+    const completedTasks = records.filter(
+      (r) => r.entityType === 'task' && (r.fields?.status === 'completed' || r.fields?.status === 'done')
+    )
+    const decisionsInPeriod = records.filter((r) => r.entityType === 'decision')
+    const activityRecords = records.filter((r) => r.entityType === 'activity')
+
+    for (const t of completedTasks) {
+      const compDate = t.timestamps?.completed_at ? ` on ${t.timestamps.completed_at.slice(0, 10)}` : ''
+      recordedFacts.push({
+        type: 'RECORDED_FACT',
+        domain: 'task',
+        statement: `Task "${t.title}" is documented as completed${compDate}.`,
+      })
+    }
+
+    for (const d of decisionsInPeriod) {
+      const decDate = d.timestamps?.decided_at ? ` on ${d.timestamps.decided_at}` : ''
+      recordedFacts.push({
+        type: 'RECORDED_FACT',
+        domain: 'decision',
+        statement: `Decision "${d.title}" was decided${decDate}.`,
+      })
+    }
+
+    for (const a of activityRecords) {
+      if (a.fields?.completedTasksCount !== undefined) {
+        recordedFacts.push({
+          type: 'RECORDED_FACT',
+          domain: 'activity',
+          statement: `Activity aggregate records ${a.fields.completedTasksCount} completed task(s) and ${a.fields.decisionsCount || 0} decision(s) for ${periodLabel}.`,
+        })
+      }
+    }
+
+    if (completedTasks.length === 0) {
+      boundedGaps.push({
+        type: 'BOUNDED_GAP',
+        domain: 'task',
+        statement: `No tasks were recorded as completed within ${periodLabel} in the records checked.`,
+      })
+    }
+
+    if (decisionsInPeriod.length === 0) {
+      boundedGaps.push({
+        type: 'BOUNDED_GAP',
+        domain: 'decision',
+        statement: `No decisions were recorded within ${periodLabel} in the records checked.`,
+      })
+    }
+
+    for (const la of limitedAbsences) {
+      if (la.domain !== 'task' && la.domain !== 'decision') {
+        boundedGaps.push({
+          type: 'BOUNDED_GAP',
+          domain: la.domain,
+          statement: la.claim,
+          boundary: la.claim,
+        })
+      }
+    }
+
+    observationalGaps.push({
+      type: 'OBSERVATIONAL_GAP',
+      statement: `Distinguish completion dates from record creation dates. Count only work documented as completed within ${periodLabel}.`,
+    })
+    observationalGaps.push({
+      type: 'OBSERVATIONAL_GAP',
+      statement: `Tasks created during the period but not marked completed are still pending and must not be counted as accomplishments for this period.`,
+    })
+    observationalGaps.push({
+      type: 'OBSERVATIONAL_GAP',
+      statement: `Do not invent achievements, completion percentages, or undocumented accomplishments.`,
+    })
+    observationalGaps.push({
+      type: 'OBSERVATIONAL_GAP',
+      statement: `What cannot be verified: whether additional work was completed offline or outside the Vault without being logged.`,
+    })
+
+    recommendations.push({
+      type: 'RECOMMENDATION',
+      statement: `Log pending work and mark completed items in your Vault to maintain an accurate record of accomplishments.`,
+    })
+
+    return { recordedFacts, boundedGaps, observationalGaps, recommendations }
+  }
+
+  // --------------------------------------------------------------------------
+  // Dedicated BLOCKER_ASSESSMENT contract branch
+  // --------------------------------------------------------------------------
+  if (plan.primaryIntent === 'BLOCKER_ASSESSMENT') {
+    const blockedTasks = records.filter(
+      (r) => r.entityType === 'task' && String(r.fields?.status).toLowerCase() === 'blocked'
+    )
+    const overdueTasks = records.filter((r) => {
+      if (r.entityType !== 'task') return false
+      const rawDue = r.timestamps?.due_date || r.fields?.due_date
+      if (!rawDue) return false
+      const dueMs = new Date(rawDue).getTime()
+      const isFinished = ['completed', 'done', 'cancelled'].includes(String(r.fields?.status || '').toLowerCase())
+      return !isNaN(dueMs) && dueMs < Date.now() && !isFinished
+    })
+
+    for (const b of blockedTasks) {
+      recordedFacts.push({
+        type: 'RECORDED_FACT',
+        domain: 'task',
+        statement: `Task "${b.title}" is explicitly marked with status "blocked".`,
+      })
+      if (b.fields?.description) {
+        recordedFacts.push({
+          type: 'RECORDED_FACT',
+          domain: 'task',
+          statement: `Blocker notes for "${b.title}": ${String(b.fields.description).slice(0, 140)}.`,
+        })
+      }
+    }
+
+    for (const ot of overdueTasks) {
+      recordedFacts.push({
+        type: 'RECORDED_FACT',
+        domain: 'task',
+        statement: `Task "${ot.title}" is overdue (due: ${ot.timestamps?.due_date || ot.fields?.due_date}, status: ${ot.fields?.status || 'open'}).`,
+      })
+    }
+
+    const openTasks = records.filter(
+      (r) => r.entityType === 'task' && !['completed', 'done', 'cancelled'].includes(String(r.fields?.status || '').toLowerCase())
+    )
+    for (const ot of openTasks.filter((t) => !blockedTasks.includes(t) && !overdueTasks.includes(t)).slice(0, 5)) {
+      recordedFacts.push({
+        type: 'RECORDED_FACT',
+        domain: 'task',
+        statement: `Open task "${ot.title}" is marked ${ot.fields?.status || 'todo'}.`,
+      })
+    }
+
+    for (const la of limitedAbsences) {
+      boundedGaps.push({
+        type: 'BOUNDED_GAP',
+        domain: la.domain,
+        statement: la.claim,
+        boundary: la.claim,
+      })
+    }
+
+    if (blockedTasks.length === 0) {
+      observationalGaps.push({
+        type: 'OBSERVATIONAL_GAP',
+        statement: `No tasks are explicitly marked as "blocked" in the records checked. State this clearly rather than claiming no blockers exist in the real world.`,
+      })
+    }
+
+    observationalGaps.push({
+      type: 'OBSERVATIONAL_GAP',
+      statement: `Distinguish explicitly recorded blockers (tasks marked blocked) from possible risks inferred from available evidence (such as overdue due dates or lack of recent activity).`,
+    })
+    observationalGaps.push({
+      type: 'OBSERVATIONAL_GAP',
+      statement: `What cannot be verified: team dependencies, external roadblocks, or offline blockers not logged in Vault records.`,
+    })
+
+    recommendations.push({
+      type: 'RECOMMENDATION',
+      statement: `Review overdue tasks, address dependencies on blocked items, and update due dates to maintain project velocity.`,
+    })
+
+    return { recordedFacts, boundedGaps, observationalGaps, recommendations }
+  }
+
+  // --------------------------------------------------------------------------
+  // Dedicated CROSS_DOMAIN_RECAP contract branch
+  // --------------------------------------------------------------------------
+  if (plan.primaryIntent === 'CROSS_DOMAIN_RECAP') {
+    const timeframeLabel = plan.temporalWindow?.label || 'recent activity'
+    const activityRecords = records.filter((r) => r.entityType === 'activity')
+    const decisionRecords = records.filter((r) => r.entityType === 'decision')
+    const meetingRecords = records.filter((r) => r.entityType === 'meeting')
+    const taskRecords = records.filter((r) => r.entityType === 'task')
+    const projectRecords = records.filter((r) => r.entityType === 'project')
+
+    for (const a of activityRecords) {
+      recordedFacts.push({
+        type: 'RECORDED_FACT',
+        domain: 'activity',
+        statement: `Activity digest for ${timeframeLabel}: ${a.fields?.completedTasksCount || 0} completed tasks, ${a.fields?.decisionsCount || 0} decisions, ${a.fields?.interactionsCount || 0} interactions.`,
+      })
+    }
+
+    for (const p of projectRecords) {
+      recordedFacts.push({
+        type: 'RECORDED_FACT',
+        domain: 'project',
+        statement: `Active project "${p.title}" (status: ${p.fields?.status || 'active'}, priority: ${p.fields?.priority || 'medium'}).`,
+      })
+    }
+
+    for (const d of decisionRecords.slice(0, 5)) {
+      recordedFacts.push({
+        type: 'RECORDED_FACT',
+        domain: 'decision',
+        statement: `Decision "${d.title}": ${String(d.fields?.decision || '').slice(0, 120)}.`,
+      })
+    }
+
+    for (const m of meetingRecords.slice(0, 3)) {
+      recordedFacts.push({
+        type: 'RECORDED_FACT',
+        domain: 'meeting',
+        statement: `Meeting "${m.title}" (scheduled: ${m.timestamps?.scheduled_at || 'recent'}).`,
+      })
+    }
+
+    for (const t of taskRecords.slice(0, 5)) {
+      recordedFacts.push({
+        type: 'RECORDED_FACT',
+        domain: 'task',
+        statement: `Task "${t.title}" is marked ${t.fields?.status || 'completed'}.`,
+      })
+    }
+
+    for (const la of limitedAbsences) {
+      boundedGaps.push({
+        type: 'BOUNDED_GAP',
+        domain: la.domain,
+        statement: la.claim,
+        boundary: la.claim,
+      })
+    }
+
+    observationalGaps.push({
+      type: 'OBSERVATIONAL_GAP',
+      statement: `Identify cross-domain connections strictly through authoritative foreign keys (project_id) or explicit record links. Do not fabricate connections between unrelated meetings, decisions, or tasks.`,
+    })
+    observationalGaps.push({
+      type: 'OBSERVATIONAL_GAP',
+      statement: `Present records linked to specific projects under their parent project, and unlinked records under workspace-wide activity.`,
+    })
+    observationalGaps.push({
+      type: 'OBSERVATIONAL_GAP',
+      statement: `Activity digest counts reflect workspace-wide actions within the timeframe window.`,
+    })
+    observationalGaps.push({
+      type: 'OBSERVATIONAL_GAP',
+      statement: `What cannot be verified: work or events that occurred outside the Vault or outside the requested timeframe.`,
+    })
+
+    recommendations.push({
+      type: 'RECOMMENDATION',
+      statement: `Maintain momentum on active workstreams and ensure key next actions from recent meetings and decisions are tracked as tasks.`,
+    })
+
+    return { recordedFacts, boundedGaps, observationalGaps, recommendations }
+  }
+
+  // --------------------------------------------------------------------------
+  // Dedicated WEEKLY_FOCUS contract branch
+  // --------------------------------------------------------------------------
+  if (plan.primaryIntent === 'WEEKLY_FOCUS') {
+    const projectRecords = records.filter((r) => r.entityType === 'project')
+    const taskRecords = records.filter((r) => r.entityType === 'task')
+    const decisionRecords = records.filter((r) => r.entityType === 'decision')
+
+    for (const p of projectRecords) {
+      recordedFacts.push({
+        type: 'RECORDED_FACT',
+        domain: 'project',
+        statement: `Project "${p.title}" is marked ${p.fields?.status || 'active'} with priority ${p.fields?.priority || 'normal'}.`,
+      })
+      if (p.fields?.description) {
+        recordedFacts.push({
+          type: 'RECORDED_FACT',
+          domain: 'project',
+          statement: `Documented scope: ${String(p.fields.description).slice(0, 160)}.`,
+        })
+      }
+    }
+
+    for (const t of taskRecords) {
+      const status = t.fields?.status || 'todo'
+      const priority = t.fields?.priority || 'medium'
+      const due = t.timestamps?.due_date ? ` (due: ${t.timestamps.due_date})` : ''
+      recordedFacts.push({
+        type: 'RECORDED_FACT',
+        domain: 'task',
+        statement: `Task "${t.title}" is marked ${status} with priority ${priority}${due}.`,
+      })
+    }
+
+    for (const d of decisionRecords.slice(0, 3)) {
+      recordedFacts.push({
+        type: 'RECORDED_FACT',
+        domain: 'decision',
+        statement: `Documented decision "${d.title}": ${String(d.fields?.decision || '').slice(0, 120)}.`,
+      })
+    }
+
+    for (const knf of policy.knownNullFields) {
+      recordedFacts.push({
+        type: 'RECORDED_FACT',
+        statement: `${knf.statement}.`,
+      })
+    }
+
+    for (const la of limitedAbsences) {
+      boundedGaps.push({
+        type: 'BOUNDED_GAP',
+        domain: la.domain,
+        statement: la.claim,
+        boundary: la.claim,
+      })
+    }
+
+    observationalGaps.push({
+      type: 'OBSERVATIONAL_GAP',
+      statement: `Separate documented Vault records from recommended weekly priorities. Recommendations should guide execution without being presented as recorded historical facts.`,
+    })
+    observationalGaps.push({
+      type: 'OBSERVATIONAL_GAP',
+      statement: `What cannot be verified: unrecorded external commitments, calendar events, or offline priorities.`,
+    })
+
+    recommendations.push({
+      type: 'RECOMMENDATION',
+      statement: `Prioritize high-impact pending tasks and address overdue items first before starting new workstreams.`,
+    })
+
+    return { recordedFacts, boundedGaps, observationalGaps, recommendations }
+  }
+
+  // --------------------------------------------------------------------------
+  // Default branch: PLAN_VS_ACTUAL & PROJECT_PROGRESS
+  // --------------------------------------------------------------------------
   for (const r of records) {
     if (r.entityType === 'project') {
       recordedFacts.push({
@@ -571,7 +1140,7 @@ export function buildAnswerContract(
     }
   }
 
-  // 2. Direct counts & null fields
+  // Direct counts & null fields
   if (policy.directFactualCounts.recordedTaskCount !== undefined) {
     const total = policy.directFactualCounts.recordedTaskCount
     const completed = policy.directFactualCounts.completedRecordedTaskCount ?? 0
@@ -609,7 +1178,7 @@ export function buildAnswerContract(
     })
   }
 
-  // 3. Bounded gaps (strictly preserving bounded retrieval scope)
+  // Bounded gaps (strictly preserving bounded retrieval scope)
   for (const la of limitedAbsences) {
     const scopeDesc = la.targetEntityName
       ? `linked to "${la.targetEntityName}" in the records checked`
@@ -622,7 +1191,7 @@ export function buildAnswerContract(
     })
   }
 
-  // 4. Observational gaps
+  // Observational gaps
   if (records.some((r) => r.entityType === 'task')) {
     observationalGaps.push({
       type: 'OBSERVATIONAL_GAP',
@@ -653,7 +1222,7 @@ export function buildAnswerContract(
     }
   }
 
-  // 5. Recommendations
+  // Recommendations
   recommendations.push({
     type: 'RECOMMENDATION',
     statement:
