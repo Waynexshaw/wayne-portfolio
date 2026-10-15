@@ -836,3 +836,257 @@ test('16. Preservation of existing provenance resolution and publication safegua
   assert.strictEqual(resolved.citations[0].title, 'Community structure')
   assert.strictEqual(resolved.citations[0].url, '/vault/projects/p-1')
 })
+
+// ----------------------------------------------------------------------------
+// Test 17: Entity Extraction Normalization and Name Preservation
+// ----------------------------------------------------------------------------
+test('17. Entity extraction: "Community structure project" -> "Community structure", "Community structure" normal, "Project Nightfall" preserved', () => {
+  // A. "Community structure project" resolves to "Community structure"
+  const p1 = 'Based only on my workspace records, analyze the decision gaps for the Community structure project.'
+  const plan1 = planReasoning({ prompt: p1 })
+  assert.strictEqual(plan1?.primaryIntent, 'DECISION_GAP_ANALYSIS')
+  assert.strictEqual(plan1?.entityTarget?.name, 'Community structure', '"Community structure project" must resolve to "Community structure"')
+
+  // B. "Community structure" resolves normally
+  const p2 = 'Based only on my workspace records, analyze the decision gaps for Community structure.'
+  const plan2 = planReasoning({ prompt: p2 })
+  assert.strictEqual(plan2?.entityTarget?.name, 'Community structure', '"Community structure" must resolve normally')
+
+  // C. "Project Nightfall" is preserved (leading "Project" is part of legitimate name)
+  const p3 = 'Give me a progress report on Project Nightfall.'
+  const plan3 = planReasoning({ prompt: p3 })
+  assert.strictEqual(plan3?.entityTarget?.name, 'Project Nightfall', '"Project Nightfall" must preserve leading "Project"')
+
+  // D. Generic initiative classifier stripping
+  const p4 = 'Analyze the decision gaps for the Growth initiative.'
+  const plan4 = planReasoning({ prompt: p4 })
+  assert.strictEqual(plan4?.entityTarget?.name, 'Growth', 'Trailing "initiative" must be stripped from entity name')
+})
+
+// ----------------------------------------------------------------------------
+// Test 18: Targeted Retrieval Normalization and Exact-Title Preference
+// ----------------------------------------------------------------------------
+test('18. Targeted retrieval: "Phoenix Project" retrievable via exact-match, "Community structure project" retrievable via normalization, unknown stays unknown', async () => {
+  const mockProjects = [
+    {
+      id: 'proj-phoenix',
+      title: 'Phoenix Project',
+      slug: 'phoenix-project-123',
+      description: 'The core phoenix project',
+      status: 'active',
+      priority: 'high',
+      created_at: '2026-01-01T00:00:00Z',
+      workspace_id: 'ws-test',
+    },
+    {
+      id: 'proj-comm',
+      title: 'Community structure',
+      slug: 'community-structure-1u7e3',
+      description: 'Map out structure for the community',
+      status: 'active',
+      priority: 'medium',
+      created_at: '2026-01-01T00:00:00Z',
+      workspace_id: 'ws-test',
+    },
+  ]
+
+  const createMockDb = (projects: typeof mockProjects) => ({
+    from: (table: string) => {
+      let currentWs = ''
+      let filterOr = ''
+      const builder: any = {
+        select: () => builder,
+        eq: (col: string, val: string) => {
+          if (col === 'workspace_id') currentWs = val
+          return builder
+        },
+        in: () => builder,
+        or: (str: string) => {
+          filterOr = str
+          return builder
+        },
+        order: () => builder,
+        limit: () => {
+          if (table === 'workspace_projects') {
+            const matches = projects.filter((p) => {
+              if (p.workspace_id !== currentWs) return false
+              const lowerOr = filterOr.toLowerCase()
+              // Parse out or filters
+              return (
+                lowerOr.includes(`title.ilike.%${p.title.toLowerCase()}%`) ||
+                lowerOr.includes(`slug.ilike.%${p.slug.toLowerCase()}%`) ||
+                (p.title.toLowerCase().includes('phoenix project') && lowerOr.includes('phoenix project')) ||
+                (p.title.toLowerCase().includes('community structure') && lowerOr.includes('community structure'))
+              )
+            })
+            return Promise.resolve({ data: matches, error: null, count: matches.length })
+          }
+          if (table === 'tasks') return Promise.resolve({ data: [], error: null })
+          if (table === 'decisions') return Promise.resolve({ data: [], error: null })
+          return Promise.resolve({ data: [], error: null })
+        },
+      }
+      return builder
+    },
+  })
+
+  const service = new VaultRetrievalService(createMockDb(mockProjects), 'ws-test')
+
+  // A. "Phoenix Project" queried directly remains retrievable via exact title match
+  const phoenixRecords: VaultRecord[] = []
+  const phoenixEmpty: any[] = []
+  await (service as any).retrieveProjectContext('Phoenix Project', phoenixRecords, [], phoenixEmpty, [])
+  assert.strictEqual(phoenixRecords.length, 1, '"Phoenix Project" must be retrieved')
+  assert.strictEqual(phoenixRecords[0].title, 'Phoenix Project')
+  assert.strictEqual(phoenixEmpty.length, 0)
+
+  // B. "Community structure project" (with trailing "project") retrieves "Community structure" via defensive normalization
+  const commRecords: VaultRecord[] = []
+  const commEmpty: any[] = []
+  await (service as any).retrieveProjectContext('Community structure project', commRecords, [], commEmpty, [])
+  assert.strictEqual(commRecords.length, 1, '"Community structure project" must defensively normalize and retrieve "Community structure"')
+  assert.strictEqual(commRecords[0].title, 'Community structure')
+  assert.strictEqual(commRecords[0].fields.description, 'Map out structure for the community')
+  assert.strictEqual(commEmpty.length, 0)
+
+  // C. Unknown project remains unknown
+  const unknownRecords: VaultRecord[] = []
+  const unknownEmpty: any[] = []
+  await (service as any).retrieveProjectContext('Unknown Phantom Project', unknownRecords, [], unknownEmpty, [])
+  assert.strictEqual(unknownRecords.length, 0, 'Unknown project must yield 0 records')
+  assert.strictEqual(unknownEmpty.length, 1, 'Unknown project must record empty state')
+  assert.strictEqual(unknownEmpty[0].domain, 'project')
+})
+
+// ----------------------------------------------------------------------------
+// Test 19: Related Tasks, Decisions, and Meetings Use Resolved Project ID
+// ----------------------------------------------------------------------------
+test('19. Related decisions and tasks use the resolved project ID across workspace boundaries', async () => {
+  let tasksFilteredProjectId = ''
+  let decisionsFilteredProjectId = ''
+  let meetingsFilteredProjectId = ''
+  let tasksWorkspace = ''
+
+  const mockDb = {
+    from: (table: string) => {
+      let currentWs = ''
+      const builder: any = {
+        select: () => builder,
+        eq: (col: string, val: string) => {
+          if (col === 'workspace_id') {
+            currentWs = val
+            tasksWorkspace = val
+          }
+          if (table === 'tasks' && col === 'project_id') tasksFilteredProjectId = val
+          return builder
+        },
+        in: () => builder,
+        or: (str: string) => {
+          if (table === 'decisions') {
+            const m = str.match(/project_id\.eq\.([a-zA-Z0-9_\-]+)/)
+            if (m) decisionsFilteredProjectId = m[1]
+          }
+          if (table === 'meetings') {
+            const m = str.match(/project_id\.eq\.([a-zA-Z0-9_\-]+)/)
+            if (m) meetingsFilteredProjectId = m[1]
+          }
+          return builder
+        },
+        order: () => builder,
+        limit: () => {
+          if (table === 'workspace_projects') {
+            return Promise.resolve({
+              data: [
+                {
+                  id: 'proj-comm-uuid',
+                  title: 'Community structure',
+                  slug: 'community-structure-1u7e3',
+                  workspace_id: currentWs,
+                },
+              ],
+              error: null,
+            })
+          }
+          return Promise.resolve({ data: [], error: null })
+        },
+      }
+      return builder
+    },
+  }
+
+  const service = new VaultRetrievalService(mockDb, 'ws-pevra-target')
+
+  // Query tasks with "Community structure project"
+  await (service as any).retrieveTasks({ entityQuery: 'Community structure project' }, [], [], [])
+  assert.strictEqual(tasksFilteredProjectId, 'proj-comm-uuid', 'Tasks query must be scoped to resolved project ID')
+  assert.strictEqual(tasksWorkspace, 'ws-pevra-target', 'Tasks query must be strictly scoped to current workspace')
+
+  // Query decisions with "Community structure project"
+  await (service as any).retrieveDecisions('Community structure project', [], [], [])
+  assert.strictEqual(decisionsFilteredProjectId, 'proj-comm-uuid', 'Decisions query must filter by resolved project ID')
+
+  // Query meetings with "Community structure project"
+  await (service as any).retrieveMeetings({ entityQuery: 'Community structure project' }, [], [], [])
+  assert.strictEqual(meetingsFilteredProjectId, 'proj-comm-uuid', 'Meetings query must filter by resolved project ID')
+})
+
+// ----------------------------------------------------------------------------
+// Test 20: Original Production Prompt Retrieves Community Structure Description
+// ----------------------------------------------------------------------------
+test('20. Original production prompt retrieves Community structure description', async () => {
+  const prodPrompt =
+    'Based only on the records in my current workspace, analyze the documented decisions, open questions, and possible decision gaps for the Community structure project. Clearly distinguish recorded facts from possible gaps and things you cannot verify.'
+
+  const plan = planReasoning({ prompt: prodPrompt })
+  assert(plan !== null)
+  assert.strictEqual(plan.primaryIntent, 'DECISION_GAP_ANALYSIS')
+  assert.strictEqual(plan.entityTarget?.name, 'Community structure')
+
+  const mockDb = {
+    from: (table: string) => {
+      const builder: any = {
+        select: () => builder,
+        eq: () => builder,
+        or: () => builder,
+        in: () => builder,
+        order: () => builder,
+        limit: () => {
+          if (table === 'workspace_projects') {
+            return Promise.resolve({
+              data: [
+                {
+                  id: '716bf0e1-acbc-449d-8fe2-98a8c21aefc5',
+                  workspace_id: 'e1356dae-9ca7-4d41-980d-f74cc53de833',
+                  title: 'Community structure',
+                  slug: 'community-structure-1u7e3',
+                  status: 'active',
+                  priority: 'medium',
+                  description: 'Map out structure for the community',
+                  created_at: '2026-09-13T15:26:31.34415+00:00',
+                  updated_at: '2026-09-13T15:26:31.34415+00:00',
+                },
+              ],
+              error: null,
+              count: 1,
+            })
+          }
+          if (table === 'decisions') return Promise.resolve({ data: [], error: null })
+          if (table === 'tasks') return Promise.resolve({ data: [], error: null })
+          if (table === 'meetings') return Promise.resolve({ data: [], error: null })
+          if (table === 'interactions') return Promise.resolve({ data: [], error: null })
+          return Promise.resolve({ data: [], error: null })
+        },
+      }
+      return builder
+    },
+  }
+
+  const service = new VaultRetrievalService(mockDb, 'e1356dae-9ca7-4d41-980d-f74cc53de833')
+  const execution = await service.executeReasoningPlan(plan)
+
+  const projOutcome = execution.domainOutcomes.find((o) => o.domain === 'project')
+  assert.strictEqual(projOutcome?.status, 'AVAILABLE', 'Project domain must be AVAILABLE, not empty')
+  assert.strictEqual(projOutcome?.records.length, 1)
+  assert.strictEqual(projOutcome?.records[0].title, 'Community structure')
+  assert.strictEqual(projOutcome?.records[0].fields.description, 'Map out structure for the community')
+})
